@@ -1,0 +1,82 @@
+name: lacak_saji
+description: "LacakSaji: Paspor Rantai Waktu-Suhu Kriptografis dan Audit Organoleptik Edge-AI untuk Keamanan Pangan Makan Bergizi Gratis."
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.14.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+  material_ui: ^1.1.0
+
+  # Routing & State Management
+  go_router: ^18.1.4
+  flutter_riverpod: ^3.5.0
+  riverpod_annotation: ^4.0.8
+
+  # Local Offline-First Database & Sync
+  drift: ^2.35.4
+  sqlite3_flutter_libs: ^0.5.42
+  path_provider: ^2.1.5
+  path: ^1.9.1
+  workmanager: ^0.10.10
+  connectivity_plus: ^7.3.1
+
+  # Preferences, Secure Storage & Env
+  shared_preferences: ^2.5.3
+  flutter_secure_storage: ^11.2.0
+  flutter_dotenv: ^6.0.2
+
+  # Backend, Realtime & Emergency Push
+  supabase_flutter: ^2.18.3
+  firebase_core: ^5.2.0
+  firebase_messaging: ^17.1.0
+
+  # Cryptography & QR
+  cryptography: ^2.9.0
+  qr_flutter: ^4.1.0
+  mobile_scanner: ^7.5.0
+
+  # On-Device Edge AI & Image Processing
+  tflite_flutter: ^0.12.1
+  image: ^4.13.1
+
+  # Camera & Media Compression
+  camera: ^0.12.2
+  image_picker: ^1.2.4
+  flutter_image_compress: ^2.5.1
+  screenshot: ^3.0.0
+
+  # Weather & Location
+  dio: ^5.11.1
+  geolocator: ^14.1.2
+
+  # Local Notifications, PDF & Sharing
+  flutter_local_notifications: ^23.0.3
+  timezone: ^0.11.2
+  pdf: ^3.13.1
+  share_plus: ^13.3.1
+  url_launcher: ^6.3.3
+
+  # Typography & Utilities
+  google_fonts: ^9.0.0
+  intl: ^0.20.2
+  uuid: ^4.6.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+  build_runner: ^2.17.1
+  drift_dev: ^2.35.3
+  riverpod_generator: ^4.0.10
+
+flutter:
+  uses-material-design: true
+  assets:
+    - .env
+    - assets/models/food_freshness_int8.tflite
