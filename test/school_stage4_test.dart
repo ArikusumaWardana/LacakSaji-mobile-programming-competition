@@ -358,6 +358,7 @@ class _InMemoryStage4SchoolRepository implements SchoolRepository {
 
   final List<SchoolInspectionItem> _inspections = [];
   final List<SampleVaultItem> _vaults = [];
+  final List<SchoolBatchOption> extraWasteBatches = [];
   final StreamController<void> _vaultChangeCtrl =
       StreamController<void>.broadcast();
 
@@ -569,16 +570,17 @@ class _InMemoryStage4SchoolRepository implements SchoolRepository {
     required SchoolProfile school,
     required bool isOffline,
   }) async {
-    return _inspections
-        .map(
-          (i) => SchoolBatchOption(
-            batchId: i.batchId,
-            batchCode: i.batchCode,
-            menuName: i.menuName,
-            sealedAtUtc: i.scannedAtUtc,
-          ),
-        )
-        .toList(growable: false);
+    return [
+      ..._inspections.map(
+        (i) => SchoolBatchOption(
+          batchId: i.batchId,
+          batchCode: i.batchCode,
+          menuName: i.menuName,
+          sealedAtUtc: i.scannedAtUtc,
+        ),
+      ),
+      ...extraWasteBatches,
+    ];
   }
 
   @override
@@ -1176,6 +1178,89 @@ void main() {
 
         await tester.tap(find.text('Sisa Makan'));
         await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull);
+
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      },
+    );
+
+    testWidgets(
+      'G07 batch picker opens scrollable popup on 320dp Ekstra Besar viewport and updates selected batch',
+      (tester) async {
+        final nowUtc = DateTime.now().toUtc();
+        final fixtures = await _prepareSignedQrFixtures(nowUtc);
+        final ctx = await pumpSchoolApp(
+          tester,
+          weather: BmkgWeatherReading(
+            adm4Code: _demoSchool.adm4Code,
+            temperatureC: 31.0,
+            source: BmkgSource.fallbackOffline,
+            observedAtUtc: nowUtc,
+          ),
+          validQrJson: fixtures.validQrJson,
+          fakeQrJson: fixtures.fakeQrJson,
+          publicKeyB64: fixtures.publicKeyB64,
+          screenSize: const Size(320, 700),
+        );
+
+        ctx.repo.extraWasteBatches.addAll(
+          List.generate(
+            10,
+            (i) => SchoolBatchOption(
+              batchId: 'batch-pick-$i',
+              batchCode: 'BCH-2611-P${i.toString().padLeft(2, '0')}',
+              menuName: i == 0
+                  ? 'Nasi Ayam Panggang Kecap & Tumis Kangkung'
+                  : 'Menu Pilihan Panjang Nomor ${i + 1} Dengan Sayur Segar',
+              sealedAtUtc: nowUtc.subtract(Duration(hours: i * 4)),
+            ),
+          ),
+        );
+
+        await tester.tap(find.text('Profil'));
+        await tester.pumpAndSettle();
+        await tester.ensureVisible(find.text('Ekstra Besar'));
+        await tester.tap(find.text('Ekstra Besar'));
+        await tester.pumpAndSettle();
+
+        await tester.tap(find.text('Sisa Makan'));
+        await tester.pumpAndSettle();
+        expect(
+          find.text('Nasi Ayam Panggang Kecap & Tumis Kangkung'),
+          findsOneWidget,
+        );
+        expect(tester.takeException(), isNull);
+
+        // Open scrollable batch picker popup.
+        await tester.tap(
+          find.text('Nasi Ayam Panggang Kecap & Tumis Kangkung'),
+        );
+        await tester.pumpAndSettle();
+
+        expect(find.text('Pilih Batch Makanan'), findsOneWidget);
+        expect(
+          find.text('10 batch tersedia. Gulir untuk memilih.'),
+          findsOneWidget,
+        );
+        expect(tester.takeException(), isNull);
+
+        // Scroll inside the popup to the 10th item and select it.
+        final targetText = find.text(
+          'Menu Pilihan Panjang Nomor 10 Dengan Sayur Segar',
+        );
+        await tester.scrollUntilVisible(
+          targetText,
+          200,
+          scrollable: find.byType(Scrollable).last,
+        );
+        await tester.pumpAndSettle();
+        await tester.tap(targetText);
+        await tester.pumpAndSettle();
+
+        // Popup closes and screen reflects newly chosen batch.
+        expect(find.text('Pilih Batch Makanan'), findsNothing);
+        expect(targetText, findsOneWidget);
         expect(tester.takeException(), isNull);
 
         tester.view.resetPhysicalSize();

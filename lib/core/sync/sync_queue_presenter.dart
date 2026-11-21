@@ -113,10 +113,14 @@ String formatFriendlySyncError(String? rawError) {
       lower.contains('invalid_grant')) {
     return 'Hak akses atau sesi akun tidak cocok dengan data ini. Coba keluar lalu masuk ulang.';
   }
+  if (lower.contains('sample_vaults_inspection_id_fkey') ||
+      (lower.contains('23503') && lower.contains('inspection_id'))) {
+    return 'Data pemeriksaan makanan untuk sampel ini belum tersimpan di server. Kirim ulang pemeriksaan atau hapus data antrean lama.';
+  }
   if (lower.contains('23503') ||
       lower.contains('foreign key') ||
       lower.contains('not present in table')) {
-    return 'Data batch rujukan belum tercatat di server.';
+    return 'Data rujukan untuk catatan ini belum tercatat di server.';
   }
   if (lower.contains('23505') || lower.contains('duplicate')) {
     return 'Data ini sudah tercatat sebelumnya di server.';

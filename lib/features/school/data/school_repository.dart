@@ -523,13 +523,10 @@ class SupabaseSchoolRepository implements SchoolRepository {
             );
       }
 
-      await client.from('school_inspections').upsert(
-        dbMap,
-        onConflict: 'batch_id,school_id',
-      );
+      final persistedId = await _saveInspectionRemote(client, dbMap);
 
       return SchoolInspectionItem(
-        id: item.id,
+        id: persistedId,
         batchId: item.batchId,
         batchCode: item.batchCode,
         menuName: item.menuName,
@@ -572,6 +569,63 @@ class SupabaseSchoolRepository implements SchoolRepository {
         localPhotoPath: samplePhoto?.filePath,
       );
       return item;
+    }
+  }
+
+  /// Inserts a new inspection first so fresh rows only require Postgres INSERT
+  /// privileges, then updates or fetches the existing row ID on unique conflict.
+  Future<String> _saveInspectionRemote(
+    SupabaseClient client,
+    Map<String, dynamic> dbMap,
+  ) async {
+    final fallbackId = dbMap['id'] as String;
+    try {
+      final inserted = await client
+          .from('school_inspections')
+          .insert(dbMap)
+          .select('id')
+          .maybeSingle();
+      return (inserted?['id'] as String?) ?? fallbackId;
+    } on PostgrestException catch (pgError) {
+      if (pgError.code != '23505') {
+        rethrow;
+      }
+
+      final batchId = dbMap['batch_id'] as String?;
+      final schoolId = dbMap['school_id'] as String?;
+      if (batchId == null || schoolId == null) {
+        return fallbackId;
+      }
+
+      final updatePayload = Map<String, dynamic>.from(dbMap)
+        ..remove('id')
+        ..remove('batch_id')
+        ..remove('school_id');
+
+      try {
+        final updated = await client
+            .from('school_inspections')
+            .update(updatePayload)
+            .eq('batch_id', batchId)
+            .eq('school_id', schoolId)
+            .select('id')
+            .maybeSingle();
+        if (updated?['id'] is String) {
+          return updated!['id'] as String;
+        }
+      } on PostgrestException catch (updateError) {
+        if (updateError.code != '42501') {
+          rethrow;
+        }
+      }
+
+      final existing = await client
+          .from('school_inspections')
+          .select('id')
+          .eq('batch_id', batchId)
+          .eq('school_id', schoolId)
+          .maybeSingle();
+      return (existing?['id'] as String?) ?? fallbackId;
     }
   }
 
@@ -900,6 +954,7 @@ class SupabaseSchoolRepository implements SchoolRepository {
 
     final pendingItems = await _database.getPendingSyncItems();
     var syncedCount = 0;
+    final remappedInspectionIds = <String, String>{};
 
     for (final row in pendingItems) {
       if (row.operationType != 'create_inspection' &&
@@ -910,7 +965,6 @@ class SupabaseSchoolRepository implements SchoolRepository {
       }
 
       try {
-        await _database.updateSyncItemStatus(id: row.id, status: 'syncing');
         final map = Map<String, dynamic>.from(
           jsonDecode(row.payloadJson) as Map,
         );
@@ -918,10 +972,16 @@ class SupabaseSchoolRepository implements SchoolRepository {
             .whereType<String>()
             .toList(growable: false);
 
+        if ((row.operationType == 'create_inspection' ||
+                row.operationType == 'create_sample' ||
+                row.operationType == 'create_waste_log') &&
+            map['school_id'] != school.id) {
+          continue;
+        }
+
+        await _database.updateSyncItemStatus(id: row.id, status: 'syncing');
+
         if (row.operationType == 'create_inspection') {
-          if (map['school_id'] != school.id) {
-            continue;
-          }
           final storagePath = map['sample_photo_url'] as String?;
           if (storagePath != null && localPaths.isNotEmpty) {
             final file = File(localPaths.first);
@@ -938,13 +998,16 @@ class SupabaseSchoolRepository implements SchoolRepository {
           }
           map.remove('batch_code');
           map.remove('menu_name');
-          await client.from('school_inspections').upsert(
-            map,
-            onConflict: 'batch_id,school_id',
-          );
+          final localInspectionId = map['id'] as String?;
+          final persistedId = await _saveInspectionRemote(client, map);
+          if (localInspectionId != null && persistedId != localInspectionId) {
+            remappedInspectionIds[localInspectionId] = persistedId;
+          }
         } else if (row.operationType == 'create_sample') {
-          if (map['school_id'] != school.id) {
-            continue;
+          final originalInspectionId = map['inspection_id'] as String?;
+          if (originalInspectionId != null &&
+              remappedInspectionIds.containsKey(originalInspectionId)) {
+            map['inspection_id'] = remappedInspectionIds[originalInspectionId];
           }
           try {
             await client.from('sample_vaults').insert(map);
@@ -969,9 +1032,6 @@ class SupabaseSchoolRepository implements SchoolRepository {
             isSynced: true,
           );
         } else if (row.operationType == 'create_waste_log') {
-          if (map['school_id'] != school.id) {
-            continue;
-          }
           final remotePaths = (map['photo_urls'] as List? ?? const [])
               .whereType<String>()
               .toList(growable: false);

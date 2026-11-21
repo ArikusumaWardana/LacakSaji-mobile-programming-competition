@@ -107,6 +107,17 @@ class AppDatabase extends _$AppDatabase {
     return (delete(localSyncQueue)..where((t) => t.id.isIn(ids))).go();
   }
 
+  /// Recovers queue rows left stuck in `syncing` if app closed or skipped mid-sync.
+  Future<int> recoverStuckSyncingItems() {
+    return (update(localSyncQueue)..where((t) => t.status.equals('syncing')))
+        .write(
+          LocalSyncQueueCompanion(
+            status: const Value('pending'),
+            updatedAt: Value(DateTime.now().toUtc()),
+          ),
+        );
+  }
+
   Future<int> updateSyncItemStatus({
     required int id,
     required String status,

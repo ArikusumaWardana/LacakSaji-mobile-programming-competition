@@ -789,6 +789,7 @@ class SupabaseKitchenRepository implements KitchenRepository {
       return 0;
     }
 
+    await _database.recoverStuckSyncingItems();
     final pendingRows = await _database.getPendingSyncItems();
     final batchRows = pendingRows
         .where((row) => row.operationType == 'create_batch')

@@ -103,6 +103,9 @@ class _FakeQueueDatabase extends Fake implements AppDatabase {
   }
 
   @override
+  Future<int> recoverStuckSyncingItems() async => 0;
+
+  @override
   Future<void> close() async {
     await _itemsCtrl.close();
   }
@@ -191,8 +194,14 @@ void main() {
         contains('Hak akses atau sesi akun'),
       );
       expect(
+        formatFriendlySyncError(
+          'PostgrestException(message: insert or update on table "sample_vaults" violates foreign key constraint "sample_vaults_inspection_id_fkey", code: 23503)',
+        ),
+        contains('Data pemeriksaan makanan untuk sampel ini belum tersimpan'),
+      );
+      expect(
         formatFriendlySyncError('foreign key constraint 23503'),
-        contains('batch rujukan belum tercatat'),
+        contains('Data rujukan untuk catatan ini belum tercatat'),
       );
 
       final db = AppDatabase(NativeDatabase.memory());
@@ -253,6 +262,23 @@ void main() {
       expect(await db.getPendingSyncItems(), hasLength(1));
       expect(await db.deleteSyncItemsByIds([id2]), 1);
       expect(await db.getPendingSyncItems(), isEmpty);
+
+      final stuckId = await db.enqueueSyncItem(
+        LocalSyncQueueCompanion.insert(
+          operationType: 'create_inspection',
+          entityId: 'insp-stuck',
+          payloadJson: jsonEncode({'id': 'insp-stuck', 'school_id': 'school-a'}),
+          status: const Value('syncing'),
+          createdAt: now,
+          updatedAt: now,
+        ),
+      );
+      expect(await db.getPendingSyncItems(), isEmpty);
+      expect(await db.recoverStuckSyncingItems(), 1);
+      final recovered = await db.getPendingSyncItems();
+      expect(recovered, hasLength(1));
+      expect(recovered.first.id, stuckId);
+      expect(recovered.first.status, 'pending');
     },
   );
 

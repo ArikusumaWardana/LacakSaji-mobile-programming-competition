@@ -11,6 +11,7 @@ import '../../../core/widgets/lacak_feedback_states.dart';
 import '../../../core/widgets/lacak_section_surface.dart';
 import '../../../core/widgets/lacak_status_badge.dart';
 import '../../auth/presentation/auth_controller.dart';
+import '../../kitchen/domain/kitchen_models.dart';
 import '../data/hybrid_vision_service.dart';
 import '../domain/school_models.dart';
 import 'school_providers.dart';
@@ -47,6 +48,23 @@ class _PlateWasteScreenState extends ConsumerState<PlateWasteScreen> {
   int? _proteinWastePct;
   int? _vegWastePct;
   String? _validationError;
+
+  Future<void> _openBatchPicker({
+    required List<SchoolBatchOption> batches,
+    required String activeBatchId,
+  }) async {
+    final chosen = await showDialog<SchoolBatchOption>(
+      context: context,
+      builder: (_) => _BatchPickerDialog(
+        batches: batches,
+        selectedBatchId: activeBatchId,
+        nowUtc: DateTime.now().toUtc(),
+      ),
+    );
+    if (chosen != null && mounted && chosen.batchId != _selectedBatchId) {
+      setState(() => _selectedBatchId = chosen.batchId);
+    }
+  }
 
   Future<void> _addOmprengPhoto(List<SchoolBatchOption> batches) async {
     if (_capturing || _submitting || _photos.length >= 5) {
@@ -306,11 +324,11 @@ class _PlateWasteScreenState extends ConsumerState<PlateWasteScreen> {
                     );
                   }
 
-                  final activeBatchId = batches.any(
+                  final activeBatch = batches.firstWhere(
                     (b) => b.batchId == _selectedBatchId,
-                  )
-                      ? _selectedBatchId!
-                      : batches.first.batchId;
+                    orElse: () => batches.first,
+                  );
+                  final activeBatchId = activeBatch.batchId;
 
                   return Column(
                     children: [
@@ -333,31 +351,13 @@ class _PlateWasteScreenState extends ConsumerState<PlateWasteScreen> {
                                     style: AppTypography.titleSection,
                                   ),
                                   const SizedBox(height: AppSpacing.sm),
-                                  DropdownButtonFormField<String>(
-                                    initialValue: activeBatchId,
-                                    isExpanded: true,
-                                    decoration: const InputDecoration(),
-                                    items: batches
-                                        .map(
-                                          (b) => DropdownMenuItem(
-                                            value: b.batchId,
-                                            child: Text(
-                                              b.displayLabel,
-                                              overflow: TextOverflow.ellipsis,
-                                              style: AppTypography.tabular(
-                                                AppTypography.bodyLarge,
-                                              ),
-                                            ),
-                                          ),
-                                        )
-                                        .toList(growable: false),
-                                    onChanged: (value) {
-                                      if (value != null) {
-                                        setState(
-                                          () => _selectedBatchId = value,
-                                        );
-                                      }
-                                    },
+                                  _BatchPickerTrigger(
+                                    batch: activeBatch,
+                                    nowUtc: DateTime.now().toUtc(),
+                                    onTap: () => _openBatchPicker(
+                                      batches: batches,
+                                      activeBatchId: activeBatchId,
+                                    ),
                                   ),
                                   const SizedBox(height: AppSpacing.xl),
                                   Wrap(
@@ -911,6 +911,287 @@ class _EstimatedComponentStat extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+String _formatBatchTimestamp(DateTime sealedAtUtc, DateTime nowUtc) {
+  if (isSameWibCalendarDay(sealedAtUtc, nowUtc)) {
+    return 'Hari ini, ${formatWibTime(sealedAtUtc)}';
+  }
+  return formatWibDateTime(sealedAtUtc);
+}
+
+class _BatchPickerTrigger extends StatelessWidget {
+  const _BatchPickerTrigger({
+    required this.batch,
+    required this.nowUtc,
+    required this.onTap,
+  });
+
+  final SchoolBatchOption batch;
+  final DateTime nowUtc;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      label: 'Pilih batch makanan, terpilih ${batch.menuName}',
+      child: Material(
+        color: AppColors.surfaceBase,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppSpacing.radiusControl),
+          side: const BorderSide(color: AppColors.borderHairline, width: 1),
+        ),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(AppSpacing.radiusControl),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(
+              minHeight: AppSpacing.primaryButtonMinHeight,
+            ),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.lg,
+                vertical: AppSpacing.md,
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          batch.menuName,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: AppTypography.titleItem.copyWith(
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          '${batch.batchCode} · ${_formatBatchTimestamp(batch.sealedAtUtc, nowUtc)}',
+                          style: AppTypography.tabular(
+                            AppTypography.bodyMedium.copyWith(
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.sm),
+                  const Icon(
+                    Icons.unfold_more_rounded,
+                    size: 22,
+                    color: AppColors.textSecondary,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _BatchPickerDialog extends StatefulWidget {
+  const _BatchPickerDialog({
+    required this.batches,
+    required this.selectedBatchId,
+    required this.nowUtc,
+  });
+
+  final List<SchoolBatchOption> batches;
+  final String selectedBatchId;
+  final DateTime nowUtc;
+
+  @override
+  State<_BatchPickerDialog> createState() => _BatchPickerDialogState();
+}
+
+class _BatchPickerDialogState extends State<_BatchPickerDialog> {
+  final ScrollController _scrollController = ScrollController();
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final maxDialogHeight = MediaQuery.sizeOf(context).height * 0.72;
+
+    return Dialog(
+      backgroundColor: AppColors.bgCanvas,
+      elevation: 0,
+      insetPadding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.lg,
+        vertical: AppSpacing.xl,
+      ),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppSpacing.radiusSurface),
+        side: const BorderSide(color: AppColors.borderHairline, width: 1),
+      ),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxWidth: AppSpacing.tabletFormMaxWidth,
+          maxHeight: maxDialogHeight,
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(AppSpacing.lg),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Pilih Batch Makanan',
+                          style: AppTypography.titleSection,
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          '${widget.batches.length} batch tersedia. Gulir untuk memilih.',
+                          style: AppTypography.bodyMedium,
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    tooltip: 'Tutup',
+                    constraints: const BoxConstraints(
+                      minWidth: AppSpacing.minTouchTarget,
+                      minHeight: AppSpacing.minTouchTarget,
+                    ),
+                    icon: const Icon(Icons.close_rounded),
+                  ),
+                ],
+              ),
+              const SizedBox(height: AppSpacing.md),
+              Flexible(
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: AppColors.surfaceBase,
+                    borderRadius: BorderRadius.circular(
+                      AppSpacing.radiusSurface,
+                    ),
+                    border: Border.all(
+                      color: AppColors.borderHairline,
+                      width: 1,
+                    ),
+                  ),
+                  clipBehavior: Clip.antiAlias,
+                  child: Scrollbar(
+                    controller: _scrollController,
+                    thumbVisibility: true,
+                    child: ListView.separated(
+                      controller: _scrollController,
+                      shrinkWrap: true,
+                      itemCount: widget.batches.length,
+                      separatorBuilder: (_, _) => const Divider(height: 1),
+                      itemBuilder: (context, index) {
+                        final batch = widget.batches[index];
+                        final isSelected =
+                            batch.batchId == widget.selectedBatchId;
+                        return Material(
+                          color: isSelected
+                              ? AppColors.primaryTint
+                              : AppColors.surfaceBase,
+                          child: InkWell(
+                            onTap: () => Navigator.of(context).pop(batch),
+                            child: Semantics(
+                              button: true,
+                              selected: isSelected,
+                              child: ConstrainedBox(
+                                constraints: const BoxConstraints(
+                                  minHeight: AppSpacing.selectionRowMinHeight,
+                                ),
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: AppSpacing.lg,
+                                    vertical: AppSpacing.md,
+                                  ),
+                                  child: Row(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.center,
+                                    children: [
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              batch.menuName,
+                                              style: AppTypography.titleItem
+                                                  .copyWith(
+                                                    color: isSelected
+                                                        ? AppColors
+                                                              .onPrimaryTint
+                                                        : AppColors.textPrimary,
+                                                    fontWeight: isSelected
+                                                        ? FontWeight.w700
+                                                        : FontWeight.w600,
+                                                  ),
+                                            ),
+                                            const SizedBox(height: 2),
+                                            Text(
+                                              '${batch.batchCode} · ${_formatBatchTimestamp(batch.sealedAtUtc, widget.nowUtc)}',
+                                              style: AppTypography.tabular(
+                                                AppTypography.bodyMedium
+                                                    .copyWith(
+                                                      color: isSelected
+                                                          ? AppColors
+                                                                .onPrimaryTint
+                                                          : AppColors
+                                                                .textSecondary,
+                                                    ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      if (isSelected) ...[
+                                        const SizedBox(width: AppSpacing.sm),
+                                        const Icon(
+                                          Icons.check_circle_rounded,
+                                          size: 22,
+                                          color: AppColors.primary,
+                                        ),
+                                      ],
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: AppSpacing.md),
+              LacakSecondaryButton(
+                label: 'Tutup',
+                onPressed: () => Navigator.of(context).pop(),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

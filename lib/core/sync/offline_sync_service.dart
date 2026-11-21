@@ -26,9 +26,11 @@ Future<SyncQueueExecutionResult> replayDriftSyncQueue({
   String? schoolId,
   Set<String>? operationTypes,
 }) async {
+  await database.recoverStuckSyncingItems();
   final pendingRows = await database.getPendingSyncItems();
   var syncedCount = 0;
   var failedCount = 0;
+  final remappedInspectionIds = <String, String>{};
 
   for (final row in pendingRows) {
     if (operationTypes != null && !operationTypes.contains(row.operationType)) {
@@ -53,6 +55,7 @@ Future<SyncQueueExecutionResult> replayDriftSyncQueue({
         localPaths: localPaths,
         kitchenId: kitchenId,
         schoolId: schoolId,
+        remappedInspectionIds: remappedInspectionIds,
       );
       if (!handled) {
         continue;
@@ -79,6 +82,61 @@ Future<SyncQueueExecutionResult> replayDriftSyncQueue({
   );
 }
 
+Future<String> _saveInspectionRemoteForSync(
+  SupabaseClient client,
+  Map<String, dynamic> dbMap,
+) async {
+  final fallbackId = dbMap['id'] as String;
+  try {
+    final inserted = await client
+        .from('school_inspections')
+        .insert(dbMap)
+        .select('id')
+        .maybeSingle();
+    return (inserted?['id'] as String?) ?? fallbackId;
+  } on PostgrestException catch (pgError) {
+    if (pgError.code != '23505') {
+      rethrow;
+    }
+
+    final batchId = dbMap['batch_id'] as String?;
+    final schoolId = dbMap['school_id'] as String?;
+    if (batchId == null || schoolId == null) {
+      return fallbackId;
+    }
+
+    final updatePayload = Map<String, dynamic>.from(dbMap)
+      ..remove('id')
+      ..remove('batch_id')
+      ..remove('school_id');
+
+    try {
+      final updated = await client
+          .from('school_inspections')
+          .update(updatePayload)
+          .eq('batch_id', batchId)
+          .eq('school_id', schoolId)
+          .select('id')
+          .maybeSingle();
+      if (updated?['id'] is String) {
+        return updated!['id'] as String;
+      }
+    } on PostgrestException catch (updateError) {
+      if (updateError.code != '42501') {
+        rethrow;
+      }
+    }
+
+    final existing = await client
+        .from('school_inspections')
+        .select('id')
+        .eq('batch_id', batchId)
+        .eq('school_id', schoolId)
+        .maybeSingle();
+    return (existing?['id'] as String?) ?? fallbackId;
+  }
+}
+
 Future<bool> _processSyncRow({
   required AppDatabase database,
   required SupabaseClient client,
@@ -87,6 +145,7 @@ Future<bool> _processSyncRow({
   required List<String> localPaths,
   required String? kitchenId,
   required String? schoolId,
+  required Map<String, String> remappedInspectionIds,
 }) async {
   switch (row.operationType) {
     case 'create_batch':
@@ -127,9 +186,11 @@ Future<bool> _processSyncRow({
       }
       map.remove('batch_code');
       map.remove('menu_name');
-      await client
-          .from('school_inspections')
-          .upsert(map, onConflict: 'batch_id,school_id');
+      final localInspectionId = map['id'] as String?;
+      final persistedId = await _saveInspectionRemoteForSync(client, map);
+      if (localInspectionId != null && persistedId != localInspectionId) {
+        remappedInspectionIds[localInspectionId] = persistedId;
+      }
       return true;
 
     case 'create_sample':
@@ -137,6 +198,11 @@ Future<bool> _processSyncRow({
         return false;
       }
       await database.updateSyncItemStatus(id: row.id, status: 'syncing');
+      final originalInspectionId = map['inspection_id'] as String?;
+      if (originalInspectionId != null &&
+          remappedInspectionIds.containsKey(originalInspectionId)) {
+        map['inspection_id'] = remappedInspectionIds[originalInspectionId];
+      }
       try {
         await client.from('sample_vaults').insert(map);
       } on PostgrestException catch (pgError) {
