@@ -1,6 +1,6 @@
 import 'dart:io';
-import 'dart:typed_data';
 
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image/image.dart' as img;
 import 'package:path/path.dart' as p;
@@ -34,6 +34,12 @@ abstract class KlbReportPdfService {
     Uint8List? photoBytesOverride,
   });
 
+  Future<String> sharePdfToOtherApps({
+    required PuskesmasDraftArgs args,
+    required SchoolProfile school,
+    Uint8List? photoBytesOverride,
+  });
+
   Future<bool> openDirectWhatsAppChat({
     required String puskesmasWa,
     required String summaryText,
@@ -41,6 +47,10 @@ abstract class KlbReportPdfService {
 }
 
 class DeviceKlbReportPdfService implements KlbReportPdfService {
+  static const MethodChannel _whatsAppChannel = MethodChannel(
+    'com.example.lacak_saji/whatsapp',
+  );
+
   @override
   String buildWhatsAppSummaryText({
     required PuskesmasDraftArgs args,
@@ -55,28 +65,37 @@ class DeviceKlbReportPdfService implements KlbReportPdfService {
         : 'Belum tersimpan (batch dihentikan sebelum Bank Sampel)';
 
     final buffer = StringBuffer()
-      ..writeln('BERITA ACARA & LAPORAN DINI KLB LACAKSAJI')
-      ..writeln('Sekolah: ${school.name} (NPSN ${school.npsn})')
-      ..writeln('Dapur SPPG: ${args.sppgName}')
-      ..writeln('Menu & Kode Batch: ${args.menuName} (${args.batchCode})')
-      ..writeln('Tahap Laporan: $stageLine')
-      ..writeln('Kronologi Jam Segel Dapur: ${formatWibDateTime(args.sealedAtUtc)}')
-      ..writeln('Jam Terima Sekolah: ${formatWibDateTime(args.scannedAtUtc)}')
+      ..writeln('*BERITA ACARA & LAPORAN DINI KLB LACAKSAJI*')
+      ..writeln()
+      ..writeln('*Identitas Pelapor & Batch*')
+      ..writeln('- Sekolah: ${school.name} (NPSN ${school.npsn})')
+      ..writeln('- Dapur SPPG: ${args.sppgName}')
+      ..writeln('- Menu: ${args.menuName}')
+      ..writeln('- Kode Batch: *${args.batchCode}*')
+      ..writeln('- Tahap Laporan: *$stageLine*')
+      ..writeln()
+      ..writeln('*Kronologi Waktu & Suhu*')
+      ..writeln('- Jam Segel Dapur: ${formatWibDateTime(args.sealedAtUtc)}')
+      ..writeln('- Jam Terima Sekolah: ${formatWibDateTime(args.scannedAtUtc)}')
       ..writeln(
-        'Durasi Distribusi: ${formatDurationMinutes(args.elapsedMinutes)}',
+        '- Durasi Distribusi: ${formatDurationMinutes(args.elapsedMinutes)}',
       )
       ..writeln(
-        'Suhu Wilayah: ${args.bmkgTempC.toStringAsFixed(1)} C (${args.bmkgSource.label}, ${AppConstants.bmkgShortAttribution})',
+        '- Suhu Wilayah: ${args.bmkgTempC.toStringAsFixed(1)} C (${args.bmkgSource.label}, ${AppConstants.bmkgShortAttribution})',
       )
-      ..writeln('Kode Label Bank Sampel 2x24 Jam: $sampleLine')
-      ..writeln('Ringkasan Temuan: ${args.reasonSummary}');
+      ..writeln()
+      ..writeln('*Bank Sampel & Temuan*')
+      ..writeln('- Kode Bank Sampel 2x24 Jam: *$sampleLine*')
+      ..writeln('- Ringkasan Temuan: ${args.reasonSummary}');
 
     if (args.notes != null && args.notes!.trim().isNotEmpty) {
-      buffer.writeln('Catatan Lapangan: ${args.notes!.trim()}');
+      buffer.writeln('- Catatan Lapangan: ${args.notes!.trim()}');
     }
-    buffer.write(
-      'Dikirim otomatis dari aplikasi LacakSaji untuk tindak lanjut Puskesmas.',
-    );
+    buffer
+      ..writeln()
+      ..write(
+        '_Dikirim otomatis dari aplikasi LacakSaji untuk tindak lanjut Puskesmas._',
+      );
 
     return sanitizeZeroSlopCopy(buffer.toString());
   }
@@ -175,7 +194,7 @@ class DeviceKlbReportPdfService implements KlbReportPdfService {
                   children: [
                     _sectionTitle('1. IDENTITAS PELAPOR & BATCH'),
                     _kvRow('Sekolah Pelapor', '${school.name} (NPSN ${school.npsn})'),
-                    _kvRow('WA Puskesmas Tujuan', school.puskesmasWa),
+                    _kvRow('WA Puskesmas Tujuan', school.formattedPuskesmasWa),
                     _kvRow('Dapur Penyedia (SPPG)', args.sppgName),
                     _kvRow('Menu Makanan', args.menuName),
                     _kvRow('Kode Batch Segel', args.batchCode),
@@ -377,6 +396,32 @@ class DeviceKlbReportPdfService implements KlbReportPdfService {
     }
   }
 
+  Future<({File archiveFile, File shareFile})> _writePdfFiles({
+    required PuskesmasDraftArgs args,
+    required Uint8List pdfBytes,
+  }) async {
+    final safeBatch = args.batchCode.replaceAll(RegExp(r'[^A-Za-z0-9_-]'), '_');
+    final fileName = 'berita_acara_klb_$safeBatch.pdf';
+
+    final docsDir = await getApplicationDocumentsDirectory();
+    final reportsDir = Directory(p.join(docsDir.path, 'lacak_klb_reports'));
+    if (!reportsDir.existsSync()) {
+      await reportsDir.create(recursive: true);
+    }
+    final archiveFile = File(p.join(reportsDir.path, fileName));
+    await archiveFile.writeAsBytes(pdfBytes, flush: true);
+
+    final tempDir = await getTemporaryDirectory();
+    final tempReportsDir = Directory(p.join(tempDir.path, 'lacak_klb_reports'));
+    if (!tempReportsDir.existsSync()) {
+      await tempReportsDir.create(recursive: true);
+    }
+    final shareFile = File(p.join(tempReportsDir.path, fileName));
+    await shareFile.writeAsBytes(pdfBytes, flush: true);
+
+    return (archiveFile: archiveFile, shareFile: shareFile);
+  }
+
   @override
   Future<String> generateAndSharePdfToWhatsApp({
     required PuskesmasDraftArgs args,
@@ -389,25 +434,61 @@ class DeviceKlbReportPdfService implements KlbReportPdfService {
       photoBytesOverride: photoBytesOverride,
     );
     final summaryText = buildWhatsAppSummaryText(args: args, school: school);
+    final written = await _writePdfFiles(args: args, pdfBytes: pdfBytes);
 
-    final docsDir = await getApplicationDocumentsDirectory();
-    final reportsDir = Directory(p.join(docsDir.path, 'lacak_klb_reports'));
-    if (!reportsDir.existsSync()) {
-      await reportsDir.create(recursive: true);
+    if (Platform.isAndroid) {
+      final phoneDigits = _normalizeWaDigits(school.puskesmasWa);
+      try {
+        final status = await _whatsAppChannel.invokeMethod<String>(
+          'sendPdfToWhatsApp',
+          <String, dynamic>{
+            'filePath': written.shareFile.path,
+            'phoneDigits': phoneDigits,
+            'caption': summaryText,
+          },
+        );
+        if (status == 'sent_whatsapp') {
+          return written.archiveFile.path;
+        }
+      } on MissingPluginException {
+        // Fallback to SharePlus below on environments without Android channel.
+      } on PlatformException {
+        // Fallback to SharePlus below if native WhatsApp launch fails.
+      }
     }
-    final safeBatch = args.batchCode.replaceAll(RegExp(r'[^A-Za-z0-9_-]'), '_');
-    final filePath = p.join(reportsDir.path, 'berita_acara_klb_$safeBatch.pdf');
-    final file = File(filePath);
-    await file.writeAsBytes(pdfBytes, flush: true);
 
     await SharePlus.instance.share(
       ShareParams(
-        files: [XFile(file.path, mimeType: 'application/pdf')],
+        files: [XFile(written.shareFile.path, mimeType: 'application/pdf')],
         subject: sanitizeZeroSlopCopy('Berita Acara KLB ${args.batchCode}'),
         text: summaryText,
       ),
     );
-    return file.path;
+    return written.archiveFile.path;
+  }
+
+  @override
+  Future<String> sharePdfToOtherApps({
+    required PuskesmasDraftArgs args,
+    required SchoolProfile school,
+    Uint8List? photoBytesOverride,
+  }) async {
+    final pdfBytes = await buildKlbReportPdfBytes(
+      args: args,
+      school: school,
+      photoBytesOverride: photoBytesOverride,
+    );
+    final summaryText = buildWhatsAppSummaryText(args: args, school: school);
+    final written = await _writePdfFiles(args: args, pdfBytes: pdfBytes);
+
+    await SharePlus.instance.share(
+      ShareParams(
+        files: [XFile(written.shareFile.path, mimeType: 'application/pdf')],
+        subject: sanitizeZeroSlopCopy('Berita Acara KLB ${args.batchCode}'),
+        text: summaryText,
+      ),
+    );
+    return written.archiveFile.path;
   }
 
   @override

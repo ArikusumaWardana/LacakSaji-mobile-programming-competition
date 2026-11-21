@@ -82,20 +82,37 @@ Future<SyncQueueExecutionResult> replayDriftSyncQueue({
   );
 }
 
+bool _isSyncUniqueViolation(PostgrestException error) {
+  final lower = error.message.toLowerCase();
+  return error.code == '23505' ||
+      lower.contains('23505') ||
+      lower.contains('duplicate key');
+}
+
+bool _isSyncPermissionDenied(PostgrestException error) {
+  final lower = error.message.toLowerCase();
+  return error.code == '42501' ||
+      error.code == '403' ||
+      lower.contains('42501') ||
+      lower.contains('permission denied');
+}
+
 Future<String> _saveInspectionRemoteForSync(
   SupabaseClient client,
   Map<String, dynamic> dbMap,
 ) async {
   final fallbackId = dbMap['id'] as String;
   try {
-    final inserted = await client
-        .from('school_inspections')
-        .insert(dbMap)
-        .select('id')
-        .maybeSingle();
-    return (inserted?['id'] as String?) ?? fallbackId;
+    final insertedRows = List<Map<String, dynamic>>.from(
+      await client.from('school_inspections').insert(dbMap).select('id')
+          as List,
+    );
+    if (insertedRows.isNotEmpty && insertedRows.first['id'] is String) {
+      return insertedRows.first['id'] as String;
+    }
+    return fallbackId;
   } on PostgrestException catch (pgError) {
-    if (pgError.code != '23505') {
+    if (!_isSyncUniqueViolation(pgError)) {
       rethrow;
     }
 
@@ -111,29 +128,37 @@ Future<String> _saveInspectionRemoteForSync(
       ..remove('school_id');
 
     try {
-      final updated = await client
-          .from('school_inspections')
-          .update(updatePayload)
-          .eq('batch_id', batchId)
-          .eq('school_id', schoolId)
-          .select('id')
-          .maybeSingle();
-      if (updated?['id'] is String) {
-        return updated!['id'] as String;
+      final updatedRows = List<Map<String, dynamic>>.from(
+        await client
+                .from('school_inspections')
+                .update(updatePayload)
+                .eq('batch_id', batchId)
+                .eq('school_id', schoolId)
+                .select('id')
+            as List,
+      );
+      if (updatedRows.isNotEmpty && updatedRows.first['id'] is String) {
+        return updatedRows.first['id'] as String;
       }
     } on PostgrestException catch (updateError) {
-      if (updateError.code != '42501') {
+      if (!_isSyncPermissionDenied(updateError)) {
         rethrow;
       }
     }
 
-    final existing = await client
-        .from('school_inspections')
-        .select('id')
-        .eq('batch_id', batchId)
-        .eq('school_id', schoolId)
-        .maybeSingle();
-    return (existing?['id'] as String?) ?? fallbackId;
+    final existingRows = List<Map<String, dynamic>>.from(
+      await client
+              .from('school_inspections')
+              .select('id')
+              .eq('batch_id', batchId)
+              .eq('school_id', schoolId)
+              .limit(1)
+          as List,
+    );
+    if (existingRows.isNotEmpty && existingRows.first['id'] is String) {
+      return existingRows.first['id'] as String;
+    }
+    return fallbackId;
   }
 }
 

@@ -415,7 +415,7 @@ class SettingsScreen extends ConsumerWidget {
                       if (school != null) ...[
                         _SettingsRow(
                           label: 'WhatsApp Puskesmas',
-                          value: school.puskesmasWa,
+                          value: school.formattedPuskesmasWa,
                           tabular: true,
                         ),
                         _SettingsRow(

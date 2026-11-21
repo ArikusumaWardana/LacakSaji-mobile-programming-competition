@@ -544,6 +544,17 @@ class _SpyKlbPdfService implements KlbReportPdfService {
   }
 
   @override
+  Future<String> sharePdfToOtherApps({
+    required PuskesmasDraftArgs args,
+    required SchoolProfile school,
+    Uint8List? photoBytesOverride,
+  }) => generateAndSharePdfToWhatsApp(
+    args: args,
+    school: school,
+    photoBytesOverride: photoBytesOverride,
+  );
+
+  @override
   Future<bool> openDirectWhatsAppChat({
     required String puskesmasWa,
     required String summaryText,
@@ -598,10 +609,16 @@ void main() {
           school: _school1,
         );
         _assertZeroSlopText(waText);
+        expect(waText, contains('*BERITA ACARA & LAPORAN DINI KLB LACAKSAJI*'));
+        expect(waText, contains('\n\n*Identitas Pelapor & Batch*\n'));
+        expect(waText, contains('\n\n*Kronologi Waktu & Suhu*\n'));
+        expect(waText, contains('\n\n*Bank Sampel & Temuan*\n'));
         expect(waText, contains('SMP-2611-21K1'));
         expect(waText, contains(AppConstants.bmkgShortAttribution));
         expect(waText, contains('4 siswa bergejala'));
         expect(waText, contains('32.8 C'));
+        expect(_school1.formattedPuskesmasWa, '+628112800001');
+        expect(formatIndonesianWaDisplay('08112800001'), '+628112800001');
 
         final pdfBytes = await service.buildKlbReportPdfBytes(
           args: args,
@@ -972,8 +989,8 @@ void main() {
           batchCode: 'BCH-2611-21S5',
           menuName: 'Nasi Ayam Suwir & Tumis Kacang',
           schoolId: _school1.id,
-          scannedAtUtc: nowUtc.subtract(const Duration(hours: 1)),
-          sealedAtUtc: nowUtc.subtract(const Duration(hours: 2)),
+          scannedAtUtc: nowUtc,
+          sealedAtUtc: nowUtc.subtract(const Duration(minutes: 60)),
           elapsedMinutes: 60,
           bmkgTempC: 31.5,
           bmkgSource: BmkgSource.live,
@@ -1085,10 +1102,10 @@ void main() {
         _assertZeroSlopText(ctx.pdfService.lastSharedSummaryText ?? '');
 
         await tester.ensureVisible(
-          find.text('Buka Chat WA Puskesmas (628112800001)'),
+          find.text('Buka Chat WA Puskesmas (+628112800001)'),
         );
         await tester.pumpAndSettle();
-        await tester.tap(find.text('Buka Chat WA Puskesmas (628112800001)'));
+        await tester.tap(find.text('Buka Chat WA Puskesmas (+628112800001)'));
         await tester.pumpAndSettle();
         expect(ctx.pdfService.waChatLaunchCount, 1);
         _assertZeroSlopText(ctx.pdfService.lastWaLaunchText ?? '');

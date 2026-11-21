@@ -688,7 +688,7 @@ void main() {
 
         expect(tester.takeException(), isNull);
         expect(find.text('33.02.26.1002'), findsOneWidget);
-        expect(find.text('628112809999'), findsOneWidget);
+        expect(find.text('+628112809999'), findsOneWidget);
       },
     );
 

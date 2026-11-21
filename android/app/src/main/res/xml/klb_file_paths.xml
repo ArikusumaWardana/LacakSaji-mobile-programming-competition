@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths xmlns:android="http://schemas.android.com/apk/res/android">
+    <cache-path name="klb_reports_cache" path="lacak_klb_reports/" />
+    <files-path name="klb_reports_files" path="lacak_klb_reports/" />
+</paths>

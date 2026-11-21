@@ -133,6 +133,8 @@ class SchoolProfile {
   final String? partnerInviteCode;
   final String? partnerPublicKey;
 
+  String get formattedPuskesmasWa => formatIndonesianWaDisplay(puskesmasWa);
+
   factory SchoolProfile.fromMap(
     Map<String, dynamic> map, {
     Map<String, dynamic>? partnerKitchen,
@@ -305,4 +307,19 @@ class AuthState {
           : (holdKitchenActivationSummary ?? this.holdKitchenActivationSummary),
     );
   }
+}
+
+/// Formats Indonesian WhatsApp numbers with a leading `+62` prefix for display.
+String formatIndonesianWaDisplay(String raw) {
+  final digits = raw.replaceAll(RegExp(r'[^0-9]'), '');
+  if (digits.isEmpty) {
+    return '-';
+  }
+  if (digits.startsWith('0')) {
+    return '+62${digits.substring(1)}';
+  }
+  if (digits.startsWith('8')) {
+    return '+62$digits';
+  }
+  return '+$digits';
 }

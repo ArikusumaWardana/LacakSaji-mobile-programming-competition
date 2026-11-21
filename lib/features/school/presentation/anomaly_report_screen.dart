@@ -266,7 +266,7 @@ class _AnomalyReportScreenState extends ConsumerState<AnomalyReportScreen> {
                                     ? 'Peringatan ini akan menyiagakan sekolah mitra lain untuk menahan kloter berikutnya dan menyiapkan Bank Sampel Puskesmas.'
                                     : args.reasonSummary,
                               ),
-                              const SizedBox(height: AppSpacing.lg),
+                              const SizedBox(height: AppSpacing.xl),
                               Text(
                                 'Batch Terkunci Hari Ini',
                                 style: AppTypography.titleSection,
@@ -274,14 +274,28 @@ class _AnomalyReportScreenState extends ConsumerState<AnomalyReportScreen> {
                               const SizedBox(height: AppSpacing.sm),
                               LacakSectionSurface.separated(
                                 children: [
-                                  _ReportDetailRow(
-                                    label: 'Menu & Kode Batch',
-                                    value: '${args.menuName}\n(${args.batchCode})',
-                                    tabular: true,
-                                  ),
-                                  _ReportDetailRow(
-                                    label: 'Dapur SPPG',
-                                    value: args.sppgName,
+                                  Padding(
+                                    padding: const EdgeInsets.all(AppSpacing.lg),
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          args.menuName,
+                                          style: AppTypography.titleItem
+                                              .copyWith(
+                                                fontWeight: FontWeight.w700,
+                                              ),
+                                        ),
+                                        const SizedBox(height: 2),
+                                        Text(
+                                          '${args.batchCode} · ${args.sppgName}',
+                                          style: AppTypography.tabular(
+                                            AppTypography.bodyMedium,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
                                   ),
                                   _ReportDetailRow(
                                     label: 'Jam Segel Dapur',
@@ -291,23 +305,29 @@ class _AnomalyReportScreenState extends ConsumerState<AnomalyReportScreen> {
                                   _ReportDetailRow(
                                     label: 'Suhu Wilayah',
                                     value:
-                                        '${args.bmkgTempC.toStringAsFixed(1)} C\n${AppConstants.bmkgShortAttribution}',
+                                        '${args.bmkgTempC.toStringAsFixed(1)} C',
+                                    caption: AppConstants.bmkgShortAttribution,
                                     tabular: true,
                                   ),
                                   _ReportDetailRow(
                                     label: 'Kode Bank Sampel',
-                                    value: _resolvedSampleLabel ??
+                                    value:
+                                        _resolvedSampleLabel ??
                                         'Belum ada (ditahan sebelum simpan sampel)',
                                     tabular: true,
+                                    highlightValue:
+                                        _resolvedSampleLabel != null,
+                                    mutedValue: _resolvedSampleLabel == null,
                                   ),
                                   _ReportDetailRow(
                                     label: 'WA Puskesmas Tujuan',
-                                    value: school?.puskesmasWa ?? '-',
+                                    value:
+                                        school?.formattedPuskesmasWa ?? '-',
                                     tabular: true,
                                   ),
                                 ],
                               ),
-                              const SizedBox(height: AppSpacing.lg),
+                              const SizedBox(height: AppSpacing.xl),
                               Text(
                                 'Pilih Kondisi Pelaporan',
                                 style: AppTypography.titleSection,
@@ -321,7 +341,7 @@ class _AnomalyReportScreenState extends ConsumerState<AnomalyReportScreen> {
                                   () => _stage = ClusterAlertStage.preConsumption,
                                 ),
                               ),
-                              const SizedBox(height: AppSpacing.md),
+                              const SizedBox(height: AppSpacing.sm),
                               _StageChoiceTile(
                                 stage: ClusterAlertStage.postConsumption,
                                 selected:
@@ -333,20 +353,14 @@ class _AnomalyReportScreenState extends ConsumerState<AnomalyReportScreen> {
                               ),
                               if (_stage ==
                                   ClusterAlertStage.postConsumption) ...[
-                                const SizedBox(height: AppSpacing.lg),
+                                const SizedBox(height: AppSpacing.xl),
                                 Text(
                                   'Jumlah Siswa Bergejala (Tanpa Nama Siswa)',
                                   style: AppTypography.titleSection,
                                 ),
                                 const SizedBox(height: AppSpacing.sm),
-                                Container(
+                                LacakSectionSurface(
                                   padding: const EdgeInsets.all(AppSpacing.md),
-                                  decoration: BoxDecoration(
-                                    color: AppColors.surfaceSubtle,
-                                    borderRadius: BorderRadius.circular(
-                                      AppSpacing.radiusControl,
-                                    ),
-                                  ),
                                   child: Row(
                                     children: [
                                       _StepperIconButton(
@@ -385,7 +399,7 @@ class _AnomalyReportScreenState extends ConsumerState<AnomalyReportScreen> {
                                   ),
                                 ),
                               ],
-                              const SizedBox(height: AppSpacing.lg),
+                              const SizedBox(height: AppSpacing.xl),
                               LacakTextField(
                                 label: 'Catatan Singkat Lapangan (Opsional)',
                                 controller: _notesController,
@@ -393,22 +407,30 @@ class _AnomalyReportScreenState extends ConsumerState<AnomalyReportScreen> {
                                     'Contoh: Bau asam menyengat atau gejala mual pukul 10.15 WIB',
                                 maxLines: 2,
                               ),
-                              const SizedBox(height: AppSpacing.md),
-                              const Divider(height: 1),
-                              SwitchListTile(
-                                contentPadding: EdgeInsets.zero,
-                                activeThumbColor: AppColors.primary,
-                                title: Text(
-                                  'Kirim Peringatan Darurat ke Sekolah Lain',
-                                  style: AppTypography.titleItem,
+                              const SizedBox(height: AppSpacing.lg),
+                              LacakSectionSurface(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: AppSpacing.lg,
+                                  vertical: AppSpacing.xs,
                                 ),
-                                subtitle: Text(
-                                  'Bunyikan alarm darurat di semua sekolah mitra dari ${args.sppgName}.',
-                                  style: AppTypography.bodyMedium,
-                                ),
-                                value: _broadcastEnabled,
-                                onChanged: (value) => setState(
-                                  () => _broadcastEnabled = value,
+                                child: SwitchListTile(
+                                  contentPadding: EdgeInsets.zero,
+                                  activeThumbColor: AppColors.primary,
+                                  title: Text(
+                                    'Kirim Peringatan Darurat ke Sekolah Lain',
+                                    style: AppTypography.titleItem,
+                                  ),
+                                  subtitle: Padding(
+                                    padding: const EdgeInsets.only(top: 2),
+                                    child: Text(
+                                      'Bunyikan alarm darurat di semua sekolah mitra dari ${args.sppgName}.',
+                                      style: AppTypography.bodyMedium,
+                                    ),
+                                  ),
+                                  value: _broadcastEnabled,
+                                  onChanged: (value) => setState(
+                                    () => _broadcastEnabled = value,
+                                  ),
                                 ),
                               ),
                               const SizedBox(height: AppSpacing.xl),
@@ -540,38 +562,51 @@ class _ReportDetailRow extends StatelessWidget {
   const _ReportDetailRow({
     required this.label,
     required this.value,
+    this.caption,
     this.tabular = false,
+    this.highlightValue = false,
+    this.mutedValue = false,
   });
 
   final String label;
   final String value;
+  final String? caption;
   final bool tabular;
+  final bool highlightValue;
+  final bool mutedValue;
 
   @override
   Widget build(BuildContext context) {
+    final baseStyle = mutedValue
+        ? AppTypography.bodyLarge.copyWith(color: AppColors.textSecondary)
+        : AppTypography.titleItem.copyWith(
+            color: highlightValue ? AppColors.primary : AppColors.textPrimary,
+            fontWeight: highlightValue ? FontWeight.w700 : FontWeight.w600,
+          );
+
     return Padding(
       padding: const EdgeInsets.symmetric(
         horizontal: AppSpacing.lg,
         vertical: AppSpacing.md,
       ),
-      child: Row(
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Expanded(
-            flex: 2,
-            child: Text(label, style: AppTypography.bodyMedium),
-          ),
-          const SizedBox(width: AppSpacing.md),
-          Expanded(
-            flex: 3,
-            child: Text(
-              value,
-              textAlign: TextAlign.right,
-              style: tabular
-                  ? AppTypography.tabular(AppTypography.titleItem)
-                  : AppTypography.titleItem,
+          Text(
+            label,
+            style: AppTypography.labelTag.copyWith(
+              color: AppColors.textSecondary,
             ),
           ),
+          const SizedBox(height: 4),
+          Text(
+            value,
+            style: tabular ? AppTypography.tabular(baseStyle) : baseStyle,
+          ),
+          if (caption != null && caption!.isNotEmpty) ...[
+            const SizedBox(height: 2),
+            Text(caption!, style: AppTypography.captionLegal),
+          ],
         ],
       ),
     );
