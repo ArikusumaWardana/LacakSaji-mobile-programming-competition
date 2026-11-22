@@ -585,7 +585,9 @@ class _RegisterSchoolScreenState extends ConsumerState<RegisterSchoolScreen> {
           LacakTextField(
             label: 'Email PIC Sekolah',
             controller: _emailController,
-            hintText: 'pic@sdn.sch.id',
+            hintText: 'pic.sekolah@gmail.com',
+            helperText:
+                'Gunakan alamat email aktif (misal Gmail) untuk konfirmasi akun.',
             keyboardType: TextInputType.emailAddress,
             onChanged: (_) => _saveLocalDraft(),
             validator: (value) {

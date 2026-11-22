@@ -32,25 +32,46 @@ abstract final class AuthErrorMapper {
       return error.message;
     }
 
+    if (error is AuthRetryableFetchException) {
+      return 'Koneksi ke server akun terganggu sementara. Periksa jaringan Anda lalu coba lagi.';
+    }
+
     if (error is AuthException) {
       final msg = error.message.toLowerCase();
-      if (msg.contains('invalid login credentials')) {
+      final code = (error.code ?? '').toLowerCase();
+      if (code == 'invalid_credentials' ||
+          msg.contains('invalid login credentials')) {
         return 'Email atau kata sandi salah. Periksa kembali penulisan lalu coba lagi.';
       }
-      if (msg.contains('email not confirmed')) {
+      if (code == 'email_not_confirmed' ||
+          msg.contains('email not confirmed')) {
         return 'Email akun ini belum dikonfirmasi. Periksa kotak masuk email Anda sebelum masuk.';
       }
-      if (msg.contains('user already registered') ||
+      if (code == 'user_already_exists' ||
+          code == 'email_exists' ||
+          msg.contains('user already registered') ||
           msg.contains('already registered')) {
         return 'Email ini sudah terdaftar. Silakan masuk menggunakan kata sandi Anda.';
       }
-      if (msg.contains('password')) {
+      if (code == 'email_address_invalid' ||
+          msg.contains('unable to validate email') ||
+          (msg.contains('email') && msg.contains('invalid'))) {
+        return 'Alamat email ditolak atau tidak dapat menerima verifikasi. Gunakan alamat email aktif yang valid (misalnya Gmail).';
+      }
+      if (code == 'over_email_send_rate_limit' ||
+          code == 'over_request_rate_limit' ||
+          msg.contains('rate limit') ||
+          msg.contains('too many') ||
+          msg.contains('security purposes')) {
+        return 'Terlalu banyak percobaan pengiriman email dalam waktu singkat. Tunggu sebentar lalu coba lagi.';
+      }
+      if (code == 'weak_password' || msg.contains('password')) {
         return 'Kata sandi minimal terdiri dari 8 karakter dengan kombinasi huruf dan angka.';
       }
-      if (msg.contains('rate limit') || msg.contains('too many')) {
-        return 'Terlalu banyak percobaan dalam waktu singkat. Tunggu sebentar lalu coba lagi.';
+      if (code == 'signup_disabled' || msg.contains('signups not allowed')) {
+        return 'Pendaftaran akun baru sedang dinonaktifkan sementara oleh server.';
       }
-      return 'Gagal memproses akun. Periksa koneksi internet Anda lalu coba lagi.';
+      return 'Gagal memproses data akun di server. Periksa kembali isian Anda lalu coba lagi.';
     }
 
     if (error is PostgrestException) {

@@ -10,6 +10,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:lacak_saji/core/constants/app_constants.dart';
 import 'package:lacak_saji/core/database/app_database.dart';
@@ -787,7 +788,7 @@ void main() {
 
         final emailField = find.widgetWithText(
           TextFormField,
-          'dapur@lacaksaji.id',
+          'sppg.dapur@gmail.com',
         );
         await tester.ensureVisible(emailField);
         await tester.enterText(emailField, 'dapur.sbx@lacaksaji.id');
@@ -891,8 +892,8 @@ void main() {
         );
 
         await tester.enterText(
-          find.widgetWithText(TextFormField, 'pic@sdn.sch.id'),
-          'sdn3.pwt@lacaksaji.id',
+          find.widgetWithText(TextFormField, 'pic.sekolah@gmail.com'),
+          'sdn3.pwt@gmail.com',
         );
         await tester.enterText(
           find.widgetWithText(TextFormField, 'Minimal 8 karakter'),
@@ -1241,6 +1242,26 @@ void main() {
         expect(
           find.text('Status akun dan profil berhasil disinkronkan.'),
           findsOneWidget,
+        );
+      },
+    );
+
+    test(
+      'AuthErrorMapper maps invalid email and rate limit accurately without blaming internet',
+      () {
+        const invalidEmailErr = AuthApiException(
+          'Email address "dapursppgbanyumasbarat@lacaksaji.id" is invalid',
+          statusCode: '400',
+          code: 'email_address_invalid',
+        );
+        final mappedInvalid = AuthErrorMapper.mapException(invalidEmailErr);
+        expect(mappedInvalid, contains('Alamat email ditolak'));
+        expect(mappedInvalid, isNot(contains('koneksi internet')));
+
+        final retryable = AuthRetryableFetchException(message: 'Failed fetch');
+        expect(
+          AuthErrorMapper.mapException(retryable),
+          contains('Koneksi ke server akun terganggu'),
         );
       },
     );

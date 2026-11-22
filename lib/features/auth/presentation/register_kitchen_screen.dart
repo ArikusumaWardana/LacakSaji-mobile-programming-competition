@@ -663,7 +663,9 @@ class _RegisterKitchenScreenState extends ConsumerState<RegisterKitchenScreen> {
           LacakTextField(
             label: 'Email Dapur',
             controller: _emailController,
-            hintText: 'dapur@lacaksaji.id',
+            hintText: 'sppg.dapur@gmail.com',
+            helperText:
+                'Gunakan alamat email aktif (misal Gmail) untuk konfirmasi akun.',
             keyboardType: TextInputType.emailAddress,
             onChanged: (_) => _saveLocalDraft(),
             validator: (value) {
