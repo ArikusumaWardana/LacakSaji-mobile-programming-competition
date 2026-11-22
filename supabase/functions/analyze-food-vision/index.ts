@@ -36,8 +36,8 @@ interface GeminiCallOutcome {
 const rateBuckets = new Map<string, { count: number; resetAtMs: number }>();
 const RATE_LIMIT_PER_MINUTE = 20;
 const VISION_MODELS = [
-  "gemini-3.5-flash-lite",
   "gemini-3.8-flash",
+  "gemini-3.5-flash-lite",
 ];
 const PER_ATTEMPT_TIMEOUT_MS = 22_000;
 
@@ -47,28 +47,28 @@ const ORGANOLEPTIC_RESPONSE_SCHEMA = {
     rice_check: {
       type: "STRING",
       description:
-        "Observasi singkat kondisi nasi/karbohidrat: apakah putih bersih atau tampak menguning/kecokelatan sebagian, berair, menggumpal, atau kering basi.",
+        "Observasi detail nasi/karbohidrat (tengah dan tepi): apakah putih bersih atau ada bagian menguning, kecokelatan, bintik abu-abu/hitam jamur, berair, atau menggumpal.",
     },
     protein_check: {
       type: "STRING",
       description:
-        "Observasi singkat kondisi lauk/protein: apakah segar atau tampak berlendir, kusam keabuan, atau berjamur.",
+        "Observasi detail SETIAP item lauk/protein secara terpisah (misal ikan, ayam, tahu, tempe, telur): periksa bercak jamur putih/abu-abu menyerupai kapas, bagian gosong menghitam/hangus pada tahu/tempe/gorengan, lendir, atau kotoran di sekat.",
     },
     vegetable_check: {
       type: "STRING",
       description:
-        "Observasi singkat kondisi sayur: apakah segar atau terdapat bercak putih/abu-abu halus menyerupai jamur (kapang), berlendir, lembek, atau busuk.",
+        "Observasi detail sayur dan kuahnya: apakah segar atau layu gelap, berair keruh/berbusa/berbuih tanda fermentasi basi, berlendir, atau ada bercak putih/abu-abu jamur.",
     },
     fruit_and_pack_check: {
       type: "STRING",
       description:
-        "Observasi singkat buah dan kemasan minuman/wadah: apakah utuh atau ada busuk parah, kemasan menggembung, bocor, atau rusak.",
+        "Observasi detail SETIAP potongan buah dan kemasan minuman/wadah: periksa dengan teliti apakah buah potong (pepaya, melon, semangka, dll) memiliki bercak putih/abu-abu seperti kapas atau serbuk jamur, lembek busuk, atau kemasan menggembung/bocor.",
     },
     anomalies_found: {
       type: "ARRAY",
       items: { type: "STRING" },
       description:
-        "Daftar singkat setiap kejanggalan keamanan pangan yang terlihat. Kosongkan HANYA jika semua komponen benar-benar bersih tanpa tanda basi/jamur/menguning.",
+        "Daftar detail setiap kejanggalan keamanan & mutu pangan yang terlihat (sebutkan nama bahan makanan dan ciri spesifiknya, misal 'Bercak jamur putih pada pepaya', 'Jamur putih pada ikan', 'Tahu tampak gosong menghitam'). Kosongkan HANYA jika semua komponen benar-benar bersih.",
     },
     freshness_status: {
       type: "STRING",
@@ -80,7 +80,7 @@ const ORGANOLEPTIC_RESPONSE_SCHEMA = {
     summary_id: {
       type: "STRING",
       description:
-        "Ringkasan 1-2 kalimat bahasa Indonesia sederhana untuk guru (maks 220 karakter, tanpa emoji, tanpa em-dash) menyebut komponen spesifik jika ada kejanggalan.",
+        "Ringkasan 1-3 kalimat bahasa Indonesia sederhana dan tegas untuk guru (maks 280 karakter, tanpa emoji, tanpa em-dash) yang menyebutkan semua komponen bermasalah.",
     },
   },
   required: [
@@ -268,7 +268,7 @@ async function callGeminiModelChain(
               responseMimeType: "application/json",
               responseSchema,
               temperature: 0.1,
-              maxOutputTokens: 1024,
+              maxOutputTokens: 1536,
             },
           }),
         },
@@ -447,20 +447,26 @@ Deno.serve(async (req: Request) => {
   const prompt =
     mode === "organoleptic"
       ? `Anda adalah inspektur keamanan pangan sekolah yang sangat teliti dan mengutamakan keselamatan anak (prinsip kehati-hatian BGN/BPOM) untuk menu "${menuName}".
-Tugas Anda: periksa SETIAP sekat makanan pada foto secara detail sebelum mengambil kesimpulan. Lebih baik memberi peringatan (suspicious_discoloration) daripada meloloskan makanan yang mulai basi atau berjamur.
+Tugas Anda: periksa SETIAP sekat makanan dan SETIAP potongan makanan di dalamnya secara detail (zoom in setiap benda satu per satu) sebelum mengambil kesimpulan. Lebih baik memberi peringatan (suspicious_discoloration) daripada meloloskan makanan yang berjamur, gosong, atau mulai basi.
 
-Periksa hal-hal berikut secara ketat:
-1. NASI / KARBOHIDRAT: Periksa apakah nasi putih memiliki bagian yang menguning, kekuningan kusam, kecokelatan, tampak berair/basah lengket, atau menggumpal tidak wajar dibandingkan tepi nasi lain. Nasi putih yang mulai menguning di sebagian area WAJIB dicatat sebagai kejanggalan (tanda awal basi / penyimpanan terlalu lama).
-2. SAYURAN (misal buncis, wortel, tumisan): Zoom dan periksa ujung serta permukaan sayuran secara teliti apakah ada bercak putih halus, bintik putih/abu-abu menyerupai jamur (kapang), lendir, warna pucat kusam, atau pembusukan. Bercak putih pada sayur WAJIB dilaporkan sebagai kejanggalan.
-3. LAUK / PROTEIN: Periksa apakah ada lendir mengkilap tidak wajar, warna abu-abu/kehijauan, atau jamur.
-4. BUAH & KEMASAN: Bedakan bintik cokelat matang alami pada kulit pisang dari busuk berair/berjamur. Periksa apakah kotak susu/wadah menggembung, bocor, atau rusak.
-5. Jika foto diambil dari layar (ada garis moire tipis), abaikan garis layarnya, tetapi TETAP periksa perubahan warna pada nasi dan bercak putih pada sayur secara ketat.${localContext}
+Periksa seluruh 5 area ini secara ketat dan terpisah:
+1. NASI / KARBOHIDRAT: Periksa bagian tengah maupun pinggir nasi apakah ada area menguning, kecokelatan kusam, bintik/bercak abu-abu gelap atau hitam (tanda jamur nasi), basah berlendir, atau menggumpal tidak wajar. Jika ada bagian menguning atau berbintik gelap, WAJIB dicatat ke anomalies_found.
+2. SAYURAN & KUAH: Periksa warna dan permukaan sayur apakah tampak layu gelap/kehitaman, berlendir, memiliki bercak putih/abu-abu halus (kapang/jamur), atau kuah tampak berbusa/berbuih keruh (tanda fermentasi basi). Buih/busa pada kuah maupun bercak putih WAJIB dilaporkan ke anomalies_found.
+3. LAUK / PROTEIN (periksa SETIAP potongan, misalnya ikan/ayam DAN tahu/tempe/telur satu per satu):
+   - Periksa teliti apakah ada lapisan/bercak putih atau abu-abu seperti kapas/serbuk (jamur/kapang) pada permukaan ikan goreng, tahu, tempe, atau daging. Jangan terkecoh mengira bercak putih jamur sebagai bumbu/garam jika bentuknya menggumpal seperti kapas atau tidak merata.
+   - Periksa teliti apakah tahu, tempe, ikan, atau lauk goreng memiliki bagian GOSONG MENGHITAM / hangus terbakar yang mencolok. Bagian gosong menghitam WAJIB dicatat sebagai temuan mutu & keamanan pangan.
+   - Catat juga bila ada noda/minyak kotor di sekat kosong, namun TETAP laporkan kondisi masing-masing lauk secara jujur.
+4. BUAH & KEMASAN:
+   - Periksa SETIAP potongan buah (pepaya, melon, semangka, jeruk, dll.) apakah ada BERCAK PUTIH/ABU-ABU halus seperti kapas atau bulu (jamur/kapang), bagian lembek berair, atau busuk kehitaman. Bercak putih kecil pada permukaan pepaya/buah potong WAJIB dilaporkan sebagai jamur di anomalies_found dan fruit_and_pack_check (JANGAN pernah menyebut segar jika ada titik/bercak putih jamur).
+   - Bedakan bintik cokelat matang alami pada kulit pisang dari busuk berair/berjamur.
+   - Periksa kotak susu/minuman/wadah apakah menggembung, bocor, basah merembes, atau segel rusak.
+5. Jika foto diambil dari layar (ada garis moire tipis), abaikan garis layarnya, tetapi TETAP periksa bercak jamur putih, bagian gosong, perubahan warna, dan busa kuah secara ketat.${localContext}
 
 Aturan keputusan:
-- Jika ada SATU SAJA kejanggalan pada nasi, sayur, lauk, atau buah busuk: masukkan ke anomalies_found, set slime_or_discoloration_detected = true, dan freshness_status = "suspicious_discoloration".
-- Jika kemasan susu/wadah menggembung/bocor/rusak: set packaging_issue_detected = true dan freshness_status = "packaging_anomaly".
-- Set freshness_status = "fresh_likely" HANYA jika anomalies_found benar-benar kosong.
-- Tulis summary_id dalam bahasa Indonesia sederhana yang mudah dipahami guru (sebutkan langsung komponen yang bermasalah, tanpa istilah teknis, tanpa emoji, tanpa em-dash).`
+- Jika ada SATU SAJA kejanggalan (nasi menguning/berbintik, kuah sayur berbuih/layu gelap, lauk berjamur atau tahu/lauk gosong menghitam, buah ada bercak putih jamur/busuk): masukkan semua temuan ke anomalies_found, set slime_or_discoloration_detected = true, dan freshness_status = "suspicious_discoloration".
+- Jika kemasan minuman/wadah menggembung/bocor/rusak: set packaging_issue_detected = true dan freshness_status = "packaging_anomaly".
+- Set freshness_status = "fresh_likely" HANYA jika seluruh komponen (nasi, sayur, semua potong lauk, semua potong buah, dan kemasan) benar-benar bersih tanpa bercak jamur, gosong, layu/buih, maupun perubahan warna.
+- Tulis summary_id dalam bahasa Indonesia sederhana yang lengkap dan tegas (sebutkan langsung setiap komponen bermasalah yang ditemukan, tanpa istilah teknis, tanpa emoji, tanpa em-dash).`
       : `Anda adalah asisten estimasi sisa makanan ompreng siswa untuk menu "${menuName}".
 Periksa setiap sekat makanan secara terpisah dan jelaskan dulu apa yang terlihat di masing-masing sekat:
 1. Sekat NASI / KARBOHIDRAT: bandingkan sisa nasi yang terlihat terhadap kapasitas porsi penuh sekat tersebut (0 = habis tak bersisa, 25 = tinggal sedikit/remah di sudut, 50 = tersisa sekitar setengah, 75-100 = masih hampir penuh/utuh).

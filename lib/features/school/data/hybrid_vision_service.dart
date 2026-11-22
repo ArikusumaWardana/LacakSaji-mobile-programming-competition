@@ -732,13 +732,15 @@ Map<String, dynamic> _runOnDeviceOrganolepticIsolate(
   );
 
   // Multi-zone organoleptic analysis on the camera-compensated 224x224 frame
-  // plus localized pale-yellow rice patch detection on the raw resized frame.
+  // plus localized pale-yellow rice, mold on green veg/orange fruit, and charred protein detection.
   var totalPixels = 0;
   var darkDecayPixels = 0;
   var greenishMoldPixels = 0;
   var localizedSlimeBlocks = 0;
   var localizedYellowRiceBlocks = 0;
   var localizedWhiteSpeckOnVegBlocks = 0;
+  var localizedWhiteMoldOnOrangeBlocks = 0;
+  var localizedCharredLaukBlocks = 0;
   var cleanNeutralBrightBlocks = 0;
   var borderDistortionBlocks = 0;
   var totalBlocks = 0;
@@ -755,6 +757,37 @@ Map<String, dynamic> _runOnDeviceOrganolepticIsolate(
     return qLum >= 28 && qLum <= 165 && qg > qr + 8 && qg > qb + 8;
   }
 
+  bool isOrangeFruitPixel(int px, int py) {
+    if (px < 0 || px >= 224 || py < 0 || py >= 224) {
+      return false;
+    }
+    final q = preWbFrame.getPixel(px, py);
+    final qr = q.r.toDouble();
+    final qg = q.g.toDouble();
+    final qb = q.b.toDouble();
+    return qr >= 150 &&
+        qr > qg + 32 &&
+        qr > qb + 60 &&
+        qg >= 55 &&
+        qg <= 155;
+  }
+
+  bool isWarmProteinPixel(int px, int py) {
+    if (px < 0 || px >= 224 || py < 0 || py >= 224) {
+      return false;
+    }
+    final q = preWbFrame.getPixel(px, py);
+    final qr = q.r.toDouble();
+    final qg = q.g.toDouble();
+    final qb = q.b.toDouble();
+    final qLum = 0.299 * qr + 0.587 * qg + 0.114 * qb;
+    return qLum >= 65 &&
+        qLum <= 190 &&
+        qr > qg + 15 &&
+        qg > qb + 12 &&
+        qr > qb + 35;
+  }
+
   for (var by = 0; by < 7; by++) {
     for (var bx = 0; bx < 7; bx++) {
       totalBlocks++;
@@ -764,6 +797,10 @@ Map<String, dynamic> _runOnDeviceOrganolepticIsolate(
       var blockYellowRice = 0;
       var blockGreenVeg = 0;
       var blockEmbeddedWhiteSpeck = 0;
+      var blockOrangeFruit = 0;
+      var blockEmbeddedOrangeMold = 0;
+      var blockWarmProtein = 0;
+      var blockEmbeddedChar = 0;
       var blockCleanBright = 0;
       var blockDarkEdge = 0;
       var blockSamples = 0;
@@ -803,7 +840,7 @@ Map<String, dynamic> _runOnDeviceOrganolepticIsolate(
             blockMold++;
           }
 
-          // Check pre-WB pixel for patchy pale-yellow rice discoloration vs clean white rice.
+          // Check pre-WB pixel for localized anomalies preserving true hue contrast.
           final rp = preWbFrame.getPixel(x, y);
           final rr = rp.r.toDouble();
           final rg = rp.g.toDouble();
@@ -826,6 +863,31 @@ Map<String, dynamic> _runOnDeviceOrganolepticIsolate(
             if (isGreenVegPixel(x, y + 4)) greenNeighbors++;
             if (greenNeighbors >= 2) {
               blockEmbeddedWhiteSpeck++;
+            }
+          }
+
+          if (isOrangeFruitPixel(x, y)) {
+            blockOrangeFruit++;
+          } else if (!isBorderBlock &&
+              rLum >= 175 &&
+              rSat <= 0.22 &&
+              (rr - rb).abs() <= 26) {
+            if (isOrangeFruitPixel(x - 4, y) ||
+                isOrangeFruitPixel(x + 4, y) ||
+                isOrangeFruitPixel(x, y - 4) ||
+                isOrangeFruitPixel(x, y + 4)) {
+              blockEmbeddedOrangeMold++;
+            }
+          }
+
+          if (isWarmProteinPixel(x, y)) {
+            blockWarmProtein++;
+          } else if (!isBorderBlock && rLum <= 45 && rSat <= 0.32) {
+            if (isWarmProteinPixel(x - 4, y) ||
+                isWarmProteinPixel(x + 4, y) ||
+                isWarmProteinPixel(x, y - 4) ||
+                isWarmProteinPixel(x, y + 4)) {
+              blockEmbeddedChar++;
             }
           }
 
@@ -852,6 +914,10 @@ Map<String, dynamic> _runOnDeviceOrganolepticIsolate(
       final blockCleanRatio = blockCleanBright / bDenom;
       final blockGreenVegRatio = blockGreenVeg / bDenom;
       final blockSpeckRatio = blockEmbeddedWhiteSpeck / bDenom;
+      final blockOrangeRatio = blockOrangeFruit / bDenom;
+      final blockOrangeMoldRatio = blockEmbeddedOrangeMold / bDenom;
+      final blockWarmProteinRatio = blockWarmProtein / bDenom;
+      final blockCharRatio = blockEmbeddedChar / bDenom;
 
       // True slime combines localized wet sheen WITH adjacent dull/decayed tissue
       // inside the same spatial region (unlike uniform flash reflection).
@@ -870,6 +936,16 @@ Map<String, dynamic> _runOnDeviceOrganolepticIsolate(
           blockSpeckRatio >= 0.025) {
         localizedWhiteSpeckOnVegBlocks++;
       }
+      if (!isBorderBlock &&
+          blockOrangeRatio >= 0.16 &&
+          blockOrangeMoldRatio >= 0.025) {
+        localizedWhiteMoldOnOrangeBlocks++;
+      }
+      if (!isBorderBlock &&
+          blockWarmProteinRatio >= 0.18 &&
+          blockCharRatio >= 0.025) {
+        localizedCharredLaukBlocks++;
+      }
       if (isBorderBlock && (blockDarkEdge / bDenom) > 0.52) {
         borderDistortionBlocks++;
       }
@@ -886,6 +962,8 @@ Map<String, dynamic> _runOnDeviceOrganolepticIsolate(
   final hasLocalizedYellowing =
       cleanNeutralBrightBlocks >= 3 && localizedYellowRiceBlocks >= 2;
   final hasWhiteSpeckOnVeg = localizedWhiteSpeckOnVegBlocks >= 1;
+  final hasWhiteMoldOnOrangeFruit = localizedWhiteMoldOnOrangeBlocks >= 1;
+  final hasCharredSpotOnLauk = localizedCharredLaukBlocks >= 1;
 
   // Relax threshold slightly when camera was blurry/noisy so sensor artifacts
   // never cause false alarms, while real spoilage still triggers reliably.
@@ -898,13 +976,19 @@ Map<String, dynamic> _runOnDeviceOrganolepticIsolate(
       moldRatio > 0.18 ||
       localizedSlimeBlocks >= 8 ||
       hasLocalizedYellowing ||
-      hasWhiteSpeckOnVeg;
+      hasWhiteSpeckOnVeg ||
+      hasWhiteMoldOnOrangeFruit ||
+      hasCharredSpotOnLauk;
 
   final localHints = <String>[
     if (hasLocalizedYellowing)
       'Terdeteksi bercak kekuningan tidak merata pada area nasi putih',
     if (hasWhiteSpeckOnVeg)
       'Terdeteksi bintik putih/pucat pada permukaan sayur hijau (cek kemungkinan jamur/kapang)',
+    if (hasWhiteMoldOnOrangeFruit)
+      'Terdeteksi bercak putih halus pada potongan buah/pepaya (cek kemungkinan jamur kapas)',
+    if (hasCharredSpotOnLauk)
+      'Terdeteksi bagian gelap/gosong menghitam pada potongan lauk goreng',
     if (moldRatio > 0.18 || localizedSlimeBlocks >= 8)
       'Terdeteksi area kusam atau kilap lendir tidak merata',
   ];
@@ -918,12 +1002,17 @@ Map<String, dynamic> _runOnDeviceOrganolepticIsolate(
 
   if (isSuspiciousDiscoloration) {
     resolvedLabel = 'suspicious_discoloration';
+    final hasExplicitLocalFinding =
+        hasLocalizedYellowing ||
+        hasWhiteSpeckOnVeg ||
+        hasWhiteMoldOnOrangeFruit ||
+        hasCharredSpotOnLauk;
     resolvedConfidence =
         (0.68 +
                 math.max(
                   dullRatio * 0.35,
-                  (hasLocalizedYellowing || hasWhiteSpeckOnVeg)
-                      ? 0.14
+                  hasExplicitLocalFinding
+                      ? 0.16
                       : tfliteResult.spoilageActivation * 0.3,
                 ))
             .clamp(0.66, 0.93);
@@ -944,15 +1033,15 @@ Map<String, dynamic> _runOnDeviceOrganolepticIsolate(
     summaryText =
         'Terdeteksi bagian wadah atau kemasan yang tampak kurang wajar. Periksa keutuhan kemasan secara langsung.';
   } else if (resolvedLabel == 'suspicious_discoloration') {
-    if (hasLocalizedYellowing && hasWhiteSpeckOnVeg) {
+    final specificParts = <String>[
+      if (hasLocalizedYellowing) 'nasi tampak kekuningan tidak merata',
+      if (hasWhiteSpeckOnVeg) 'bintik putih pada sayuran hijau',
+      if (hasWhiteMoldOnOrangeFruit) 'bercak putih curiga jamur pada buah',
+      if (hasCharredSpotOnLauk) 'bagian gosong menghitam pada lauk',
+    ];
+    if (specificParts.isNotEmpty) {
       summaryText =
-          'Terdeteksi area nasi tampak kekuningan tidak merata serta bintik putih pada sayuran. Periksa bau dan kondisi makanan secara ketat.';
-    } else if (hasWhiteSpeckOnVeg) {
-      summaryText =
-          'Terdeteksi bintik putih atau pucat pada area sayuran hijau. Periksa kemungkinan jamur atau lendir sebelum dibagikan.';
-    } else if (hasLocalizedYellowing) {
-      summaryText =
-          'Terdeteksi area nasi atau makanan yang tampak kekuningan tidak merata. Periksa bau dan teksturnya sebelum dibagikan ke siswa.';
+          'Terdeteksi ${specificParts.join(', ')}. Periksa bau dan kondisi makanan secara ketat sebelum dibagikan.';
     } else {
       summaryText =
           'Terdeteksi area warna kusam atau kilap mencurigakan pada makanan. Periksa bau dan kondisi makanan secara manual.';

@@ -688,6 +688,16 @@ void main() {
             await DeviceBatchExportService().buildPrintableLabelPdfBytes(batch);
         expect(pdfBytes.length, greaterThan(500));
         expect(ascii.decode(pdfBytes.take(5).toList()), '%PDF-');
+
+        final courierWaText = DeviceBatchExportService.buildCourierWhatsAppText(
+          batch,
+        );
+        expect(courierWaText, contains('*SURAT JALAN DIGITAL LACAKSAJI*\n\n'));
+        expect(courierWaText, contains('*Detail Pengiriman Batch*\n'));
+        expect(courierWaText, contains('- Kode Batch: *BCH-2611-21PDF*\n'));
+        expect(courierWaText, contains('- Jumlah Porsi: *160 porsi*\n'));
+        expect(courierWaText, contains('*Instruksi Kurir*\n'));
+        expect(courierWaText, isNot(contains('\u2014')));
       },
     );
   });

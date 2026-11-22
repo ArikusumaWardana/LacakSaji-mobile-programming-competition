@@ -231,13 +231,25 @@ class SchoolRegistrationResult {
   final AuthSessionSnapshot? session;
 }
 
+enum AuthBusyAction {
+  signIn,
+  signInDemo,
+  registerKitchen,
+  registerSchool,
+  refreshStatus,
+  updatePartnerCode,
+  updateSchoolSettings,
+  updateKitchenLocation,
+  signOut,
+}
+
 class AuthState {
   const AuthState({
     required this.status,
     this.profile,
     this.kitchen,
     this.school,
-    this.isBusy = false,
+    this.busyAction,
     this.errorMessage,
     this.pendingConfirmationEmail,
     this.holdKitchenActivationSummary = false,
@@ -248,7 +260,7 @@ class AuthState {
         profile = null,
         kitchen = null,
         school = null,
-        isBusy = false,
+        busyAction = null,
         errorMessage = null,
         pendingConfirmationEmail = null,
         holdKitchenActivationSummary = false;
@@ -257,10 +269,12 @@ class AuthState {
   final UserProfile? profile;
   final KitchenProfile? kitchen;
   final SchoolProfile? school;
-  final bool isBusy;
+  final AuthBusyAction? busyAction;
   final String? errorMessage;
   final String? pendingConfirmationEmail;
   final bool holdKitchenActivationSummary;
+
+  bool get isBusy => busyAction != null;
 
   String get landingRoute {
     if (status != AuthStatus.authenticated || profile == null) {
@@ -285,10 +299,11 @@ class AuthState {
     UserProfile? profile,
     KitchenProfile? kitchen,
     SchoolProfile? school,
-    bool? isBusy,
+    AuthBusyAction? busyAction,
     String? errorMessage,
     String? pendingConfirmationEmail,
     bool? holdKitchenActivationSummary,
+    bool clearBusy = false,
     bool clearError = false,
     bool clearEntities = false,
   }) {
@@ -297,7 +312,7 @@ class AuthState {
       profile: clearEntities ? null : (profile ?? this.profile),
       kitchen: clearEntities ? null : (kitchen ?? this.kitchen),
       school: clearEntities ? null : (school ?? this.school),
-      isBusy: isBusy ?? this.isBusy,
+      busyAction: clearBusy ? null : (busyAction ?? this.busyAction),
       errorMessage: clearError ? null : (errorMessage ?? this.errorMessage),
       pendingConfirmationEmail: clearEntities
           ? null
@@ -307,6 +322,48 @@ class AuthState {
           : (holdKitchenActivationSummary ?? this.holdKitchenActivationSummary),
     );
   }
+}
+
+enum AuthFeedbackType {
+  loggedIn,
+  loggedOut,
+}
+
+/// Transient notification emitted after explicit sign-in or sign-out transitions.
+class AuthFeedbackNotice {
+  const AuthFeedbackNotice({
+    required this.id,
+    required this.type,
+    required this.title,
+    required this.message,
+  });
+
+  final int id;
+  final AuthFeedbackType type;
+  final String title;
+  final String message;
+}
+
+/// Resolves a clean actor display name without duplicating role parentheses.
+String? resolveAuthActorName({
+  required UserProfile? profile,
+  required KitchenProfile? kitchen,
+  required SchoolProfile? school,
+}) {
+  final kitchenName = kitchen?.name.trim();
+  if (kitchenName != null && kitchenName.isNotEmpty) {
+    return kitchenName;
+  }
+  final schoolName = school?.name.trim();
+  if (schoolName != null && schoolName.isNotEmpty) {
+    return schoolName;
+  }
+  final fullName = profile?.fullName.trim();
+  if (fullName != null && fullName.isNotEmpty) {
+    final cleaned = fullName.replaceAll(RegExp(r'\s*\([^)]*\)\s*$'), '').trim();
+    return cleaned.isNotEmpty ? cleaned : fullName;
+  }
+  return null;
 }
 
 /// Formats Indonesian WhatsApp numbers with a leading `+62` prefix for display.

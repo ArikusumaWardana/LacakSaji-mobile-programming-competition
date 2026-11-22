@@ -161,41 +161,50 @@ class PendingVerificationScreen extends ConsumerWidget {
                   LacakPrimaryButton(
                     label: 'Periksa Status Sekarang',
                     icon: Icons.refresh_rounded,
-                    isLoading: authState.isBusy,
-                    onPressed: () async {
-                      final ok = await ref
-                          .read(authControllerProvider.notifier)
-                          .refreshStatus();
-                      if (ok && context.mounted) {
-                        final nextStatus = ref
-                            .read(authControllerProvider)
-                            .school
-                            ?.verificationStatus;
-                        if (nextStatus != SchoolVerificationStatus.approved) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text(
-                                'Status masih menunggu persetujuan dapur SPPG.',
-                              ),
-                            ),
-                          );
-                        }
-                      }
-                    },
+                    isLoading:
+                        authState.busyAction == AuthBusyAction.refreshStatus,
+                    onPressed: authState.isBusy
+                        ? null
+                        : () async {
+                            final ok = await ref
+                                .read(authControllerProvider.notifier)
+                                .refreshStatus();
+                            if (ok && context.mounted) {
+                              final nextStatus = ref
+                                  .read(authControllerProvider)
+                                  .school
+                                  ?.verificationStatus;
+                              if (nextStatus !=
+                                  SchoolVerificationStatus.approved) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text(
+                                      'Status masih menunggu persetujuan dapur SPPG.',
+                                    ),
+                                  ),
+                                );
+                              }
+                            }
+                          },
                   ),
                   const SizedBox(height: AppSpacing.md),
                   LacakSecondaryButton(
                     label: 'Ubah Kode Mitra SPPG',
                     icon: Icons.edit_rounded,
-                    isLoading: authState.isBusy,
-                    onPressed: () => _openChangePartnerDialog(context, ref),
+                    isLoading:
+                        authState.busyAction ==
+                        AuthBusyAction.updatePartnerCode,
+                    onPressed: authState.isBusy
+                        ? null
+                        : () => _openChangePartnerDialog(context, ref),
                   ),
                   const SizedBox(height: AppSpacing.md),
                   LacakSecondaryButton(
                     label: 'Pindai QR Kotak Makanan (Tautkan Otomatis)',
                     icon: Icons.qr_code_scanner_rounded,
-                    isLoading: authState.isBusy,
-                    onPressed: () => _showAutoLinkInfoDialog(context),
+                    onPressed: authState.isBusy
+                        ? null
+                        : () => _showAutoLinkInfoDialog(context),
                   ),
                 ],
               ),

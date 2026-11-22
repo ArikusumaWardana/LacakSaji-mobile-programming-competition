@@ -10,8 +10,8 @@ import 'package:uuid/uuid.dart';
 
 import '../constants/app_constants.dart';
 
-/// Maximum compressed packaging/sample photo byte budget (120 KB to preserve mold & discoloration detail for AI Vision).
-const int kMaxWebpPhotoBytes = 120 * 1024;
+/// Maximum compressed packaging/sample photo byte budget (180 KB to preserve mold & char detail for AI Vision).
+const int kMaxWebpPhotoBytes = 180 * 1024;
 
 class CapturedWebpPhoto {
   const CapturedWebpPhoto({

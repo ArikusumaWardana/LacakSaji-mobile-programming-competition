@@ -1,7 +1,10 @@
+import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:drift/drift.dart' hide isNotNull, isNull;
 import 'package:drift/native.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -531,9 +534,21 @@ void main() {
 
         expect(find.text('Beranda Dapur SPPG'), findsOneWidget);
         expect(find.text('SPPG Purwokerto Utara'), findsOneWidget);
+        expect(find.text('Berhasil Masuk'), findsOneWidget);
+        expect(
+          find.text('Masuk sebagai SPPG Purwokerto Utara (Petugas Dapur SPPG).'),
+          findsOneWidget,
+        );
         expect(find.byType(NavigationBar), findsOneWidget);
         expect(find.text('Sekolah'), findsOneWidget);
         expect(find.text('Riwayat'), findsOneWidget);
+
+        // Dismisses cleanly when tapping close button.
+        await tester.tap(
+          find.byKey(const ValueKey<String>('auth_feedback_close_button')),
+        );
+        await tester.pumpAndSettle();
+        expect(find.text('Berhasil Masuk'), findsNothing);
 
         // Verify responsive switch to NavigationRail on >= 600dp width.
         tester.view.physicalSize = const Size(720, 900);
@@ -610,6 +625,17 @@ void main() {
         await tester.pumpAndSettle();
 
         expect(find.text('Masuk LacakSaji'), findsOneWidget);
+        expect(find.text('Berhasil Keluar'), findsOneWidget);
+        expect(
+          find.text('Anda telah keluar dari akun SDN 1 Purwokerto.'),
+          findsOneWidget,
+        );
+        expect(tester.takeException(), isNull);
+
+        // Auto-dismisses cleanly after 4 seconds.
+        await tester.pump(const Duration(seconds: 4));
+        await tester.pumpAndSettle();
+        expect(find.text('Berhasil Keluar'), findsNothing);
 
         tester.view.resetPhysicalSize();
         tester.view.resetDevicePixelRatio();
@@ -997,4 +1023,292 @@ void main() {
       expect(historySamples.first.status, 'disposed');
     });
   });
+
+  group('Auth Floating Notification Coverage', () {
+    testWidgets(
+      'Email/password form login and S04 Pending Keluar logout show floating feedback',
+      (tester) async {
+        SharedPreferences.setMockInitialValues({});
+        final prefs = await SharedPreferences.getInstance();
+        final fakeRepo = _PendingFormFakeAuthRepository();
+
+        await tester.pumpWidget(buildTestApp(prefs: prefs, fakeRepo: fakeRepo));
+        await tester.pumpAndSettle();
+
+        final fields = find.byType(TextFormField);
+        await tester.ensureVisible(fields.at(0));
+        await tester.enterText(fields.at(0), 'pending.sekolah@lacaksaji.id');
+        await tester.enterText(fields.at(1), 'LacakSaji2026!');
+        await tester.pump();
+
+        final submitButton = find.byType(ElevatedButton).first;
+        await tester.ensureVisible(submitButton);
+        await tester.tap(submitButton);
+        await tester.pumpAndSettle();
+
+        expect(find.text('Berhasil Masuk'), findsOneWidget);
+        expect(
+          find.text(
+            'Masuk sebagai SDN Harapan Menunggu (Menunggu persetujuan SPPG).',
+          ),
+          findsOneWidget,
+        );
+
+        await tester.tap(
+          find.byKey(const ValueKey<String>('auth_feedback_close_button')),
+        );
+        await tester.pumpAndSettle();
+        expect(find.text('Berhasil Masuk'), findsNothing);
+
+        final logoutControl = find
+            .ancestor(
+              of: find.textContaining('Keluar'),
+              matching: find.bySubtype<ButtonStyleButton>(),
+            )
+            .last;
+        await tester.ensureVisible(logoutControl);
+        await tester.tap(logoutControl);
+        await tester.pumpAndSettle();
+        final confirmLogout = find.textContaining('Ya, Keluar');
+        if (confirmLogout.evaluate().isNotEmpty) {
+          await tester.tap(confirmLogout.first);
+          await tester.pumpAndSettle();
+        }
+
+        expect(find.text('Berhasil Keluar'), findsOneWidget);
+        expect(
+          find.text('Anda telah keluar dari akun SDN Harapan Menunggu.'),
+          findsOneWidget,
+        );
+
+        await tester.pump(const Duration(seconds: 4));
+        await tester.pumpAndSettle();
+        expect(find.text('Berhasil Keluar'), findsNothing);
+      },
+    );
+
+    testWidgets(
+      'C01 signOut loader only animates Keluar Akun without triggering sync loader',
+      (tester) async {
+        SharedPreferences.setMockInitialValues({});
+        final prefs = await SharedPreferences.getInstance();
+        final fakeRepo = _DelayedSignOutFakeAuthRepository();
+
+        await tester.pumpWidget(buildTestApp(prefs: prefs, fakeRepo: fakeRepo));
+        await tester.pumpAndSettle();
+
+        await tester.ensureVisible(find.text('Masuk Cepat (Akun Demo)'));
+        await tester.tap(find.text('Masuk Cepat (Akun Demo)'));
+        await tester.pumpAndSettle();
+
+        await tester.ensureVisible(find.text('Sekolah 1: SDN 1 Purwokerto'));
+        await tester.tap(find.text('Sekolah 1: SDN 1 Purwokerto'));
+        await tester.pumpAndSettle();
+
+        await tester.tap(find.text('Profil'));
+        await tester.pumpAndSettle();
+
+        final logoutButtonFinder = find.text('Keluar Akun');
+        await tester.ensureVisible(logoutButtonFinder);
+        await tester.tap(logoutButtonFinder);
+        await tester.pumpAndSettle();
+
+        await tester.tap(find.text('Ya, Keluar Akun'));
+        await tester.pump();
+
+        expect(
+          find.descendant(
+            of: find.ancestor(
+              of: find.text('Keluar Akun'),
+              matching: find.byType(ElevatedButton),
+            ),
+            matching: find.byType(CircularProgressIndicator),
+          ),
+          findsOneWidget,
+        );
+        expect(
+          find.descendant(
+            of: find.ancestor(
+              of: find.text('Sinkronkan & Perbarui Sekarang'),
+              matching: find.byType(OutlinedButton),
+            ),
+            matching: find.byType(CircularProgressIndicator),
+          ),
+          findsNothing,
+        );
+        expect(
+          find.descendant(
+            of: find.ancestor(
+              of: find.text('Ubah WA Puskesmas & Wilayah'),
+              matching: find.byType(OutlinedButton),
+            ),
+            matching: find.byType(CircularProgressIndicator),
+          ),
+          findsNothing,
+        );
+
+        fakeRepo.completeSignOut();
+        await tester.pumpAndSettle();
+        expect(find.text('Berhasil Keluar'), findsOneWidget);
+      },
+    );
+
+    testWidgets(
+      'C01 sync and refreshStatus loader only animates Sinkronkan without GPS or Keluar loaders',
+      (tester) async {
+        final tempDocsDir = Directory.systemTemp.createTempSync(
+          'lacak_c01_sync_',
+        );
+        const pathChannel = MethodChannel('plugins.flutter.io/path_provider');
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(pathChannel, (call) async {
+              if (call.method == 'getApplicationDocumentsDirectory' ||
+                  call.method == 'getTemporaryDirectory') {
+                return tempDocsDir.path;
+              }
+              return null;
+            });
+        addTearDown(() async {
+          TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+              .setMockMethodCallHandler(pathChannel, null);
+          if (tempDocsDir.existsSync()) {
+            tempDocsDir.deleteSync(recursive: true);
+          }
+        });
+
+        SharedPreferences.setMockInitialValues({});
+        final prefs = await SharedPreferences.getInstance();
+        final fakeRepo = _DelayedSignOutFakeAuthRepository();
+
+        await tester.pumpWidget(buildTestApp(prefs: prefs, fakeRepo: fakeRepo));
+        await tester.pumpAndSettle();
+
+        await tester.ensureVisible(find.text('Masuk Cepat (Akun Demo)'));
+        await tester.tap(find.text('Masuk Cepat (Akun Demo)'));
+        await tester.pumpAndSettle();
+
+        await tester.ensureVisible(find.text('Dapur SPPG A (SPPG-PWT-01)'));
+        await tester.tap(find.text('Dapur SPPG A (SPPG-PWT-01)'));
+        await tester.pumpAndSettle();
+
+        await tester.tap(find.text('Profil'));
+        await tester.pumpAndSettle();
+
+        final syncButton = find.text('Sinkronkan & Perbarui Sekarang');
+        await tester.ensureVisible(syncButton);
+        await tester.tap(syncButton);
+        for (var i = 0; i < 25 && !fakeRepo.refreshStarted; i++) {
+          await tester.runAsync(
+            () => Future<void>.delayed(const Duration(milliseconds: 20)),
+          );
+          await tester.pump(const Duration(milliseconds: 20));
+        }
+        expect(fakeRepo.refreshStarted, isTrue);
+
+        expect(
+          find.descendant(
+            of: find.ancestor(
+              of: find.text('Sinkronkan & Perbarui Sekarang'),
+              matching: find.byType(OutlinedButton),
+            ),
+            matching: find.byType(CircularProgressIndicator),
+          ),
+          findsOneWidget,
+        );
+        expect(
+          find.descendant(
+            of: find.ancestor(
+              of: find.text('Perbarui Lokasi GPS Dapur'),
+              matching: find.byType(OutlinedButton),
+            ),
+            matching: find.byType(CircularProgressIndicator),
+          ),
+          findsNothing,
+        );
+        expect(
+          find.descendant(
+            of: find.ancestor(
+              of: find.text('Keluar Akun'),
+              matching: find.byType(ElevatedButton),
+            ),
+            matching: find.byType(CircularProgressIndicator),
+          ),
+          findsNothing,
+        );
+
+        fakeRepo.completeRefresh();
+        await tester.pumpAndSettle();
+        expect(
+          find.text('Status akun dan profil berhasil disinkronkan.'),
+          findsOneWidget,
+        );
+      },
+    );
+  });
+}
+
+class _DelayedSignOutFakeAuthRepository extends _FakeAuthRepository {
+  final Completer<void> _signOutCompleter = Completer<void>();
+  bool refreshStarted = false;
+  final Completer<void> _refreshCompleter = Completer<void>();
+
+  void completeSignOut() {
+    if (!_signOutCompleter.isCompleted) {
+      _signOutCompleter.complete();
+    }
+  }
+
+  void completeRefresh() {
+    if (!_refreshCompleter.isCompleted) {
+      _refreshCompleter.complete();
+    }
+  }
+
+  @override
+  Future<AuthSessionSnapshot?> refreshSession() async {
+    refreshStarted = true;
+    await _refreshCompleter.future;
+    return super.refreshSession();
+  }
+
+  @override
+  Future<void> signOut() async {
+    await _signOutCompleter.future;
+    await super.signOut();
+  }
+}
+
+class _PendingFormFakeAuthRepository extends _FakeAuthRepository {
+  @override
+  Future<AuthSessionSnapshot> signInWithPassword({
+    required String email,
+    required String password,
+  }) async {
+    if (email.trim() == 'pending.sekolah@lacaksaji.id') {
+      currentSession = const AuthSessionSnapshot(
+        profile: UserProfile(
+          id: 'u-pending',
+          email: 'pending.sekolah@lacaksaji.id',
+          role: UserRole.school,
+          fullName: 'Ibu Rina',
+        ),
+        school: SchoolProfile(
+          id: 's-pending',
+          ownerUserId: 'u-pending',
+          sppgId: 'k-1',
+          npsn: '20309999',
+          name: 'SDN Harapan Menunggu',
+          adm4Code: '33.02.26.1001',
+          lat: -7.42,
+          lng: 109.23,
+          puskesmasWa: '628112800001',
+          verificationStatus: SchoolVerificationStatus.pending,
+          partnerKitchenName: 'SPPG Purwokerto Utara',
+          partnerInviteCode: 'SPPG-PWT-01',
+        ),
+      );
+      return currentSession!;
+    }
+    return super.signInWithPassword(email: email, password: password);
+  }
 }

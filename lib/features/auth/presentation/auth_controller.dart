@@ -18,6 +18,67 @@ final authRepositoryProvider = Provider<AuthRepository>((ref) {
   );
 });
 
+final authFeedbackProvider =
+    NotifierProvider<AuthFeedbackNotifier, AuthFeedbackNotice?>(
+      AuthFeedbackNotifier.new,
+    );
+
+class AuthFeedbackNotifier extends Notifier<AuthFeedbackNotice?> {
+  int _nextId = 0;
+
+  @override
+  AuthFeedbackNotice? build() => null;
+
+  void showLoginSuccess(AuthSessionSnapshot snapshot) {
+    final actorName =
+        resolveAuthActorName(
+          profile: snapshot.profile,
+          kitchen: snapshot.kitchen,
+          school: snapshot.school,
+        ) ??
+        snapshot.profile.role.label;
+    final roleNote = _resolveLoginRoleDetail(snapshot);
+    state = AuthFeedbackNotice(
+      id: ++_nextId,
+      type: AuthFeedbackType.loggedIn,
+      title: 'Berhasil Masuk',
+      message: 'Masuk sebagai $actorName ($roleNote).',
+    );
+  }
+
+  void showLogoutSuccess(String? previousActorName) {
+    final cleanName = previousActorName?.trim();
+    state = AuthFeedbackNotice(
+      id: ++_nextId,
+      type: AuthFeedbackType.loggedOut,
+      title: 'Berhasil Keluar',
+      message: cleanName != null && cleanName.isNotEmpty
+          ? 'Anda telah keluar dari akun $cleanName.'
+          : 'Anda telah keluar dari akun.',
+    );
+  }
+
+  void dismiss() {
+    if (state != null) {
+      state = null;
+    }
+  }
+
+  String _resolveLoginRoleDetail(AuthSessionSnapshot snapshot) {
+    if (snapshot.profile.role == UserRole.school && snapshot.school != null) {
+      switch (snapshot.school!.verificationStatus) {
+        case SchoolVerificationStatus.pending:
+          return 'Menunggu persetujuan SPPG';
+        case SchoolVerificationStatus.rejected:
+          return 'Tautan SPPG ditolak';
+        case SchoolVerificationStatus.approved:
+          return snapshot.profile.role.label;
+      }
+    }
+    return snapshot.profile.role.label;
+  }
+}
+
 final authControllerProvider =
     NotifierProvider<AuthController, AuthState>(AuthController.new);
 
@@ -61,8 +122,28 @@ class AuthController extends Notifier<AuthState> {
   Future<bool> signIn({
     required String email,
     required String password,
+  }) {
+    return _performSignIn(
+      email: email,
+      password: password,
+      busyAction: AuthBusyAction.signIn,
+    );
+  }
+
+  Future<bool> signInDemo(DemoAccountPreset preset) {
+    return _performSignIn(
+      email: preset.email,
+      password: preset.password,
+      busyAction: AuthBusyAction.signInDemo,
+    );
+  }
+
+  Future<bool> _performSignIn({
+    required String email,
+    required String password,
+    required AuthBusyAction busyAction,
   }) async {
-    state = state.copyWith(isBusy: true, clearError: true);
+    state = state.copyWith(busyAction: busyAction, clearError: true);
     try {
       final snapshot = await _repo.signInWithPassword(
         email: email,
@@ -74,18 +155,15 @@ class AuthController extends Notifier<AuthState> {
         kitchen: snapshot.kitchen,
         school: snapshot.school,
       );
+      ref.read(authFeedbackProvider.notifier).showLoginSuccess(snapshot);
       return true;
     } catch (error) {
       state = state.copyWith(
-        isBusy: false,
+        clearBusy: true,
         errorMessage: AuthErrorMapper.mapException(error),
       );
       return false;
     }
-  }
-
-  Future<bool> signInDemo(DemoAccountPreset preset) {
-    return signIn(email: preset.email, password: preset.password);
   }
 
   Future<WhitelistCheckResult> verifySppgWhitelist({
@@ -110,7 +188,10 @@ class AuthController extends Notifier<AuthState> {
     required String email,
     required String password,
   }) async {
-    state = state.copyWith(isBusy: true, clearError: true);
+    state = state.copyWith(
+      busyAction: AuthBusyAction.registerKitchen,
+      clearError: true,
+    );
     try {
       final result = await _repo.registerKitchen(
         regNumber: regNumber,
@@ -142,7 +223,7 @@ class AuthController extends Notifier<AuthState> {
       return result;
     } catch (error) {
       state = state.copyWith(
-        isBusy: false,
+        clearBusy: true,
         errorMessage: AuthErrorMapper.mapException(error),
       );
       return null;
@@ -178,7 +259,10 @@ class AuthController extends Notifier<AuthState> {
     required String email,
     required String password,
   }) async {
-    state = state.copyWith(isBusy: true, clearError: true);
+    state = state.copyWith(
+      busyAction: AuthBusyAction.registerSchool,
+      clearError: true,
+    );
     try {
       final result = await _repo.registerSchool(
         npsn: npsn,
@@ -210,7 +294,7 @@ class AuthController extends Notifier<AuthState> {
       return result;
     } catch (error) {
       state = state.copyWith(
-        isBusy: false,
+        clearBusy: true,
         errorMessage: AuthErrorMapper.mapException(error),
       );
       return null;
@@ -218,7 +302,10 @@ class AuthController extends Notifier<AuthState> {
   }
 
   Future<bool> refreshStatus() async {
-    state = state.copyWith(isBusy: true, clearError: true);
+    state = state.copyWith(
+      busyAction: AuthBusyAction.refreshStatus,
+      clearError: true,
+    );
     try {
       final snapshot = await _repo.refreshSession();
       if (snapshot == null) {
@@ -234,7 +321,7 @@ class AuthController extends Notifier<AuthState> {
       return true;
     } catch (error) {
       state = state.copyWith(
-        isBusy: false,
+        clearBusy: true,
         errorMessage: AuthErrorMapper.mapException(error),
       );
       return false;
@@ -242,7 +329,10 @@ class AuthController extends Notifier<AuthState> {
   }
 
   Future<bool> updateSchoolPartnerCode(String inviteCode) async {
-    state = state.copyWith(isBusy: true, clearError: true);
+    state = state.copyWith(
+      busyAction: AuthBusyAction.updatePartnerCode,
+      clearError: true,
+    );
     try {
       final snapshot = await _repo.updateSchoolPartnerCode(inviteCode);
       state = AuthState(
@@ -254,7 +344,7 @@ class AuthController extends Notifier<AuthState> {
       return true;
     } catch (error) {
       state = state.copyWith(
-        isBusy: false,
+        clearBusy: true,
         errorMessage: AuthErrorMapper.mapException(error),
       );
       return false;
@@ -265,7 +355,10 @@ class AuthController extends Notifier<AuthState> {
     required String puskesmasWa,
     required String adm4Code,
   }) async {
-    state = state.copyWith(isBusy: true, clearError: true);
+    state = state.copyWith(
+      busyAction: AuthBusyAction.updateSchoolSettings,
+      clearError: true,
+    );
     try {
       final snapshot = await _repo.updateSchoolOperationalSettings(
         puskesmasWa: puskesmasWa,
@@ -280,7 +373,7 @@ class AuthController extends Notifier<AuthState> {
       return true;
     } catch (error) {
       state = state.copyWith(
-        isBusy: false,
+        clearBusy: true,
         errorMessage: AuthErrorMapper.mapException(error),
       );
       return false;
@@ -292,7 +385,10 @@ class AuthController extends Notifier<AuthState> {
     required double lng,
     required String adm4Code,
   }) async {
-    state = state.copyWith(isBusy: true, clearError: true);
+    state = state.copyWith(
+      busyAction: AuthBusyAction.updateKitchenLocation,
+      clearError: true,
+    );
     try {
       final snapshot = await _repo.updateKitchenLocation(
         lat: lat,
@@ -308,7 +404,7 @@ class AuthController extends Notifier<AuthState> {
       return true;
     } catch (error) {
       state = state.copyWith(
-        isBusy: false,
+        clearBusy: true,
         errorMessage: AuthErrorMapper.mapException(error),
       );
       return false;
@@ -316,11 +412,22 @@ class AuthController extends Notifier<AuthState> {
   }
 
   Future<void> signOut() async {
-    state = state.copyWith(isBusy: true, clearError: true);
+    final previousActorName = resolveAuthActorName(
+      profile: state.profile,
+      kitchen: state.kitchen,
+      school: state.school,
+    );
+    state = state.copyWith(
+      busyAction: AuthBusyAction.signOut,
+      clearError: true,
+    );
     try {
       await _repo.signOut();
     } finally {
       state = const AuthState(status: AuthStatus.unauthenticated);
+      ref
+          .read(authFeedbackProvider.notifier)
+          .showLogoutSuccess(previousActorName);
     }
   }
 }

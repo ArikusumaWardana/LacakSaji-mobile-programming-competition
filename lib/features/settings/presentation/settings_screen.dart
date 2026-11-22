@@ -156,6 +156,7 @@ class SettingsScreen extends ConsumerWidget {
     final isOffline = ref.watch(isOfflineProvider).value ?? false;
     final pendingCount = ref.watch(pendingSyncCountProvider).value ?? 0;
     final syncState = ref.watch(offlineSyncControllerProvider);
+    final anyBusy = authState.isBusy || syncState.isSyncing;
     final width = MediaQuery.sizeOf(context).width;
     final horizontalPad = AppSpacing.horizontalPadding(width);
     final maxWidth = AppSpacing.maxContentWidth(width);
@@ -339,58 +340,65 @@ class SettingsScreen extends ConsumerWidget {
                               label: 'Sinkronkan & Perbarui Sekarang',
                               icon: Icons.sync_rounded,
                               isLoading:
-                                  authState.isBusy || syncState.isSyncing,
-                              onPressed: () async {
-                                final report = await ref
-                                    .read(
-                                      offlineSyncControllerProvider.notifier,
-                                    )
-                                    .syncNowWithReport();
-                                final totalSynced = report.syncedCount;
-                                if (totalSynced > 0) {
-                                  if (kitchen != null) {
-                                    invalidateKitchenProviders(ref);
-                                  }
-                                  if (school != null) {
-                                    invalidateSchoolProviders(ref);
-                                  }
-                                }
-                                final ok = await ref
-                                    .read(authControllerProvider.notifier)
-                                    .refreshStatus();
-                                if (context.mounted) {
-                                  final syncFeedback =
-                                      report.remainingCount > 0 ||
-                                          totalSynced > 0
-                                      ? report.buildFeedbackMessage()
-                                      : (ok
-                                            ? 'Status akun dan profil berhasil disinkronkan.'
-                                            : (ref
-                                                      .read(
-                                                        authControllerProvider,
-                                                      )
-                                                      .errorMessage ??
-                                                  'Sinkronisasi belum berhasil.'));
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Text(syncFeedback),
-                                      action: report.remainingCount > 0
-                                          ? SnackBarAction(
-                                              label: 'Lihat Rincian',
-                                              onPressed: () {
-                                                if (context.mounted) {
-                                                  showPendingSyncQueueSheet(
-                                                    context,
-                                                    ref,
-                                                  );
-                                                }
-                                              },
-                                            )
-                                          : null,
-                                    ),
-                                  );
-                                }
-                              },
+                                  syncState.isSyncing ||
+                                  authState.busyAction ==
+                                      AuthBusyAction.refreshStatus,
+                              onPressed: anyBusy
+                                  ? null
+                                  : () async {
+                                      final report = await ref
+                                          .read(
+                                            offlineSyncControllerProvider
+                                                .notifier,
+                                          )
+                                          .syncNowWithReport();
+                                      final totalSynced = report.syncedCount;
+                                      if (totalSynced > 0) {
+                                        if (kitchen != null) {
+                                          invalidateKitchenProviders(ref);
+                                        }
+                                        if (school != null) {
+                                          invalidateSchoolProviders(ref);
+                                        }
+                                      }
+                                      final ok = await ref
+                                          .read(authControllerProvider.notifier)
+                                          .refreshStatus();
+                                      if (context.mounted) {
+                                        final syncFeedback =
+                                            report.remainingCount > 0 ||
+                                                totalSynced > 0
+                                            ? report.buildFeedbackMessage()
+                                            : (ok
+                                                  ? 'Status akun dan profil berhasil disinkronkan.'
+                                                  : (ref
+                                                            .read(
+                                                              authControllerProvider,
+                                                            )
+                                                            .errorMessage ??
+                                                        'Sinkronisasi belum berhasil.'));
+                                        ScaffoldMessenger.of(
+                                          context,
+                                        ).showSnackBar(
+                                          SnackBar(
+                                            content: Text(syncFeedback),
+                                            action: report.remainingCount > 0
+                                                ? SnackBarAction(
+                                                    label: 'Lihat Rincian',
+                                                    onPressed: () {
+                                                      if (context.mounted) {
+                                                        showPendingSyncQueueSheet(
+                                                          context,
+                                                          ref,
+                                                        );
+                                                      }
+                                                    },
+                                                  )
+                                                : null,
+                                          ),
+                                        );
+                                      }
+                                    },
                             ),
                             if (pendingCount > 0) ...[
                               const SizedBox(height: AppSpacing.xs),
@@ -428,9 +436,16 @@ class SettingsScreen extends ConsumerWidget {
                           child: LacakSecondaryButton(
                             label: 'Ubah WA Puskesmas & Wilayah',
                             icon: Icons.edit_rounded,
-                            isLoading: authState.isBusy,
-                            onPressed: () =>
-                                _editSchoolSettings(context, ref, school),
+                            isLoading:
+                                authState.busyAction ==
+                                AuthBusyAction.updateSchoolSettings,
+                            onPressed: anyBusy
+                                ? null
+                                : () => _editSchoolSettings(
+                                    context,
+                                    ref,
+                                    school,
+                                  ),
                           ),
                         ),
                       ],
@@ -451,9 +466,16 @@ class SettingsScreen extends ConsumerWidget {
                           child: LacakSecondaryButton(
                             label: 'Perbarui Lokasi GPS Dapur',
                             icon: Icons.location_on_rounded,
-                            isLoading: authState.isBusy,
-                            onPressed: () =>
-                                _updateKitchenGps(context, ref, kitchen),
+                            isLoading:
+                                authState.busyAction ==
+                                AuthBusyAction.updateKitchenLocation,
+                            onPressed: anyBusy
+                                ? null
+                                : () => _updateKitchenGps(
+                                    context,
+                                    ref,
+                                    kitchen,
+                                  ),
                           ),
                         ),
                       ],
@@ -463,8 +485,10 @@ class SettingsScreen extends ConsumerWidget {
                   LacakDangerButton(
                     label: 'Keluar Akun',
                     icon: Icons.logout_rounded,
-                    isLoading: authState.isBusy,
-                    onPressed: () => _confirmSignOut(context, ref),
+                    isLoading: authState.busyAction == AuthBusyAction.signOut,
+                    onPressed: anyBusy
+                        ? null
+                        : () => _confirmSignOut(context, ref),
                   ),
                   const SizedBox(height: AppSpacing.lg),
                   Text(

@@ -12,6 +12,7 @@ import '../../../core/widgets/lacak_logo.dart';
 import '../../../core/widgets/lacak_section_surface.dart';
 import '../../../core/widgets/lacak_status_badge.dart';
 import '../../../core/widgets/lacak_text_field.dart';
+import '../domain/auth_models.dart';
 import 'auth_controller.dart';
 
 /// S02: Centered focal login screen modeled after the user's reference layout
@@ -332,8 +333,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     LacakPrimaryButton(
                       label: 'Masuk',
                       icon: Icons.login_rounded,
-                      isLoading: authState.isBusy,
-                      onPressed: _submitLogin,
+                      isLoading: authState.busyAction == AuthBusyAction.signIn,
+                      onPressed: authState.isBusy ? null : _submitLogin,
                     ),
                     const SizedBox(height: AppSpacing.xl),
 
@@ -401,8 +402,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     LacakSecondaryButton(
                       label: 'Masuk Cepat (Akun Demo)',
                       icon: Icons.switch_account_rounded,
-                      isLoading: authState.isBusy,
-                      onPressed: () => _openDemoSheet(),
+                      isLoading:
+                          authState.busyAction == AuthBusyAction.signInDemo,
+                      onPressed: authState.isBusy
+                          ? null
+                          : () => _openDemoSheet(),
                     ),
                     const SizedBox(height: AppSpacing.xl),
 

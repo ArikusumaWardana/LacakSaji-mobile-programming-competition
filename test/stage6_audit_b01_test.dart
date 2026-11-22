@@ -962,6 +962,37 @@ void main() {
         expect(yellowRes.summaryText, contains('kekuningan'));
         expect(yellowRes.summaryText, isNot(contains('TFLite')));
 
+        // 1c) Papaya pieces with fuzzy white mold spots & charred spots on fried tofu.
+        final moldyPapayaCharredTofu = img.Image(width: 160, height: 160);
+        for (var y = 0; y < 160; y++) {
+          for (var x = 0; x < 160; x++) {
+            if (x < 80) {
+              // Orange-coral papaya cubes with crisp white mold colonies
+              final isWhiteMold = x >= 28 && x < 46 && y >= 50 && y < 74;
+              if (isWhiteMold) {
+                moldyPapayaCharredTofu.setPixelRgb(x, y, 224, 222, 218);
+              } else {
+                moldyPapayaCharredTofu.setPixelRgb(x, y, 206, 98, 56);
+              }
+            } else {
+              // Warm golden-brown fried tofu with blackened charred patch
+              final isCharredPatch = x >= 104 && x < 126 && y >= 52 && y < 76;
+              if (isCharredPatch) {
+                moldyPapayaCharredTofu.setPixelRgb(x, y, 22, 20, 18);
+              } else {
+                moldyPapayaCharredTofu.setPixelRgb(x, y, 168, 114, 58);
+              }
+            }
+          }
+        }
+        final defectPng = Uint8List.fromList(
+          img.encodePng(moldyPapayaCharredTofu),
+        );
+        final defectRes = await service.analyzeOnDevice(defectPng);
+        expect(defectRes.label, OnDeviceVisualLabel.suspiciousDiscoloration);
+        expect(defectRes.summaryText, contains('jamur'));
+        expect(defectRes.summaryText, contains('gosong'));
+
         // 2) Blurry camera photo of spoiled/slimy food (dark dull oxidation + wet slime glare clusters).
         final blurrySpoiled = img.Image(width: 160, height: 160);
         for (var y = 0; y < 160; y++) {

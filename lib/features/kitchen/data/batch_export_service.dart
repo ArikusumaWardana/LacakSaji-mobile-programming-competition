@@ -11,6 +11,7 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:share_plus/share_plus.dart';
 
+import '../../alerts/domain/cluster_alert_models.dart';
 import '../domain/kitchen_models.dart';
 
 typedef WaybillPngCapturer = Future<Uint8List> Function(GlobalKey boundaryKey);
@@ -45,6 +46,30 @@ abstract class BatchExportService {
 }
 
 class DeviceBatchExportService implements BatchExportService {
+  /// Builds a structured, bolded, scannable WhatsApp caption for courier QR handoff.
+  static String buildCourierWhatsAppText(FoodBatchItem batch) {
+    final buffer = StringBuffer()
+      ..writeln('*SURAT JALAN DIGITAL LACAKSAJI*')
+      ..writeln()
+      ..writeln('*Detail Pengiriman Batch*')
+      ..writeln('- Dapur SPPG: ${batch.sppgName}')
+      ..writeln('- Kode Batch: *${batch.batchCode}*')
+      ..writeln('- Menu: ${batch.menuName}')
+      ..writeln('- Risiko Pangan: ${batch.riskCategory.label}')
+      ..writeln('- Jumlah Porsi: *${batch.portionCount} porsi*')
+      ..writeln('- Jam Segel Dapur: ${formatWibDateTime(batch.sealedAtUtc)}')
+      ..writeln()
+      ..writeln('*Instruksi Kurir*')
+      ..writeln(
+        'Tunjukkan gambar QR pada pesan ini kepada Guru atau PIC Sekolah saat makanan tiba.',
+      )
+      ..writeln()
+      ..write(
+        '_Dikirim otomatis dari aplikasi LacakSaji untuk distribusi MBG._',
+      );
+    return sanitizeZeroSlopCopy(buffer.toString());
+  }
+
   @override
   Future<String> shareDigitalWaybillPng({
     required FoodBatchItem batch,
@@ -59,14 +84,8 @@ class DeviceBatchExportService implements BatchExportService {
     await SharePlus.instance.share(
       ShareParams(
         files: [XFile(file.path, mimeType: 'image/png')],
-        subject: 'Surat Jalan Digital ${batch.batchCode}',
-        text:
-            'Surat Jalan Digital LacakSaji\n'
-            'Dapur: ${batch.sppgName}\n'
-            'Kode Batch: ${batch.batchCode}\n'
-            'Menu: ${batch.menuName} (${batch.portionCount} porsi)\n'
-            'Jam Segel: ${formatWibDateTime(batch.sealedAtUtc)}\n'
-            'Tunjukkan QR ini kepada PIC Sekolah saat makanan tiba.',
+        subject: sanitizeZeroSlopCopy('Surat Jalan Digital ${batch.batchCode}'),
+        text: buildCourierWhatsAppText(batch),
       ),
     );
     return file.path;

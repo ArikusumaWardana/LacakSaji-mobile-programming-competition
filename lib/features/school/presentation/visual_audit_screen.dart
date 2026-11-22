@@ -528,21 +528,29 @@ class _UnifiedPhotoAuditCard extends StatelessWidget {
           local.label == OnDeviceVisualLabel.packagingAnomaly ||
           cloud?.packagingIssueDetected == true ||
           cloud?.freshnessStatus == OnDeviceVisualLabel.packagingAnomaly;
-      final level = isPack ? LacakStatusLevel.danger : LacakStatusLevel.warning;
+      final isHighRisk = _isHighRiskVisualDefect(cloud, local);
+      final level = (isPack || isHighRisk)
+          ? LacakStatusLevel.danger
+          : LacakStatusLevel.warning;
       final statusTitle = isPack
           ? 'PERLU CEK KEMASAN'
-          : 'PERLU PERIKSA KETAT';
+          : (isHighRisk
+                ? 'TERINDIKASI TIDAK LAYAK'
+                : 'PERLU PERIKSA KETAT');
+      final badgeLabel = (isPack || isHighRisk) ? 'BAHAYA' : 'PERHATIAN';
       final summary = cloudFlagged
           ? cloud.summaryText
           : local.summaryText;
       return (
         level: level,
         statusTitle: statusTitle,
-        badgeLabel: 'PERHATIAN',
+        badgeLabel: badgeLabel,
         summary: summary,
         helperNote: cloud != null && !cloud.ok
             ? 'Terdeteksi dari pemeriksaan cepat di HP. Lengkapi cek bau dan tampilan di bawah.'
-            : 'Tetap pastikan bau, rasa, dan kemasan pada daftar periksa di bawah.',
+            : (isHighRisk
+                  ? 'Temuan berisiko tinggi (jamur, busuk, atau gosong parah). Segera tahan distribusi jika terkonfirmasi.'
+                  : 'Tetap pastikan bau, rasa, dan kemasan pada daftar periksa di bawah.'),
       );
     }
 
@@ -579,11 +587,35 @@ class _UnifiedPhotoAuditCard extends StatelessWidget {
     );
   }
 
+  bool _isHighRiskVisualDefect(
+    CloudVisionResult? cloud,
+    OnDeviceVisualResult local,
+  ) {
+    if (cloud != null && cloud.ok) {
+      if (cloud.anomaliesFound.length >= 2) {
+        return true;
+      }
+      final combined = [
+        cloud.summaryText,
+        ...cloud.anomaliesFound,
+        cloud.riceCheck ?? '',
+        cloud.proteinCheck ?? '',
+        cloud.vegetableCheck ?? '',
+        cloud.fruitAndPackCheck ?? '',
+      ].join(' ').toLowerCase();
+      return RegExp(
+        r'\b(jamur|kapang|busuk|basi|lendir|gosong|hangus|berbuih|berbusa)\b',
+      ).hasMatch(combined);
+    }
+    return local.localHints.length >= 2;
+  }
+
   bool _hasComponentDetails(CloudVisionResult cloud) {
     return (cloud.riceCheck ?? '').isNotEmpty ||
         (cloud.vegetableCheck ?? '').isNotEmpty ||
         (cloud.proteinCheck ?? '').isNotEmpty ||
-        (cloud.fruitAndPackCheck ?? '').isNotEmpty;
+        (cloud.fruitAndPackCheck ?? '').isNotEmpty ||
+        cloud.anomaliesFound.isNotEmpty;
   }
 
   @override
@@ -726,6 +758,13 @@ class _UnifiedPhotoAuditCard extends StatelessWidget {
                         label: 'Buah & Kemasan',
                         detail: cloudResult!.fruitAndPackCheck!,
                       ),
+                    if (cloudResult!.anomaliesFound.isNotEmpty) ...[
+                      const SizedBox(height: AppSpacing.sm),
+                      _ComponentCheckBullet(
+                        label: 'Temuan Utama',
+                        detail: cloudResult!.anomaliesFound.join('; '),
+                      ),
+                    ],
                   ],
                 ),
               ),

@@ -12,6 +12,7 @@ import '../theme/app_colors.dart';
 import '../theme/app_spacing.dart';
 import '../theme/app_typography.dart';
 import 'lacak_buttons.dart';
+import 'lacak_floating_notice.dart';
 import 'lacak_section_surface.dart';
 import 'lacak_status_badge.dart';
 
@@ -25,11 +26,17 @@ class GlobalEmergencySyncHost extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     ref.watch(offlineSyncControllerProvider);
     final alertState = ref.watch(clusterAlertControllerProvider);
+    final authNotice = ref.watch(authFeedbackProvider);
 
     return Stack(
       fit: StackFit.expand,
       children: [
         child,
+        if (alertState.activeAlert == null)
+          LacakFloatingAuthNotice(
+            notice: authNotice,
+            onDismiss: () => ref.read(authFeedbackProvider.notifier).dismiss(),
+          ),
         if (alertState.activeAlert != null)
           Positioned.fill(
             child: LacakClusterAlertOverlay(
