@@ -1,0 +1,53 @@
+  name: Supabase Keep-Alive
+
+on:
+  schedule:
+    # Runs every 3 days at 03:00 UTC (10:00 WIB) to stay well within Supabase's 7-day free-tier pause window.
+    - cron: '0 3 */3 * *'
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  keepalive:
+    name: Ping Supabase API & Postgres
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Query read-only public RPC on Supabase
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: |
+          set -euo pipefail
+
+          BASE_URL="${SUPABASE_URL%/}"
+          API_KEY="${SUPABASE_PUBLISHABLE_KEY:-${SUPABASE_ANON_KEY:-}}"
+
+          if [ -z "$BASE_URL" ] || [ -z "$API_KEY" ]; then
+            echo "Missing secrets: set SUPABASE_URL and SUPABASE_PUBLISHABLE_KEY (or SUPABASE_ANON_KEY) in GitHub Repository Secrets."
+            exit 1
+          fi
+
+          AUTH_ARGS=(-H "apikey: $API_KEY")
+          if [[ "$API_KEY" == eyJ* ]]; then
+            AUTH_ARGS+=(-H "Authorization: Bearer $API_KEY")
+          fi
+
+          # Hits both PostgREST Data API and Postgres (SELECT on official_sppg_registry)
+          # with zero data mutation and zero sensitive output.
+          RESPONSE=$(curl --silent --show-error --fail-with-body --max-time 30 \
+            -X POST "$BASE_URL/rest/v1/rpc/verify_sppg_whitelist" \
+            "${AUTH_ARGS[@]}" \
+            -H "Content-Type: application/json" \
+            -d '{"p_reg_number":"PING-KEEPALIVE","p_pin":"0000"}')
+
+          echo "Supabase Data API & Postgres keep-alive OK: $RESPONSE"
+
+          # Also verify Auth service is awake.
+          curl --silent --show-error --fail --max-time 20 \
+            "$BASE_URL/auth/v1/health" \
+            "${AUTH_ARGS[@]}" >/dev/null
+
+          echo "Supabase Auth health check OK."
