@@ -788,6 +788,28 @@ Map<String, dynamic> _runOnDeviceOrganolepticIsolate(
         qr > qb + 35;
   }
 
+  // Counts how many of the 4 directions reach a matching food pixel within
+  // 12 px. Real mold or char sits inside the food (2+ sides), while tray rim
+  // highlights and compartment crevice shadows touch food on one side only.
+  int enclosingSides(int px, int py, bool Function(int, int) isFood) {
+    const directions = [
+      [-1, 0],
+      [1, 0],
+      [0, -1],
+      [0, 1],
+    ];
+    var sides = 0;
+    for (final d in directions) {
+      for (var step = 4; step <= 12; step += 4) {
+        if (isFood(px + d[0] * step, py + d[1] * step)) {
+          sides++;
+          break;
+        }
+      }
+    }
+    return sides;
+  }
+
   for (var by = 0; by < 7; by++) {
     for (var bx = 0; bx < 7; bx++) {
       totalBlocks++;
@@ -853,15 +875,16 @@ Map<String, dynamic> _runOnDeviceOrganolepticIsolate(
           if (rLum >= 28 && rLum <= 165 && rg > rr + 8 && rg > rb + 8) {
             blockGreenVeg++;
           } else if (!isBorderBlock &&
-              rLum >= 148 &&
-              rSat <= 0.24 &&
-              (rr - rb).abs() <= 26) {
+              rLum >= 155 &&
+              rLum <= 228 &&
+              rSat <= 0.16 &&
+              (rr - rb).abs() <= 20) {
             var greenNeighbors = 0;
             if (isGreenVegPixel(x - 4, y)) greenNeighbors++;
             if (isGreenVegPixel(x + 4, y)) greenNeighbors++;
             if (isGreenVegPixel(x, y - 4)) greenNeighbors++;
             if (isGreenVegPixel(x, y + 4)) greenNeighbors++;
-            if (greenNeighbors >= 2) {
+            if (greenNeighbors >= 3) {
               blockEmbeddedWhiteSpeck++;
             }
           }
@@ -870,23 +893,18 @@ Map<String, dynamic> _runOnDeviceOrganolepticIsolate(
             blockOrangeFruit++;
           } else if (!isBorderBlock &&
               rLum >= 175 &&
-              rSat <= 0.22 &&
-              (rr - rb).abs() <= 26) {
-            if (isOrangeFruitPixel(x - 4, y) ||
-                isOrangeFruitPixel(x + 4, y) ||
-                isOrangeFruitPixel(x, y - 4) ||
-                isOrangeFruitPixel(x, y + 4)) {
+              rLum <= 232 &&
+              rSat <= 0.14 &&
+              (rr - rb).abs() <= 20) {
+            if (enclosingSides(x, y, isOrangeFruitPixel) >= 2) {
               blockEmbeddedOrangeMold++;
             }
           }
 
           if (isWarmProteinPixel(x, y)) {
             blockWarmProtein++;
-          } else if (!isBorderBlock && rLum <= 45 && rSat <= 0.32) {
-            if (isWarmProteinPixel(x - 4, y) ||
-                isWarmProteinPixel(x + 4, y) ||
-                isWarmProteinPixel(x, y - 4) ||
-                isWarmProteinPixel(x, y + 4)) {
+          } else if (!isBorderBlock && rLum <= 28 && rSat <= 0.24) {
+            if (enclosingSides(x, y, isWarmProteinPixel) >= 2) {
               blockEmbeddedChar++;
             }
           }
@@ -932,18 +950,18 @@ Map<String, dynamic> _runOnDeviceOrganolepticIsolate(
         localizedYellowRiceBlocks++;
       }
       if (!isBorderBlock &&
-          blockGreenVegRatio >= 0.20 &&
-          blockSpeckRatio >= 0.025) {
+          blockGreenVegRatio >= 0.24 &&
+          blockSpeckRatio >= 0.045) {
         localizedWhiteSpeckOnVegBlocks++;
       }
       if (!isBorderBlock &&
-          blockOrangeRatio >= 0.16 &&
-          blockOrangeMoldRatio >= 0.025) {
+          blockOrangeRatio >= 0.22 &&
+          blockOrangeMoldRatio >= 0.045) {
         localizedWhiteMoldOnOrangeBlocks++;
       }
       if (!isBorderBlock &&
-          blockWarmProteinRatio >= 0.18 &&
-          blockCharRatio >= 0.025) {
+          blockWarmProteinRatio >= 0.24 &&
+          blockCharRatio >= 0.045) {
         localizedCharredLaukBlocks++;
       }
       if (isBorderBlock && (blockDarkEdge / bDenom) > 0.52) {

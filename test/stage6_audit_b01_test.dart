@@ -1066,6 +1066,53 @@ void main() {
         expect(omprengWaste.estimatedVegWastePct, greaterThanOrEqualTo(50));
         expect(omprengWaste.estimatedProteinWastePct, greaterThanOrEqualTo(25));
         expect(omprengWaste.estimatedCarbWastePct, greaterThanOrEqualTo(50));
+
+        // 5) Realistic clean fried-chicken ompreng with natural compartment shadows
+        //    (must NOT false-alarm as gosong menghitam or mold).
+        final normalFriedChickenTray = img.Image(width: 160, height: 160);
+        for (var y = 0; y < 160; y++) {
+          for (var x = 0; x < 160; x++) {
+            if (x < 22 || x >= 138 || y < 22 || y >= 138) {
+              normalFriedChickenTray.setPixelRgb(x, y, 146, 98, 62);
+            } else if (x >= 28 && x < 64 && y >= 28 && y < 68) {
+              // Fried chicken inside deep stainless compartment with rim shadow (luma ~34..42)
+              final inRimShadow = x < 34 || y < 34;
+              if (inRimShadow) {
+                normalFriedChickenTray.setPixelRgb(x, y, 42, 34, 28);
+              } else {
+                normalFriedChickenTray.setPixelRgb(x, y, 142, 82, 38);
+              }
+            } else if (x >= 68 && x < 104 && y >= 28 && y < 68) {
+              // Stir-fried green beans & carrot slices
+              if ((x + y) % 6 == 0) {
+                normalFriedChickenTray.setPixelRgb(x, y, 204, 102, 42);
+              } else {
+                normalFriedChickenTray.setPixelRgb(x, y, 58, 118, 48);
+              }
+            } else if (x >= 66 && x < 132 && y >= 76 && y < 132) {
+              normalFriedChickenTray.setPixelRgb(x, y, 224, 222, 218);
+            } else {
+              normalFriedChickenTray.setPixelRgb(x, y, 172, 174, 176);
+            }
+          }
+        }
+        final normalTrayPng = Uint8List.fromList(
+          img.encodePng(normalFriedChickenTray),
+        );
+        final normalTrayRes = await service.analyzeOnDevice(normalTrayPng);
+        expect(normalTrayRes.label, OnDeviceVisualLabel.freshLikely);
+        expect(normalTrayRes.localHints, isEmpty);
+
+        // 6) Real photo of a normal MBG tray (fried chicken, green beans and
+        //    carrots, banana, rice, milk carton on a wooden desk). Reported
+        //    false alarm: "bagian gosong menghitam pada lauk".
+        final realTrayBytes = File(
+          'test/fixtures/normal_mbg_tray.jpg',
+        ).readAsBytesSync();
+        final realTrayRes = await service.analyzeOnDevice(realTrayBytes);
+        expect(realTrayRes.label, OnDeviceVisualLabel.freshLikely);
+        expect(realTrayRes.localHints, isEmpty);
+        expect(realTrayRes.summaryText, isNot(contains('gosong')));
       },
     );
   });

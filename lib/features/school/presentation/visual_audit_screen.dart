@@ -554,19 +554,19 @@ class _UnifiedPhotoAuditSummary extends StatelessWidget {
     }
 
     final localFlagged = local.label != OnDeviceVisualLabel.freshLikely;
+    final cloudSucceeded = cloud != null && cloud.ok;
     final cloudFlagged =
-        cloud != null &&
-        cloud.ok &&
+        cloudSucceeded &&
         ((cloud.freshnessStatus != null &&
                 cloud.freshnessStatus != OnDeviceVisualLabel.freshLikely) ||
             cloud.slimeOrDiscolorationDetected == true ||
             cloud.packagingIssueDetected == true);
 
-    if (localFlagged || cloudFlagged) {
-      final isPack =
-          local.label == OnDeviceVisualLabel.packagingAnomaly ||
-          cloud?.packagingIssueDetected == true ||
-          cloud?.freshnessStatus == OnDeviceVisualLabel.packagingAnomaly;
+    if (cloudFlagged || (!cloudSucceeded && localFlagged)) {
+      final isPack = cloudFlagged
+          ? (cloud.packagingIssueDetected == true ||
+                cloud.freshnessStatus == OnDeviceVisualLabel.packagingAnomaly)
+          : local.label == OnDeviceVisualLabel.packagingAnomaly;
       final isHighRisk = _isHighRiskVisualDefect(cloud, local);
       final level = (isPack || isHighRisk)
           ? LacakStatusLevel.danger
@@ -581,15 +581,15 @@ class _UnifiedPhotoAuditSummary extends StatelessWidget {
         statusTitle: statusTitle,
         badgeLabel: badgeLabel,
         summary: summary,
-        helperNote: cloud != null && !cloud.ok
+        helperNote: !cloudSucceeded
             ? 'Terdeteksi dari pemeriksaan cepat di HP. Lengkapi cek bau dan tampilan di bawah.'
             : (isHighRisk
-                  ? 'Temuan berisiko tinggi (jamur, busuk, atau gosong parah). Segera tahan distribusi jika terkonfirmasi.'
+                  ? 'Temuan berisiko tinggi (jamur, busuk, atau basi). Segera tahan distribusi jika terkonfirmasi.'
                   : 'Tetap pastikan bau, rasa, dan kemasan pada daftar periksa di bawah.'),
       );
     }
 
-    if (cloud != null && cloud.ok) {
+    if (cloudSucceeded) {
       return (
         level: LacakStatusLevel.safe,
         statusTitle: 'TAMPAK WAJAR SECARA VISUAL',
@@ -638,7 +638,7 @@ class _UnifiedPhotoAuditSummary extends StatelessWidget {
         cloud.fruitAndPackCheck ?? '',
       ].join(' ').toLowerCase();
       return RegExp(
-        r'\b(jamur|kapang|busuk|basi|lendir|gosong|hangus|berbuih|berbusa)\b',
+        r'\b(jamur|kapang|busuk|basi|lendir|berlendir|berbuih|berbusa|hangus)\b',
       ).hasMatch(combined);
     }
     return local.localHints.length >= 2;
