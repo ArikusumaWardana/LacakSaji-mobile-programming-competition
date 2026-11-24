@@ -209,6 +209,8 @@ class DeviceHybridVisionService implements HybridVisionService {
         vegetableCheck: _cleanOptionalText(map['vegetable_check'] as String?),
         fruitAndPackCheck:
             _cleanOptionalText(map['fruit_and_pack_check'] as String?),
+        menuMatch: MenuMatchStatus.fromDb(map['menu_match'] as String?),
+        menuMatchNote: _cleanOptionalText(map['menu_match_note'] as String?),
       );
     } on TimeoutException {
       return const CloudVisionResult(
@@ -765,11 +767,11 @@ Map<String, dynamic> _runOnDeviceOrganolepticIsolate(
     final qr = q.r.toDouble();
     final qg = q.g.toDouble();
     final qb = q.b.toDouble();
-    return qr >= 150 &&
-        qr > qg + 32 &&
-        qr > qb + 60 &&
+    return qr >= 170 &&
+        qr > qg + 50 &&
+        qr > qb + 80 &&
         qg >= 55 &&
-        qg <= 155;
+        qg <= 150;
   }
 
   bool isWarmProteinPixel(int px, int py) {
@@ -786,6 +788,21 @@ Map<String, dynamic> _runOnDeviceOrganolepticIsolate(
         qr > qg + 15 &&
         qg > qb + 12 &&
         qr > qb + 35;
+  }
+
+  bool isCleanWhiteRicePixel(int px, int py) {
+    if (px < 0 || px >= 224 || py < 0 || py >= 224) {
+      return false;
+    }
+    final q = preWbFrame.getPixel(px, py);
+    final qr = q.r.toDouble();
+    final qg = q.g.toDouble();
+    final qb = q.b.toDouble();
+    final qMax = qr > qg ? (qr > qb ? qr : qb) : (qg > qb ? qg : qb);
+    final qMin = qr < qg ? (qr < qb ? qr : qb) : (qg < qb ? qg : qb);
+    final qSat = qMax == 0 ? 0.0 : (qMax - qMin) / qMax;
+    final qLum = 0.299 * qr + 0.587 * qg + 0.114 * qb;
+    return qLum >= 188 && qSat <= 0.11 && (qr - qb).abs() <= 18;
   }
 
   // Counts how many of the 4 directions reach a matching food pixel within
@@ -824,6 +841,8 @@ Map<String, dynamic> _runOnDeviceOrganolepticIsolate(
       var blockWarmProtein = 0;
       var blockEmbeddedChar = 0;
       var blockCleanBright = 0;
+      var blockYellowWhiteContact = 0;
+      var blockLightNeutral = 0;
       var blockDarkEdge = 0;
       var blockSamples = 0;
       final isBorderBlock = by == 0 || by == 6 || bx == 0 || bx == 6;
@@ -909,17 +928,27 @@ Map<String, dynamic> _runOnDeviceOrganolepticIsolate(
             }
           }
 
-          if (rLum >= 150 && rSat <= 0.16 && (rr - rb).abs() <= 22) {
+          if (rLum >= 155 && rLum <= 232 && rSat <= 0.18 && (rr - rb).abs() <= 22) {
+            blockLightNeutral++;
+          }
+
+          if (isCleanWhiteRicePixel(x, y)) {
             blockCleanBright++;
           } else if (!isBorderBlock &&
-              rLum >= 132 &&
+              rLum >= 150 &&
               rLum <= 232 &&
-              (rr - rg).abs() <= 26 &&
+              (rr - rg).abs() <= 22 &&
               (rr - rb) >= 26 &&
               (rg - rb) >= 18 &&
               rSat >= 0.17 &&
-              rSat <= 0.46) {
+              rSat <= 0.36) {
             blockYellowRice++;
+            if (isCleanWhiteRicePixel(x - 4, y) ||
+                isCleanWhiteRicePixel(x + 4, y) ||
+                isCleanWhiteRicePixel(x, y - 4) ||
+                isCleanWhiteRicePixel(x, y + 4)) {
+              blockYellowWhiteContact++;
+            }
           }
         }
       }
@@ -936,6 +965,7 @@ Map<String, dynamic> _runOnDeviceOrganolepticIsolate(
       final blockOrangeMoldRatio = blockEmbeddedOrangeMold / bDenom;
       final blockWarmProteinRatio = blockWarmProtein / bDenom;
       final blockCharRatio = blockEmbeddedChar / bDenom;
+      final blockLightNeutralRatio = blockLightNeutral / bDenom;
 
       // True slime combines localized wet sheen WITH adjacent dull/decayed tissue
       // inside the same spatial region (unlike uniform flash reflection).
@@ -943,15 +973,21 @@ Map<String, dynamic> _runOnDeviceOrganolepticIsolate(
           blockMoldRatio > 0.28) {
         localizedSlimeBlocks++;
       }
-      if (blockCleanRatio > 0.35) {
+      if (blockCleanRatio > 0.30) {
         cleanNeutralBrightBlocks++;
       }
-      if (blockYellowRatio > 0.25) {
+      if (!isBorderBlock &&
+          blockCleanRatio >= 0.12 &&
+          blockYellowRatio >= 0.12 &&
+          blockYellowWhiteContact >= 4 &&
+          blockGreenVegRatio < 0.08 &&
+          blockWarmProteinRatio < 0.08) {
         localizedYellowRiceBlocks++;
       }
       if (!isBorderBlock &&
-          blockGreenVegRatio >= 0.24 &&
-          blockSpeckRatio >= 0.045) {
+          blockGreenVegRatio >= 0.42 &&
+          blockSpeckRatio >= 0.045 &&
+          blockLightNeutralRatio <= 0.22) {
         localizedWhiteSpeckOnVegBlocks++;
       }
       if (!isBorderBlock &&

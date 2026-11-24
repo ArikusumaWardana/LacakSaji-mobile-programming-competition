@@ -77,6 +77,30 @@ enum OnDeviceVisualLabel {
   }
 }
 
+enum MenuMatchStatus {
+  match('match', 'Sesuai Menu'),
+  partial('partial', 'Sebagian Berbeda'),
+  mismatch('mismatch', 'Tidak Sesuai Menu'),
+  unknown('unknown', 'Belum Terverifikasi');
+
+  const MenuMatchStatus(this.dbValue, this.displayLabel);
+
+  final String dbValue;
+  final String displayLabel;
+
+  static MenuMatchStatus? fromDb(String? value) {
+    if (value == null || value.isEmpty) {
+      return null;
+    }
+    for (final item in MenuMatchStatus.values) {
+      if (item.dbValue == value) {
+        return item;
+      }
+    }
+    return null;
+  }
+}
+
 class OnDeviceVisualResult {
   const OnDeviceVisualResult({
     required this.label,
@@ -118,6 +142,8 @@ class CloudVisionResult {
     this.proteinCheck,
     this.vegetableCheck,
     this.fruitAndPackCheck,
+    this.menuMatch,
+    this.menuMatchNote,
   });
 
   final bool ok;
@@ -137,6 +163,12 @@ class CloudVisionResult {
   final String? proteinCheck;
   final String? vegetableCheck;
   final String? fruitAndPackCheck;
+  final MenuMatchStatus? menuMatch;
+  final String? menuMatchNote;
+
+  bool get hasMenuMismatch =>
+      menuMatch == MenuMatchStatus.partial ||
+      menuMatch == MenuMatchStatus.mismatch;
 
   Map<String, dynamic> toJsonMap() {
     return {
@@ -159,6 +191,9 @@ class CloudVisionResult {
         'vegetable_check': vegetableCheck,
       if (fruitAndPackCheck != null && fruitAndPackCheck!.isNotEmpty)
         'fruit_and_pack_check': fruitAndPackCheck,
+      if (menuMatch != null) 'menu_match': menuMatch!.dbValue,
+      if (menuMatchNote != null && menuMatchNote!.isNotEmpty)
+        'menu_match_note': menuMatchNote,
     };
   }
 }

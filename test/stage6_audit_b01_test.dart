@@ -1113,6 +1113,119 @@ void main() {
         expect(realTrayRes.label, OnDeviceVisualLabel.freshLikely);
         expect(realTrayRes.localHints, isEmpty);
         expect(realTrayRes.summaryText, isNot(contains('gosong')));
+
+        // 7) Telur dadar & tahu kuning + nasi putih + sayur bayam
+        final omeletteTray = img.Image(width: 160, height: 160);
+        for (var y = 0; y < 160; y++) {
+          for (var x = 0; x < 160; x++) {
+            if (x < 22 || x >= 138 || y < 22 || y >= 138) {
+              omeletteTray.setPixelRgb(x, y, 146, 98, 62);
+            } else if (x >= 28 && x < 64 && y >= 28 && y < 68) {
+              omeletteTray.setPixelRgb(x, y, 216, 194, 128);
+            } else if (x >= 68 && x < 104 && y >= 28 && y < 68) {
+              omeletteTray.setPixelRgb(x, y, 54, 114, 48);
+            } else if (x >= 66 && x < 132 && y >= 76 && y < 132) {
+              omeletteTray.setPixelRgb(x, y, 224, 222, 218);
+            } else {
+              omeletteTray.setPixelRgb(x, y, 170, 172, 174);
+            }
+          }
+        }
+        final omeletteRes = await service.analyzeOnDevice(
+          Uint8List.fromList(img.encodePng(omeletteTray)),
+        );
+        expect(omeletteRes.label, OnDeviceVisualLabel.freshLikely);
+        expect(omeletteRes.localHints, isEmpty);
+
+        // 8) Ikan kembung perak/goreng dengan kilap kulit + nasi putih + sayur
+        final fishTray = img.Image(width: 160, height: 160);
+        for (var y = 0; y < 160; y++) {
+          for (var x = 0; x < 160; x++) {
+            if (x < 22 || x >= 138 || y < 22 || y >= 138) {
+              fishTray.setPixelRgb(x, y, 146, 98, 62);
+            } else if (x >= 28 && x < 64 && y >= 28 && y < 68) {
+              if (y < 36) {
+                fishTray.setPixelRgb(x, y, 44, 48, 54);
+              } else if ((x + y) % 11 == 0) {
+                fishTray.setPixelRgb(x, y, 240, 242, 244);
+              } else {
+                fishTray.setPixelRgb(x, y, 126, 130, 134);
+              }
+            } else if (x >= 68 && x < 104 && y >= 28 && y < 68) {
+              fishTray.setPixelRgb(x, y, 58, 118, 48);
+            } else if (x >= 66 && x < 132 && y >= 76 && y < 132) {
+              fishTray.setPixelRgb(x, y, 224, 222, 218);
+            } else {
+              fishTray.setPixelRgb(x, y, 170, 172, 174);
+            }
+          }
+        }
+        final fishRes = await service.analyzeOnDevice(
+          Uint8List.fromList(img.encodePng(fishTray)),
+        );
+        expect(fishRes.label, OnDeviceVisualLabel.freshLikely);
+        expect(fishRes.localHints, isEmpty);
+
+        // 9) Sayur lodeh / bobor bayam bersantan + tahu putih + tempe goreng + nasi putih
+        final lodehTray = img.Image(width: 160, height: 160);
+        for (var y = 0; y < 160; y++) {
+          for (var x = 0; x < 160; x++) {
+            if (x < 22 || x >= 138 || y < 22 || y >= 138) {
+              lodehTray.setPixelRgb(x, y, 146, 98, 62);
+            } else if (x >= 28 && x < 64 && y >= 28 && y < 68) {
+              lodehTray.setPixelRgb(x, y, 154, 98, 48);
+            } else if (x >= 68 && x < 104 && y >= 28 && y < 68) {
+              if ((x + y) % 5 == 0) {
+                lodehTray.setPixelRgb(x, y, 52, 112, 46);
+              } else if ((x + y) % 7 == 0) {
+                lodehTray.setPixelRgb(x, y, 228, 226, 218);
+              } else {
+                lodehTray.setPixelRgb(x, y, 218, 210, 174);
+              }
+            } else if (x >= 66 && x < 132 && y >= 76 && y < 132) {
+              lodehTray.setPixelRgb(x, y, 224, 222, 218);
+            } else {
+              lodehTray.setPixelRgb(x, y, 170, 172, 174);
+            }
+          }
+        }
+        final lodehRes = await service.analyzeOnDevice(
+          Uint8List.fromList(img.encodePng(lodehTray)),
+        );
+        expect(lodehRes.label, OnDeviceVisualLabel.freshLikely);
+        expect(lodehRes.localHints, isEmpty);
+
+        // 10) Telur rebus belah + opor ayam kuah santan + nasi putih
+        final oporEggTray = img.Image(width: 160, height: 160);
+        for (var y = 0; y < 160; y++) {
+          for (var x = 0; x < 160; x++) {
+            if (x < 22 || x >= 138 || y < 22 || y >= 138) {
+              oporEggTray.setPixelRgb(x, y, 146, 98, 62);
+            } else if (x >= 28 && x < 64 && y >= 28 && y < 68) {
+              final inYolk = x >= 40 && x < 52 && y >= 42 && y < 54;
+              if (inYolk) {
+                oporEggTray.setPixelRgb(x, y, 230, 190, 72);
+              } else {
+                oporEggTray.setPixelRgb(x, y, 234, 232, 224);
+              }
+            } else if (x >= 68 && x < 104 && y >= 28 && y < 68) {
+              if ((x + y) % 4 == 0) {
+                oporEggTray.setPixelRgb(x, y, 168, 118, 66);
+              } else {
+                oporEggTray.setPixelRgb(x, y, 220, 206, 156);
+              }
+            } else if (x >= 66 && x < 132 && y >= 76 && y < 132) {
+              oporEggTray.setPixelRgb(x, y, 224, 222, 218);
+            } else {
+              oporEggTray.setPixelRgb(x, y, 170, 172, 174);
+            }
+          }
+        }
+        final oporEggRes = await service.analyzeOnDevice(
+          Uint8List.fromList(img.encodePng(oporEggTray)),
+        );
+        expect(oporEggRes.label, OnDeviceVisualLabel.freshLikely);
+        expect(oporEggRes.localHints, isEmpty);
       },
     );
   });

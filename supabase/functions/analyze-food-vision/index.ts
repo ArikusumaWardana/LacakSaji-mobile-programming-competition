@@ -64,6 +64,17 @@ const ORGANOLEPTIC_RESPONSE_SCHEMA = {
       description:
         "Kalimat lengkap Bahasa Indonesia tentang kondisi buah dan keutuhan kemasan minuman/wadah.",
     },
+    menu_match: {
+      type: "STRING",
+      enum: ["match", "partial", "mismatch", "unknown"],
+      description:
+        "Kesesuaian isi makanan di foto dengan nama menu pada label QR: match (menu utama sesuai), partial (sebagian lauk atau sayur berbeda/tidak lengkap), mismatch (menu utama jelas tertukar dengan lauk lain), unknown (nama menu terlalu umum atau foto tidak cukup jelas).",
+    },
+    menu_match_note: {
+      type: "STRING",
+      description:
+        "Penjelasan singkat 1 kalimat Bahasa Indonesia jika ada ketidaksesuaian isi ompreng dengan nama menu (misalnya menyebut lauk/sayur yang terlihat dibanding yang tertulis). Kosongkan string jika sesuai atau unknown.",
+    },
     anomalies_found: {
       type: "ARRAY",
       items: { type: "STRING" },
@@ -88,6 +99,8 @@ const ORGANOLEPTIC_RESPONSE_SCHEMA = {
     "protein_check",
     "vegetable_check",
     "fruit_and_pack_check",
+    "menu_match",
+    "menu_match_note",
     "anomalies_found",
     "freshness_status",
     "slime_or_discoloration_detected",
@@ -450,11 +463,17 @@ Deno.serve(async (req: Request) => {
 Periksa setiap sekat makanan pada foto secara adil dan teliti:
 
 1. Bedakan dengan TEGAS antara tampilan makanan normal dengan bahaya pembusukan nyata:
-   - Ayam goreng, ikan goreng, tahu/tempe goreng, semur, rendang, dan bumbu kuning/kecap SECARA ALAMI berwarna cokelat keemasan hingga cokelat tua, disertai bayangan alami di sudut dalam sekat ompreng stainless. JANGAN pernah menganggap warna cokelat matang gorengan atau bayangan sudut sekat sebagai "gosong menghitam" atau pembusukan.
-   - Bintik cokelat matang alami pada kulit pisang adalah normal, bukan busuk.
-   - Hanya tandai masalah jika terlihat jelas bahaya nyata: jamur/kapang putih atau abu-abu menyerupai kapas/serbuk pada nasi/lauk/buah, lendir kental mengilap tidak wajar, sayur layu kehitaman atau kuah berbuih/berbusa basi, nasi menguning/berbintik hitam jamur secara lokal, buah lembek membusuk, lauk benar-benar hangus arang hitam pekat secara luas, atau kemasan minuman/wadah menggembung/bocor.
-2. Seluruh isi JSON (rice_check, protein_check, vegetable_check, fruit_and_pack_check, anomalies_found, dan summary_id) WAJIB ditulis dalam BAHASA INDONESIA yang baik, lugas, dan mudah dipahami guru sekolah. JANGAN mengisi summary_id dengan kode teknis atau bahasa Inggris.
-3. Jika ada garis moire tipis karena memotret layar atau noise kamera ringan, abaikan artefak kamera tersebut dan nilai kondisi makanan secara objektif.${localContext}
+   - Beragam lauk matang (ayam goreng, ikan goreng/kukus/balado dengan kulit abu-abu perak, tahu putih/kuning, tempe, telur rebus/dadar/semur, rendang/semur kecap), kuah santan putih atau kekuningan (sayur lodeh, bobor, opor, soto), bintik cokelat alami pada kulit pisang matang, serta bayangan gelap di sudut sekat ompreng stainless adalah NORMAL dan BUKAN pembusukan atau gosong.
+   - Hanya tandai masalah jika terlihat jelas bahaya nyata: koloni jamur/kapang putih atau abu-abu menyerupai kapas/serbuk pada nasi/lauk/buah, lendir kental mengilap tidak wajar, sayur layu kehitaman membusuk, kuah berbuih/berbusa basi terfermentasi, nasi menguning/berbintik hitam jamur secara lokal, buah lembek membusuk, lauk benar-benar hangus arang hitam pekat secara luas, atau kemasan minuman/wadah menggembung/bocor.
+2. Seluruh isi JSON (rice_check, protein_check, vegetable_check, fruit_and_pack_check, menu_match_note, anomalies_found, dan summary_id) WAJIB ditulis dalam BAHASA INDONESIA yang baik, lugas, dan mudah dipahami guru sekolah. JANGAN mengisi summary_id dengan kode teknis atau bahasa Inggris.
+3. Jika ada garis moire tipis karena memotret layar atau noise kamera ringan, abaikan artefak kamera tersebut dan nilai kondisi makanan secara objektif.
+4. Bandingkan komponen utama yang terlihat di foto dengan nama menu "${menuName}" untuk mengisi menu_match dan menu_match_note:
+   - Abaikan salah ketik minor pada nama menu (misalnya "Nasi ayam goyeng" berarti "Nasi ayam goreng" -> "match").
+   - Jika nama menu hanya menyebut hidangan utama (misalnya "Nasi Ayam Goreng") dan ompreng dilengkapi sayur, buah, atau susu standar, tetap isi "match".
+   - Isi "unknown" jika nama menu terlalu umum (seperti "Menu Makan Bergizi Gratis") atau isi foto kurang jelas.
+   - Isi "partial" jika salah satu komponen yang disebut jelas berbeda atau kurang (misalnya tertulis ayam dan bayam, tetapi sayurnya buncis/wortel).
+   - Isi "mismatch" jika lauk atau hidangan utama yang tertulis jelas tertukar dengan bahan lain (misalnya tertulis "Nasi Ayam Goreng" atau "Nasi Ikan", tetapi yang terlihat adalah tempe atau telur).
+   - ATURAN PEMISAHAN KETAT: Lauk yang tertukar BUKAN bahaya pembusukan. Jika makanan pengganti tampak segar dan layak makan, WAJIB tetap mengisi freshness_status = "fresh_likely", anomalies_found = [], slime_or_discoloration_detected = false, packaging_issue_detected = false, dan laporkan perbedaannya hanya di menu_match serta menu_match_note.${localContext}
 
 Aturan keputusan:
 - Jika seluruh makanan dan kemasan tampak segar dan normal, wajib isi anomalies_found = [], slime_or_discoloration_detected = false, packaging_issue_detected = false, dan freshness_status = "fresh_likely".
@@ -553,6 +572,27 @@ Abaikan pantulan logam stainless ompreng kosong. Gunakan bahasa Indonesia sederh
       ? Math.max(0, Math.min(1, Number(rawConf.toFixed(3))))
       : 0.8;
 
+    const allowedMenuMatches = new Set([
+      "match",
+      "partial",
+      "mismatch",
+      "unknown",
+    ]);
+    const rawMenuMatch = typeof parsed.menu_match === "string"
+      ? parsed.menu_match
+      : "unknown";
+    const menuMatch = allowedMenuMatches.has(rawMenuMatch)
+      ? rawMenuMatch
+      : "unknown";
+    let menuMatchNote = sanitizeText(parsed.menu_match_note, "");
+    if ((menuMatch === "mismatch" || menuMatch === "partial") && menuMatchNote.length === 0) {
+      menuMatchNote = menuMatch === "mismatch"
+        ? `Isi makanan pada foto tampak berbeda dari menu pada label QR (${menuName}).`
+        : `Sebagian isi makanan pada foto tampak tidak sama dengan menu pada label QR (${menuName}).`;
+    } else if (menuMatch === "match" || menuMatch === "unknown") {
+      menuMatchNote = "";
+    }
+
     const fallbackSummary = rawAnomalies.length > 0
       ? `Perlu perhatian: ${rawAnomalies.join("; ")}. Periksa bau dan kondisi makanan secara langsung.`
       : "Pemeriksaan foto selesai. Tetap konfirmasi dengan 3 pengecekan manual di bawah.";
@@ -567,6 +607,8 @@ Abaikan pantulan logam stainless ompreng kosong. Gunakan bahasa Indonesia sederh
       confidence,
       slime_or_discoloration_detected: discolorationDetected,
       packaging_issue_detected: packagingDetected,
+      menu_match: menuMatch,
+      menu_match_note: menuMatchNote,
       anomalies_found: rawAnomalies,
       rice_check: sanitizeText(parsed.rice_check, ""),
       protein_check: sanitizeText(parsed.protein_check, ""),

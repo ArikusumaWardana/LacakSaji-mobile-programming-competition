@@ -136,6 +136,22 @@ class _VisualAuditScreenState extends ConsumerState<VisualAuditScreen> {
   bool get _allChecklistAnswered =>
       _smellOk != null && _visualOk != null && _packOk != null;
 
+  String _buildWaPrefillMessage({
+    required VerifiedBatchScanContext ctx,
+    String? schoolName,
+  }) {
+    final base =
+        'Laporan audit organoleptik batch ${ctx.payload.batchCode} (${ctx.payload.menuName}) di ${schoolName ?? 'Sekolah'}.';
+    final cloud = _cloudResult;
+    if (cloud != null && cloud.ok && cloud.hasMenuMismatch) {
+      final note = (cloud.menuMatchNote ?? '').isNotEmpty
+          ? cloud.menuMatchNote!
+          : cloud.menuMatch!.displayLabel;
+      return '$base Catatan ketidaksesuaian menu: $note';
+    }
+    return base;
+  }
+
   Future<void> _submitDecision(VerifiedBatchScanContext ctx) async {
     if (_submitting) {
       return;
@@ -392,8 +408,10 @@ class _VisualAuditScreenState extends ConsumerState<VisualAuditScreen> {
                               roleLabel: 'Dapur SPPG Mitra · PIC Pengiriman',
                               phoneOrWaNumber: school?.puskesmasWa,
                               copyFallbackCode: school?.partnerInviteCode,
-                              waPrefillMessage:
-                                  'Laporan audit organoleptik batch ${ctx.payload.batchCode} (${ctx.payload.menuName}) di ${school?.name ?? 'Sekolah'}.',
+                              waPrefillMessage: _buildWaPrefillMessage(
+                                ctx: ctx,
+                                schoolName: school?.name,
+                              ),
                             ),
                             const SizedBox(height: AppSpacing.xl),
                             AuditEvidenceGallery(
@@ -649,6 +667,7 @@ class _UnifiedPhotoAuditSummary extends StatelessWidget {
         (cloud.vegetableCheck ?? '').isNotEmpty ||
         (cloud.proteinCheck ?? '').isNotEmpty ||
         (cloud.fruitAndPackCheck ?? '').isNotEmpty ||
+        (cloud.menuMatchNote ?? '').isNotEmpty ||
         cloud.anomaliesFound.isNotEmpty;
   }
 
@@ -698,6 +717,11 @@ class _UnifiedPhotoAuditSummary extends StatelessWidget {
             _ComponentCheckBullet(
               label: 'Buah & Kemasan',
               detail: cloudResult!.fruitAndPackCheck!,
+            ),
+          if ((cloudResult!.menuMatchNote ?? '').isNotEmpty)
+            _ComponentCheckBullet(
+              label: 'Kesesuaian Menu',
+              detail: cloudResult!.menuMatchNote!,
             ),
           if (cloudResult!.anomaliesFound.isNotEmpty)
             _ComponentCheckBullet(
@@ -809,6 +833,21 @@ class _UnifiedPhotoAuditSummary extends StatelessWidget {
             ],
           ),
         ),
+        if (!isRunningCloud &&
+            cloudResult != null &&
+            cloudResult!.ok &&
+            cloudResult!.hasMenuMismatch) ...[
+          const SizedBox(height: AppSpacing.md),
+          LacakStatusBanner(
+            level: LacakStatusLevel.warning,
+            title: cloudResult!.menuMatch == MenuMatchStatus.mismatch
+                ? 'Isi Tidak Sesuai Menu'
+                : 'Sebagian Menu Tidak Sesuai',
+            description: (cloudResult!.menuMatchNote ?? '').isNotEmpty
+                ? cloudResult!.menuMatchNote!
+                : 'Isi ompreng tampak berbeda dari menu pada label QR. Catatan ini tersimpan pada hasil pemeriksaan dan dapat dikonfirmasi ke Dapur SPPG.',
+          ),
+        ],
       ],
     );
   }
