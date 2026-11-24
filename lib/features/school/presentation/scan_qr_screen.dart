@@ -122,9 +122,8 @@ class _ScanQrScreenState extends ConsumerState<ScanQrScreen> {
       backgroundColor: AppColors.surfaceBase,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(
-          top: Radius.circular(AppSpacing.radiusSurface),
+          top: Radius.circular(AppSpacing.radiusHero),
         ),
-        side: BorderSide(color: AppColors.borderHairline, width: 1),
       ),
       builder: (sheetContext) {
         return SafeArea(
@@ -174,171 +173,274 @@ class _ScanQrScreenState extends ConsumerState<ScanQrScreen> {
     final maxWidth = AppSpacing.maxContentWidth(width);
     final frameSize = AppSpacing.adaptiveQrSize(width, size.height);
 
+    if (school == null) {
+      return Scaffold(
+        backgroundColor: AppColors.bgCanvas,
+        body: SafeArea(
+          child: Center(
+            child: ConstrainedBox(
+              constraints: BoxConstraints(maxWidth: maxWidth),
+              child: Padding(
+                padding: EdgeInsets.all(horizontalPad),
+                child: const LacakErrorState(
+                  message: 'Profil sekolah belum dimuat.',
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
     return Scaffold(
       backgroundColor: AppColors.textPrimary,
-      appBar: AppBar(
-        title: const Text('Pindai QR Segel Batch'),
-      ),
-      body: SafeArea(
-        child: school == null
-            ? Center(
-                child: ConstrainedBox(
-                  constraints: BoxConstraints(maxWidth: maxWidth),
-                  child: const Padding(
-                    padding: EdgeInsets.all(AppSpacing.lg),
-                    child: LacakErrorState(
-                      message: 'Profil sekolah belum dimuat.',
+      body: Column(
+        children: [
+          Expanded(
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                scannerBuilder(
+                  context,
+                  _torchEnabled,
+                  _handleDetectedQr,
+                ),
+                IgnorePointer(
+                  child: Center(
+                    child: Container(
+                      width: frameSize,
+                      height: frameSize,
+                      decoration: BoxDecoration(
+                        border: Border.all(
+                          color: AppColors.surfaceBase,
+                          width: 2.5,
+                        ),
+                        borderRadius: BorderRadius.circular(
+                          AppSpacing.radiusHero,
+                        ),
+                      ),
                     ),
                   ),
                 ),
-              )
-            : Column(
-                children: [
-                  Expanded(
-                    child: Stack(
-                      fit: StackFit.expand,
-                      children: [
-                        scannerBuilder(
-                          context,
-                          _torchEnabled,
-                          _handleDetectedQr,
-                        ),
-                        IgnorePointer(
-                          child: Center(
+                Positioned(
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  child: SafeArea(
+                    bottom: false,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: AppSpacing.lg,
+                        vertical: AppSpacing.md,
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          _ScannerCircleButton(
+                            icon: Icons.arrow_back_ios_new_rounded,
+                            tooltip: 'Kembali',
+                            onTap: () => context.pop(),
+                          ),
+                          Flexible(
                             child: Container(
-                              width: frameSize,
-                              height: frameSize,
+                              margin: const EdgeInsets.symmetric(
+                                horizontal: AppSpacing.sm,
+                              ),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 6,
+                              ),
                               decoration: BoxDecoration(
-                                border: Border.all(
-                                  color: AppColors.surfaceBase,
-                                  width: 2,
-                                ),
-                                borderRadius: BorderRadius.circular(
-                                  AppSpacing.radiusSurface,
+                                color: AppColors.scrimPill,
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: Text(
+                                'Pindai QR Segel',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: AppTypography.labelTag.copyWith(
+                                  color: AppColors.onPrimary,
+                                  fontWeight: FontWeight.w600,
                                 ),
                               ),
                             ),
                           ),
-                        ),
-                        if (_showSpinner)
-                          Container(
-                            color: AppColors.textPrimary.withValues(alpha: 0.72),
-                            child: Center(
-                              child: Container(
-                                margin: const EdgeInsets.all(AppSpacing.xl),
-                                padding: const EdgeInsets.all(AppSpacing.xl),
-                                decoration: BoxDecoration(
-                                  color: AppColors.surfaceBase,
-                                  borderRadius: BorderRadius.circular(
-                                    AppSpacing.radiusSurface,
-                                  ),
-                                ),
-                                child: Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    const CircularProgressIndicator(
-                                      color: AppColors.primary,
-                                    ),
-                                    const SizedBox(height: AppSpacing.md),
-                                    Text(
-                                      'Memverifikasi Segel Digital & Cuaca...',
-                                      textAlign: TextAlign.center,
-                                      style: AppTypography.titleItem,
-                                    ),
-                                  ],
-                                ),
-                              ),
+                          _ScannerCircleButton(
+                            icon: _torchEnabled
+                                ? Icons.flashlight_off_rounded
+                                : Icons.flashlight_on_rounded,
+                            tooltip: _torchEnabled
+                                ? 'Matikan Senter'
+                                : 'Nyalakan Senter',
+                            onTap: () => setState(
+                              () => _torchEnabled = !_torchEnabled,
                             ),
                           ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
+                ),
+                if (_showSpinner)
                   Container(
-                    width: double.infinity,
-                    color: AppColors.surfaceBase,
-                    padding: EdgeInsets.fromLTRB(
-                      horizontalPad,
-                      AppSpacing.md,
-                      horizontalPad,
-                      AppSpacing.lg,
-                    ),
+                    color: AppColors.textPrimary.withValues(alpha: 0.72),
                     child: Center(
-                      child: ConstrainedBox(
-                        constraints: BoxConstraints(maxWidth: maxWidth),
+                      child: Container(
+                        margin: const EdgeInsets.all(AppSpacing.xl),
+                        padding: const EdgeInsets.all(AppSpacing.xl),
+                        decoration: BoxDecoration(
+                          color: AppColors.surfaceBase,
+                          borderRadius: BorderRadius.circular(
+                            AppSpacing.radiusHero,
+                          ),
+                        ),
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
-                            Text(
-                              'Arahkan kamera ke Kode QR pada HP Kurir atau label wadah makanan.',
-                              textAlign: TextAlign.center,
-                              style: AppTypography.bodyLarge,
+                            const CircularProgressIndicator(
+                              color: AppColors.primary,
                             ),
                             const SizedBox(height: AppSpacing.md),
-                            LayoutBuilder(
-                              builder: (context, constraints) {
-                                final textScaler =
-                                    MediaQuery.textScalerOf(context);
-                                final stack = constraints.maxWidth < 310 ||
-                                    textScaler.scale(16) > 19.5;
-                                final torchBtn = LacakSecondaryButton(
-                                  label: _torchEnabled
-                                      ? 'Matikan Senter'
-                                      : 'Lampu Senter',
-                                  icon: Icons.flashlight_on_rounded,
-                                  onPressed: () => setState(
-                                    () => _torchEnabled = !_torchEnabled,
-                                  ),
-                                );
-                                final closeBtn = LacakSecondaryButton(
-                                  label: 'Tutup',
-                                  icon: Icons.close_rounded,
-                                  onPressed: () => context.pop(),
-                                );
-                                if (stack) {
-                                  return Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.stretch,
-                                    children: [
-                                      torchBtn,
-                                      const SizedBox(height: AppSpacing.sm),
-                                      closeBtn,
-                                    ],
-                                  );
-                                }
-                                return IntrinsicHeight(
-                                  child: Row(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.stretch,
-                                    children: [
-                                      Expanded(child: torchBtn),
-                                      const SizedBox(width: AppSpacing.md),
-                                      Expanded(child: closeBtn),
-                                    ],
-                                  ),
-                                );
-                              },
-                            ),
-                            const SizedBox(height: AppSpacing.sm),
-                            TextButton.icon(
-                              onPressed: _busy ? null : _openManualQrDialog,
-                              style: TextButton.styleFrom(
-                                minimumSize: const Size(
-                                  double.infinity,
-                                  AppSpacing.minTouchTarget,
-                                ),
-                              ),
-                              icon:
-                                  const Icon(Icons.qr_code_2_rounded, size: 20),
-                              label: const Text('Masukkan Kode QR Manual'),
+                            Text(
+                              'Memverifikasi Segel Digital & Cuaca...',
+                              textAlign: TextAlign.center,
+                              style: AppTypography.titleItem,
                             ),
                           ],
                         ),
                       ),
                     ),
                   ),
-                ],
+              ],
+            ),
+          ),
+          Container(
+            width: double.infinity,
+            decoration: const BoxDecoration(
+              color: AppColors.surfaceBase,
+              borderRadius: BorderRadius.vertical(
+                top: Radius.circular(AppSpacing.radiusHero),
               ),
+            ),
+            child: SafeArea(
+              top: false,
+              child: Padding(
+                padding: EdgeInsets.fromLTRB(
+                  horizontalPad,
+                  AppSpacing.lg,
+                  horizontalPad,
+                  AppSpacing.lg,
+                ),
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(maxWidth: maxWidth),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Text(
+                          'Arahkan kamera ke Kode QR pada HP Kurir atau label wadah makanan.',
+                          textAlign: TextAlign.center,
+                          style: AppTypography.bodyLarge,
+                        ),
+                        const SizedBox(height: AppSpacing.md),
+                        LayoutBuilder(
+                          builder: (context, constraints) {
+                            final textScaler = MediaQuery.textScalerOf(context);
+                            final stack = constraints.maxWidth < 310 ||
+                                textScaler.scale(16) > 19.5;
+                            final torchBtn = LacakSecondaryButton(
+                              label: _torchEnabled
+                                  ? 'Matikan Senter'
+                                  : 'Lampu Senter',
+                              icon: Icons.flashlight_on_rounded,
+                              onPressed: () => setState(
+                                () => _torchEnabled = !_torchEnabled,
+                              ),
+                            );
+                            final closeBtn = LacakSecondaryButton(
+                              label: 'Tutup',
+                              icon: Icons.close_rounded,
+                              onPressed: () => context.pop(),
+                            );
+                            if (stack) {
+                              return Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  torchBtn,
+                                  const SizedBox(height: AppSpacing.sm),
+                                  closeBtn,
+                                ],
+                              );
+                            }
+                            return IntrinsicHeight(
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  Expanded(child: torchBtn),
+                                  const SizedBox(width: AppSpacing.md),
+                                  Expanded(child: closeBtn),
+                                ],
+                              ),
+                            );
+                          },
+                        ),
+                        const SizedBox(height: AppSpacing.sm),
+                        TextButton.icon(
+                          onPressed: _busy ? null : _openManualQrDialog,
+                          style: TextButton.styleFrom(
+                            minimumSize: const Size(
+                              double.infinity,
+                              AppSpacing.minTouchTarget,
+                            ),
+                          ),
+                          icon: const Icon(Icons.qr_code_2_rounded, size: 20),
+                          label: const Text('Masukkan Kode QR Manual'),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ScannerCircleButton extends StatelessWidget {
+  const _ScannerCircleButton({
+    required this.icon,
+    required this.tooltip,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      label: tooltip,
+      child: Tooltip(
+        message: tooltip,
+        child: Material(
+          color: AppColors.scrimPill,
+          shape: const CircleBorder(),
+          child: InkWell(
+            onTap: onTap,
+            customBorder: const CircleBorder(),
+            child: SizedBox(
+              width: AppSpacing.minTouchTarget,
+              height: AppSpacing.minTouchTarget,
+              child: Icon(icon, size: 20, color: AppColors.onPrimary),
+            ),
+          ),
+        ),
       ),
     );
   }

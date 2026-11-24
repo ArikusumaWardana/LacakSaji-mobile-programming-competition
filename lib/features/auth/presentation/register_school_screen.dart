@@ -273,12 +273,11 @@ class _RegisterSchoolScreenState extends ConsumerState<RegisterSchoolScreen> {
         _completedResult!.requiresEmailConfirmation) {
       return Scaffold(
         backgroundColor: AppColors.bgCanvas,
-        appBar: AppBar(title: const Text('Konfirmasi Email Sekolah')),
         body: SafeArea(
           child: SingleChildScrollView(
             padding: EdgeInsets.fromLTRB(
               horizontalPad,
-              AppSpacing.lg,
+              AppSpacing.xxl,
               horizontalPad,
               AppSpacing.xxl,
             ),
@@ -288,6 +287,11 @@ class _RegisterSchoolScreenState extends ConsumerState<RegisterSchoolScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
+                    Text(
+                      'Konfirmasi Email Sekolah',
+                      style: AppTypography.displayStatus,
+                    ),
+                    const SizedBox(height: AppSpacing.lg),
                     LacakStatusBanner(
                       level: LacakStatusLevel.warning,
                       title: 'Verifikasi Email Akun Anda',
@@ -310,23 +314,11 @@ class _RegisterSchoolScreenState extends ConsumerState<RegisterSchoolScreen> {
 
     return Scaffold(
       backgroundColor: AppColors.bgCanvas,
-      appBar: AppBar(
-        title: const Text('Daftar Akun Sekolah'),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_rounded),
-          tooltip: _currentStep > 1 ? 'Langkah Sebelumnya' : 'Kembali',
-          constraints: const BoxConstraints(
-            minWidth: AppSpacing.minTouchTarget,
-            minHeight: AppSpacing.minTouchTarget,
-          ),
-          onPressed: _goBackStep,
-        ),
-      ),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: EdgeInsets.fromLTRB(
             horizontalPad,
-            AppSpacing.lg,
+            AppSpacing.md,
             horizontalPad,
             AppSpacing.xxl,
           ),
@@ -336,6 +328,37 @@ class _RegisterSchoolScreenState extends ConsumerState<RegisterSchoolScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  Row(
+                    children: [
+                      Material(
+                        color: AppColors.surfaceSoft,
+                        shape: const CircleBorder(),
+                        child: IconButton(
+                          icon: const Icon(
+                            Icons.arrow_back_ios_new_rounded,
+                            size: 19,
+                            color: AppColors.textPrimary,
+                          ),
+                          tooltip: _currentStep > 1
+                              ? 'Langkah Sebelumnya'
+                              : 'Kembali',
+                          constraints: const BoxConstraints(
+                            minWidth: AppSpacing.minTouchTarget,
+                            minHeight: AppSpacing.minTouchTarget,
+                          ),
+                          onPressed: _goBackStep,
+                        ),
+                      ),
+                      const SizedBox(width: AppSpacing.md),
+                      Expanded(
+                        child: Text(
+                          'Daftar Akun Sekolah',
+                          style: AppTypography.titleSection,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: AppSpacing.xl),
                   if (authState.errorMessage != null) ...[
                     LacakStatusBanner(
                       level: LacakStatusLevel.danger,
@@ -350,7 +373,7 @@ class _RegisterSchoolScreenState extends ConsumerState<RegisterSchoolScreen> {
                     stepTitle: _stepTitle(_currentStep),
                     stepSubtitle: _stepSubtitle(_currentStep),
                   ),
-                  const SizedBox(height: AppSpacing.lg),
+                  const SizedBox(height: AppSpacing.xl),
                   LacakAnimatedStepSwitcher(
                     currentStep: _currentStep,
                     child: switch (_currentStep) {

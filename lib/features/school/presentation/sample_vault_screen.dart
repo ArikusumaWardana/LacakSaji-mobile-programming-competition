@@ -7,17 +7,16 @@ import '../../../core/network/connectivity_provider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
+import '../../../core/widgets/editorial_widgets.dart';
 import '../../../core/widgets/lacak_buttons.dart';
 import '../../../core/widgets/lacak_confirm_dialog.dart';
 import '../../../core/widgets/lacak_feedback_states.dart';
-import '../../../core/widgets/lacak_section_surface.dart';
-import '../../../core/widgets/lacak_status_badge.dart';
 import '../../auth/presentation/auth_controller.dart';
 import '../../kitchen/domain/kitchen_models.dart';
 import '../domain/school_models.dart';
 import 'school_providers.dart';
 
-/// G05: Bank Sampel 2x24 Jam (Step 3 onboarding label generation + 48h archive & reminder vault).
+/// G05: Editorial Bank Sampel 2x24 Jam (Step 3 onboarding + 48h archive & reminder vault).
 class SampleVaultScreen extends ConsumerStatefulWidget {
   const SampleVaultScreen({super.key, this.onboardingArgs});
 
@@ -130,7 +129,7 @@ class _SampleVaultScreenState extends ConsumerState<SampleVaultScreen> {
     final args = widget.onboardingArgs;
     final width = MediaQuery.sizeOf(context).width;
     final horizontalPad = AppSpacing.horizontalPadding(width);
-    final maxWidth = AppSpacing.maxContentWidth(width);
+    final maxWidth = width >= 900 ? 840.0 : AppSpacing.maxContentWidth(width);
 
     if (args != null) {
       return _buildOnboardingScaffold(
@@ -145,62 +144,112 @@ class _SampleVaultScreenState extends ConsumerState<SampleVaultScreen> {
     final activeAsync = ref.watch(activeSampleVaultsProvider);
     final historyAsync = ref.watch(historySampleVaultsProvider);
 
+    if (school == null) {
+      return const Scaffold(
+        backgroundColor: AppColors.bgCanvas,
+        body: SafeArea(
+          child: Padding(
+            padding: EdgeInsets.all(AppSpacing.lg),
+            child: LacakErrorState(message: 'Profil sekolah belum dimuat.'),
+          ),
+        ),
+      );
+    }
+
     return Scaffold(
       backgroundColor: AppColors.bgCanvas,
-      appBar: AppBar(title: const Text('Bank Sampel 48 Jam')),
-      body: SafeArea(
-        child: school == null
-            ? Padding(
-                padding: EdgeInsets.all(horizontalPad),
-                child: const LacakErrorState(
-                  message: 'Profil sekolah belum dimuat.',
-                ),
-              )
-            : RefreshIndicator(
-                color: AppColors.primary,
-                onRefresh: () => ref
-                    .read(schoolRepositoryProvider)
-                    .refreshSampleVaultsFromServer(school.id),
-                child: SingleChildScrollView(
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  padding: EdgeInsets.fromLTRB(
-                    horizontalPad,
-                    AppSpacing.lg,
-                    horizontalPad,
-                    AppSpacing.xxl,
-                  ),
-                  child: Center(
-                    child: ConstrainedBox(
-                      constraints: BoxConstraints(maxWidth: maxWidth),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          LacakStatusBanner(
-                            level: LacakStatusLevel.safe,
-                            icon: Icons.kitchen_rounded,
-                            title: 'Ketentuan Bank Sampel Perbagi No. 4/2026',
-                            description:
-                                'Simpan 1 porsi sampel utuh pada suhu < 5 C selama 2x24 jam (48 jam). Pengingat lokal berbunyi otomatis saat retensi berakhir.',
+      body: Column(
+        children: [
+          const MinimalTopHeader(
+            contextLabel: 'Retensi 2x24 Jam',
+            title: 'Bank Sampel',
+          ),
+          Expanded(
+            child: RefreshIndicator(
+              color: AppColors.primary,
+              onRefresh: () => ref
+                  .read(schoolRepositoryProvider)
+                  .refreshSampleVaultsFromServer(school.id),
+              child: SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.only(bottom: AppSpacing.xxxl),
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(maxWidth: maxWidth),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Padding(
+                          padding: EdgeInsets.fromLTRB(
+                            horizontalPad,
+                            AppSpacing.sm,
+                            horizontalPad,
+                            AppSpacing.md,
                           ),
-                          const SizedBox(height: AppSpacing.lg),
-                          LacakSegmentedControl<bool>(
-                            options: const [
-                              LacakSegmentOption(
-                                value: true,
-                                label: 'Aktif di Kulkas',
+                          child: Container(
+                            padding: const EdgeInsets.all(AppSpacing.lg),
+                            decoration: BoxDecoration(
+                              color: AppColors.surfaceSoft,
+                              borderRadius: BorderRadius.circular(
+                                AppSpacing.radiusSurface,
                               ),
-                              LacakSegmentOption(
-                                value: false,
-                                label: 'Riwayat Selesai',
-                              ),
-                            ],
-                            selectedValue: _showActiveTab,
-                            onChanged: (selected) {
-                              setState(() => _showActiveTab = selected);
-                            },
+                            ),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Icon(
+                                  Icons.kitchen_rounded,
+                                  size: 20,
+                                  color: AppColors.primary,
+                                ),
+                                const SizedBox(width: AppSpacing.md),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        'Ketentuan Bank Sampel Perbagi No. 4/2026',
+                                        style: AppTypography.titleItem,
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        'Simpan 1 porsi utuh pada suhu < 5 C selama 48 jam. Pengingat berbunyi otomatis saat retensi berakhir.',
+                                        style: AppTypography.bodyMedium,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
-                          const SizedBox(height: AppSpacing.lg),
-                          (_showActiveTab ? activeAsync : historyAsync).when(
+                        ),
+                        FilterChipStrip<bool>(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: horizontalPad,
+                          ),
+                          selectedValue: _showActiveTab,
+                          onSelected: (selected) {
+                            setState(() => _showActiveTab = selected);
+                          },
+                          items: const [
+                            FilterChipItem(
+                              value: true,
+                              label: 'Aktif di Kulkas',
+                            ),
+                            FilterChipItem(
+                              value: false,
+                              label: 'Riwayat Selesai',
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: AppSpacing.lg),
+                        Padding(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: horizontalPad,
+                          ),
+                          child: (_showActiveTab ? activeAsync : historyAsync)
+                              .when(
                             loading: () => const LacakSkeletonList(
                               itemCount: 3,
                               loadingLabel: 'Memuat data Bank Sampel...',
@@ -220,26 +269,30 @@ class _SampleVaultScreenState extends ConsumerState<SampleVaultScreen> {
                                       : 'Sampel yang telah selesai disimpan 48 jam atau diserahkan ke lab akan tercatat di sini.',
                                 );
                               }
-                              return LacakSectionSurface.separated(
-                                children: items
-                                    .map(
-                                      (item) => _SampleVaultTile(
-                                        item: item,
-                                        isActiveTab: _showActiveTab,
-                                        isDisposing: _disposingId == item.id,
-                                        onDispose: () => _disposeSample(item),
-                                      ),
-                                    )
-                                    .toList(growable: false),
+                              return Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  for (var i = 0; i < items.length; i++)
+                                    _SampleVaultRow(
+                                      item: items[i],
+                                      isActiveTab: _showActiveTab,
+                                      isDisposing: _disposingId == items[i].id,
+                                      showDivider: i < items.length - 1,
+                                      onDispose: () => _disposeSample(items[i]),
+                                    ),
+                                ],
                               );
                             },
                           ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
                   ),
                 ),
               ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -252,94 +305,132 @@ class _SampleVaultScreenState extends ConsumerState<SampleVaultScreen> {
   }) {
     return Scaffold(
       backgroundColor: AppColors.bgCanvas,
-      appBar: AppBar(title: const Text('Simpan Bank Sampel')),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: EdgeInsets.fromLTRB(
-            horizontalPad,
-            AppSpacing.lg,
-            horizontalPad,
-            AppSpacing.xxl,
-          ),
-          child: Center(
-            child: ConstrainedBox(
-              constraints: BoxConstraints(maxWidth: maxWidth),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Text(
-                    'Langkah 3 dari 3: Simpan 1 Porsi Sampel',
-                    style: AppTypography.titleSection,
-                  ),
-                  const SizedBox(height: AppSpacing.xs),
-                  Text(
-                    '${args.menuName} · ${args.batchCode}',
-                    style: AppTypography.tabular(AppTypography.bodyMedium),
-                  ),
-                  const SizedBox(height: AppSpacing.lg),
-                  Container(
-                    padding: const EdgeInsets.all(AppSpacing.xl),
-                    decoration: BoxDecoration(
-                      color: AppColors.surfaceBase,
-                      borderRadius: BorderRadius.circular(
-                        AppSpacing.radiusSurface,
-                      ),
-                      border: Border.all(
-                        color: AppColors.primary,
-                        width: 2,
-                      ),
-                    ),
+      body: Column(
+        children: [
+          Expanded(
+            child: SingleChildScrollView(
+              padding: EdgeInsets.fromLTRB(
+                horizontalPad,
+                AppSpacing.md,
+                horizontalPad,
+                AppSpacing.xxl,
+              ),
+              child: SafeArea(
+                bottom: false,
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(maxWidth: maxWidth),
                     child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        Text(
-                          'KODE LABEL BANK SAMPEL',
-                          style: AppTypography.labelTag.copyWith(
-                            color: AppColors.textSecondary,
-                          ),
+                        Row(
+                          children: [
+                            Material(
+                              color: AppColors.surfaceSoft,
+                              shape: const CircleBorder(),
+                              child: IconButton(
+                                onPressed: () =>
+                                    Navigator.of(context).maybePop(),
+                                tooltip: 'Kembali',
+                                constraints: const BoxConstraints(
+                                  minWidth: AppSpacing.minTouchTarget,
+                                  minHeight: AppSpacing.minTouchTarget,
+                                ),
+                                icon: const Icon(
+                                  Icons.arrow_back_ios_new_rounded,
+                                  size: 19,
+                                  color: AppColors.textPrimary,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: AppSpacing.md),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Langkah 3 dari 3',
+                                    style: AppTypography.captionMuted,
+                                  ),
+                                  Text(
+                                    'Simpan Bank Sampel',
+                                    style: AppTypography.headlinePage,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
                         ),
                         const SizedBox(height: AppSpacing.sm),
                         Text(
-                          args.suggestedLabelCode,
-                          textAlign: TextAlign.center,
-                          style: AppTypography.tabular(
-                            AppTypography.displayStatus,
-                          ).copyWith(letterSpacing: 1.5),
+                          '${args.menuName} · ${args.batchCode}',
+                          style: AppTypography.tabular(AppTypography.bodyMedium),
                         ),
+                        const SizedBox(height: AppSpacing.xl),
+                        Container(
+                          padding: const EdgeInsets.all(AppSpacing.xl),
+                          decoration: BoxDecoration(
+                            color: AppColors.surfaceSoft,
+                            borderRadius: BorderRadius.circular(
+                              AppSpacing.radiusHero,
+                            ),
+                          ),
+                          child: Column(
+                            children: [
+                              Text(
+                                'KODE LABEL BANK SAMPEL',
+                                style: AppTypography.captionMuted.copyWith(
+                                  fontWeight: FontWeight.w700,
+                                  letterSpacing: 0.5,
+                                ),
+                              ),
+                              const SizedBox(height: AppSpacing.sm),
+                              Text(
+                                args.suggestedLabelCode,
+                                textAlign: TextAlign.center,
+                                style: AppTypography.tabular(
+                                  AppTypography.displayStatus,
+                                ).copyWith(letterSpacing: 1.4),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: AppSpacing.xl),
+                        const Divider(height: 1),
+                        const _InstructionStepRow(
+                          stepNumber: '1',
+                          text:
+                              'Sisihkan 1 porsi makanan utuh ke dalam wadah bersih bertutup rapat sebelum dibagikan ke siswa.',
+                        ),
+                        const Divider(height: 1),
+                        const _InstructionStepRow(
+                          stepNumber: '2',
+                          text:
+                              'Tuliskan kode label di atas secara jelas menggunakan spidol permanen atau kertas label pada tutup wadah.',
+                        ),
+                        const Divider(height: 1),
+                        const _InstructionStepRow(
+                          stepNumber: '3',
+                          text:
+                              'Simpan sampel di lemari pendingin (< 5 C) selama 2x24 jam (48 jam) sesuai Perbagi No. 4 Tahun 2026.',
+                        ),
+                        const Divider(height: 1),
                       ],
                     ),
                   ),
-                  const SizedBox(height: AppSpacing.lg),
-                  LacakSectionSurface.separated(
-                    children: const [
-                      _InstructionStepRow(
-                        stepNumber: '1',
-                        text:
-                            'Sisihkan 1 porsi makanan utuh ke dalam wadah bersih bertutup rapat sebelum dibagikan ke siswa.',
-                      ),
-                      _InstructionStepRow(
-                        stepNumber: '2',
-                        text:
-                            'Tuliskan kode label di atas secara jelas menggunakan spidol permanen atau kertas label pada tutup wadah.',
-                      ),
-                      _InstructionStepRow(
-                        stepNumber: '3',
-                        text:
-                            'Simpan sampel di lemari pendingin (< 5 C) selama 2x24 jam (48 jam) sesuai Perbagi No. 4 Tahun 2026.',
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: AppSpacing.xl),
-                  LacakPrimaryButton(
-                    label: 'Sampel Sudah di Kulkas, Selesai',
-                    icon: Icons.check_circle_rounded,
-                    isLoading: _savingOnboarding,
-                    onPressed: () => _completeOnboarding(args),
-                  ),
-                ],
+                ),
               ),
             ),
           ),
-        ),
+          StickyBottomActionBar(
+            summaryLabel: 'Retensi Wajib',
+            summaryValue: '48 Jam (< 5 C)',
+            ctaLabel: 'Simpan Sampel',
+            ctaIcon: Icons.check_circle_rounded,
+            isLoading: _savingOnboarding,
+            onCtaPressed: () => _completeOnboarding(args),
+          ),
+        ],
       ),
     );
   }
@@ -354,19 +445,27 @@ class _InstructionStepRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.all(AppSpacing.lg),
+      padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
             '$stepNumber.',
             style: AppTypography.tabular(
-              AppTypography.titleItem.copyWith(color: AppColors.primary),
+              AppTypography.titleItem.copyWith(
+                color: AppColors.primary,
+                fontWeight: FontWeight.w700,
+              ),
             ),
           ),
           const SizedBox(width: AppSpacing.md),
           Expanded(
-            child: Text(text, style: AppTypography.bodyLarge),
+            child: Text(
+              text,
+              style: AppTypography.bodyLarge.copyWith(
+                color: AppColors.textPrimary,
+              ),
+            ),
           ),
         ],
       ),
@@ -374,17 +473,19 @@ class _InstructionStepRow extends StatelessWidget {
   }
 }
 
-class _SampleVaultTile extends StatelessWidget {
-  const _SampleVaultTile({
+class _SampleVaultRow extends StatelessWidget {
+  const _SampleVaultRow({
     required this.item,
     required this.isActiveTab,
     required this.isDisposing,
+    required this.showDivider,
     required this.onDispose,
   });
 
   final SampleVaultItem item;
   final bool isActiveTab;
   final bool isDisposing;
+  final bool showDivider;
   final VoidCallback onDispose;
 
   @override
@@ -393,75 +494,72 @@ class _SampleVaultTile extends StatelessWidget {
     final remaining = item.remainingFrom(nowUtc);
     final readyToDispose = item.isReadyToDispose(nowUtc);
 
-    final LacakStatusTag statusTag;
+    final String statusText;
+    final Color statusColor;
+    final Color thumbBg;
+    final Color thumbFg;
+
     if (!isActiveTab) {
-      statusTag = LacakStatusTag(
-        level: LacakStatusLevel.safe,
-        label: item.status == 'lab_submitted' ? 'Diserahkan Lab' : 'Dimusnahkan',
-      );
+      statusText = item.status == 'lab_submitted'
+          ? 'Diserahkan Lab'
+          : 'Sudah Dimusnahkan';
+      statusColor = AppColors.safeFg;
+      thumbBg = AppColors.surfaceSoft;
+      thumbFg = AppColors.primary;
     } else if (readyToDispose) {
-      statusTag = const LacakStatusTag(
-        level: LacakStatusLevel.warning,
-        label: '48 Jam Selesai',
-      );
+      statusText = '48 Jam Selesai - Siap Dimusnahkan';
+      statusColor = AppColors.warnFg;
+      thumbBg = AppColors.warnBg;
+      thumbFg = AppColors.warnFg;
     } else {
-      statusTag = const LacakStatusTag(
-        level: LacakStatusLevel.safe,
-        label: 'Aktif < 5 C',
-        icon: Icons.kitchen_rounded,
-      );
+      statusText =
+          'Sisa ${remaining.inHours} jam ${remaining.inMinutes % 60} menit (< 5 C)';
+      statusColor = AppColors.safeFg;
+      thumbBg = AppColors.safeBg;
+      thumbFg = AppColors.safeFg;
     }
 
-    return Padding(
-      padding: const EdgeInsets.all(AppSpacing.lg),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Wrap(
-            spacing: AppSpacing.sm,
-            runSpacing: AppSpacing.xs,
-            alignment: WrapAlignment.spaceBetween,
-            crossAxisAlignment: WrapCrossAlignment.center,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text(
-                item.labelCode,
-                style: AppTypography.tabular(AppTypography.titleSection),
+              BorderlessThumbTile(
+                padding: EdgeInsets.zero,
+                fallbackIcon: Icons.kitchen_rounded,
+                fallbackBgColor: thumbBg,
+                fallbackIconColor: thumbFg,
+                title: item.labelCode,
+                statusText: statusText,
+                statusColor: statusColor,
+                metadata: [
+                  BorderlessMetaItem(
+                    icon: Icons.restaurant_menu_rounded,
+                    label: item.menuName,
+                  ),
+                  BorderlessMetaItem(
+                    icon: Icons.schedule_rounded,
+                    label: 'Masuk ${formatWibDateTime(item.storedAtUtc)}',
+                  ),
+                ],
               ),
-              statusTag,
+              if (isActiveTab) ...[
+                const SizedBox(height: AppSpacing.md),
+                LacakSecondaryButton(
+                  label: 'Tandai Sudah Dimusnahkan',
+                  icon: Icons.check_circle_rounded,
+                  isLoading: isDisposing,
+                  onPressed: onDispose,
+                ),
+              ],
             ],
           ),
-          const SizedBox(height: AppSpacing.xs),
-          Text(item.menuName, style: AppTypography.titleItem),
-          const SizedBox(height: AppSpacing.xs),
-          Text(
-            'Masuk kulkas: ${formatWibDateTime(item.storedAtUtc)}',
-            style: AppTypography.tabular(AppTypography.bodyMedium),
-          ),
-          if (isActiveTab) ...[
-            const SizedBox(height: AppSpacing.xs),
-            Text(
-              readyToDispose
-                  ? 'Masa retensi 48 jam telah berakhir. Sampel aman dimusnahkan.'
-                  : 'Sisa waktu retensi: ${remaining.inHours} jam ${remaining.inMinutes % 60} menit',
-              style: AppTypography.tabular(
-                AppTypography.bodyMedium.copyWith(
-                  color: readyToDispose
-                      ? AppColors.warnFg
-                      : AppColors.textPrimary,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ),
-            const SizedBox(height: AppSpacing.md),
-            LacakSecondaryButton(
-              label: 'Tandai Sudah Dimusnahkan',
-              icon: Icons.check_circle_rounded,
-              isLoading: isDisposing,
-              onPressed: onDispose,
-            ),
-          ],
-        ],
-      ),
+        ),
+        if (showDivider) const Divider(height: 1),
+      ],
     );
   }
 }

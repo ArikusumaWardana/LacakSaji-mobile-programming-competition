@@ -6,9 +6,9 @@ import '../../../core/network/connectivity_provider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
+import '../../../core/widgets/editorial_widgets.dart';
 import '../../../core/widgets/lacak_buttons.dart';
 import '../../../core/widgets/lacak_feedback_states.dart';
-import '../../../core/widgets/lacak_section_surface.dart';
 import '../../../core/widgets/lacak_status_badge.dart';
 import '../../auth/presentation/auth_controller.dart';
 import '../../kitchen/domain/kitchen_models.dart';
@@ -23,7 +23,8 @@ const List<({int value, String label})> _kWasteQuickOptions = [
   (value: 75, label: 'Utuh (75%+)'),
 ];
 
-/// G07: School Plate-Waste evaluation screen (1-5 ompreng photos, quick-pick waste %, submit to SPPG).
+/// G07: Editorial School Plate-Waste evaluation screen (soft picker, 1-5 ompreng photos,
+/// borderless quick-pick waste %, and StickyBottomActionBar).
 class PlateWasteScreen extends ConsumerStatefulWidget {
   const PlateWasteScreen({super.key});
 
@@ -111,7 +112,8 @@ class _PlateWasteScreenState extends ConsumerState<PlateWasteScreen> {
               ok: false,
               provider: 'offline_mode',
               fallbackRequired: true,
-              summaryText: 'Mode Tanpa Sinyal. Menggunakan perkiraan cepat di HP.',
+              summaryText:
+                  'Mode Tanpa Sinyal. Menggunakan perkiraan cepat di HP.',
             )
           : await vision.analyzeCloudPlateWaste(
               photoBytesList: allBytes,
@@ -218,16 +220,17 @@ class _PlateWasteScreenState extends ConsumerState<PlateWasteScreen> {
     final isOffline = ref.read(isOfflineProvider).value ?? false;
 
     try {
-      final syncedNow = await ref.read(schoolRepositoryProvider).submitPlateWasteLog(
-            school: school,
-            batchId: batchId,
-            carbWastePct: _carbWastePct!,
-            proteinWastePct: _proteinWastePct!,
-            vegWastePct: _vegWastePct!,
-            photos: List.unmodifiable(_photos),
-            aiAssisted: _aiAssisted,
-            isOffline: isOffline,
-          );
+      final syncedNow =
+          await ref.read(schoolRepositoryProvider).submitPlateWasteLog(
+                school: school,
+                batchId: batchId,
+                carbWastePct: _carbWastePct!,
+                proteinWastePct: _proteinWastePct!,
+                vegWastePct: _vegWastePct!,
+                photos: List.unmodifiable(_photos),
+                aiAssisted: _aiAssisted,
+                isOffline: isOffline,
+              );
       invalidateSchoolProviders(ref);
       if (!mounted) {
         return;
@@ -274,361 +277,341 @@ class _PlateWasteScreenState extends ConsumerState<PlateWasteScreen> {
     final horizontalPad = AppSpacing.horizontalPadding(width);
     final maxWidth = AppSpacing.maxContentWidth(width);
 
+    if (school == null) {
+      return const Scaffold(
+        backgroundColor: AppColors.bgCanvas,
+        body: SafeArea(
+          child: Padding(
+            padding: EdgeInsets.all(AppSpacing.lg),
+            child: LacakErrorState(message: 'Profil sekolah belum dimuat.'),
+          ),
+        ),
+      );
+    }
+
     return Scaffold(
       backgroundColor: AppColors.bgCanvas,
-      appBar: AppBar(title: const Text('Sisa Makanan Siswa')),
-      body: SafeArea(
-        child: school == null
-            ? SingleChildScrollView(
+      body: Column(
+        children: [
+          const MinimalTopHeader(
+            contextLabel: 'Evaluasi Harian',
+            title: 'Sisa Makanan Siswa',
+          ),
+          Expanded(
+            child: batchesAsync.when(
+              loading: () => SingleChildScrollView(
                 padding: EdgeInsets.all(horizontalPad),
-                child: const LacakErrorState(
-                  message: 'Profil sekolah belum dimuat.',
+                child: const LacakSkeletonList(
+                  itemCount: 3,
+                  loadingLabel: 'Memuat daftar batch hari ini...',
                 ),
-              )
-            : batchesAsync.when(
-                loading: () => SingleChildScrollView(
-                  padding: EdgeInsets.all(horizontalPad),
-                  child: const LacakSkeletonList(
-                    itemCount: 3,
-                    loadingLabel: 'Memuat daftar batch hari ini...',
-                  ),
+              ),
+              error: (error, _) => SingleChildScrollView(
+                padding: EdgeInsets.all(horizontalPad),
+                child: LacakErrorState(
+                  message: error.toString(),
+                  onRetry: () =>
+                      ref.invalidate(selectableWasteBatchesProvider),
                 ),
-                error: (error, _) => SingleChildScrollView(
-                  padding: EdgeInsets.all(horizontalPad),
-                  child: LacakErrorState(
-                    message: error.toString(),
-                    onRetry: () =>
-                        ref.invalidate(selectableWasteBatchesProvider),
-                  ),
-                ),
-                data: (batches) {
-                  if (batches.isEmpty) {
-                    return SingleChildScrollView(
-                      padding: EdgeInsets.fromLTRB(
-                        horizontalPad,
-                        AppSpacing.lg,
-                        horizontalPad,
-                        AppSpacing.xxl,
-                      ),
-                      child: Center(
-                        child: ConstrainedBox(
-                          constraints: BoxConstraints(maxWidth: maxWidth),
-                          child: const LacakEmptyState(
-                            icon: Icons.restaurant_rounded,
-                            title: 'Belum ada batch kiriman untuk dievaluasi',
-                            message:
-                                'Pindai QR makanan masuk dari Dapur SPPG terlebih dahulu agar batch muncul di sini.',
-                          ),
+              ),
+              data: (batches) {
+                if (batches.isEmpty) {
+                  return SingleChildScrollView(
+                    padding: EdgeInsets.fromLTRB(
+                      horizontalPad,
+                      AppSpacing.lg,
+                      horizontalPad,
+                      AppSpacing.xxl,
+                    ),
+                    child: Center(
+                      child: ConstrainedBox(
+                        constraints: BoxConstraints(maxWidth: maxWidth),
+                        child: const LacakEmptyState(
+                          icon: Icons.restaurant_rounded,
+                          title: 'Belum ada batch kiriman untuk dievaluasi',
+                          message:
+                              'Pindai QR makanan masuk dari Dapur SPPG terlebih dahulu agar batch muncul di sini.',
                         ),
                       ),
-                    );
-                  }
-
-                  final activeBatch = batches.firstWhere(
-                    (b) => b.batchId == _selectedBatchId,
-                    orElse: () => batches.first,
+                    ),
                   );
-                  final activeBatchId = activeBatch.batchId;
+                }
 
-                  return Column(
-                    children: [
-                      Expanded(
-                        child: SingleChildScrollView(
-                          padding: EdgeInsets.fromLTRB(
-                            horizontalPad,
-                            AppSpacing.lg,
-                            horizontalPad,
-                            AppSpacing.xxl,
-                          ),
-                          child: Center(
-                            child: ConstrainedBox(
-                              constraints: BoxConstraints(maxWidth: maxWidth),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.stretch,
-                                children: [
-                                  Text(
-                                    '1. Pilih Batch Makanan',
-                                    style: AppTypography.titleSection,
+                final activeBatch = batches.firstWhere(
+                  (b) => b.batchId == _selectedBatchId,
+                  orElse: () => batches.first,
+                );
+                final activeBatchId = activeBatch.batchId;
+
+                return Column(
+                  children: [
+                    Expanded(
+                      child: SingleChildScrollView(
+                        padding: EdgeInsets.fromLTRB(
+                          horizontalPad,
+                          AppSpacing.sm,
+                          horizontalPad,
+                          AppSpacing.xxl,
+                        ),
+                        child: Center(
+                          child: ConstrainedBox(
+                            constraints: BoxConstraints(maxWidth: maxWidth),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                Text(
+                                  '1. Pilih Batch Makanan',
+                                  style: AppTypography.titleSection,
+                                ),
+                                const SizedBox(height: AppSpacing.sm),
+                                _BatchPickerTrigger(
+                                  batch: activeBatch,
+                                  nowUtc: DateTime.now().toUtc(),
+                                  onTap: () => _openBatchPicker(
+                                    batches: batches,
+                                    activeBatchId: activeBatchId,
                                   ),
-                                  const SizedBox(height: AppSpacing.sm),
-                                  _BatchPickerTrigger(
-                                    batch: activeBatch,
-                                    nowUtc: DateTime.now().toUtc(),
-                                    onTap: () => _openBatchPicker(
-                                      batches: batches,
-                                      activeBatchId: activeBatchId,
+                                ),
+                                const SizedBox(height: AppSpacing.xl),
+                                Wrap(
+                                  spacing: AppSpacing.sm,
+                                  runSpacing: AppSpacing.xs,
+                                  alignment: WrapAlignment.spaceBetween,
+                                  crossAxisAlignment: WrapCrossAlignment.center,
+                                  children: [
+                                    Text(
+                                      '2. Foto Sampel Ompreng (3-5 foto)',
+                                      style: AppTypography.titleSection,
                                     ),
-                                  ),
-                                  const SizedBox(height: AppSpacing.xl),
+                                    LacakStatusTag(
+                                      level: _photos.isEmpty
+                                          ? LacakStatusLevel.warning
+                                          : LacakStatusLevel.safe,
+                                      label: '${_photos.length} / 5 foto',
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: AppSpacing.xs),
+                                Text(
+                                  'Potret 3-5 ompreng bekas makan siswa secara acak setelah jam makan selesai.',
+                                  style: AppTypography.bodyMedium,
+                                ),
+                                if (_photos.isNotEmpty) ...[
+                                  const SizedBox(height: AppSpacing.md),
                                   Wrap(
                                     spacing: AppSpacing.sm,
-                                    runSpacing: AppSpacing.xs,
-                                    alignment: WrapAlignment.spaceBetween,
-                                    crossAxisAlignment:
-                                        WrapCrossAlignment.center,
-                                    children: [
-                                      Text(
-                                        '2. Foto Sampel Ompreng (3-5 foto)',
-                                        style: AppTypography.titleSection,
-                                      ),
-                                      LacakStatusTag(
-                                        level: _photos.isEmpty
-                                            ? LacakStatusLevel.warning
-                                            : LacakStatusLevel.safe,
-                                        label: '${_photos.length} / 5 foto',
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: AppSpacing.xs),
-                                  Text(
-                                    'Potret 3-5 ompreng bekas makan siswa secara acak setelah jam makan selesai.',
-                                    style: AppTypography.bodyMedium,
-                                  ),
-                                  if (_photos.isNotEmpty) ...[
-                                    const SizedBox(height: AppSpacing.md),
-                                    Wrap(
-                                      spacing: AppSpacing.sm,
-                                      runSpacing: AppSpacing.sm,
-                                      children: List.generate(
-                                        _photos.length,
-                                        (index) => Stack(
-                                          clipBehavior: Clip.none,
-                                          children: [
-                                            Container(
-                                              width: 84,
-                                              height: 84,
-                                              decoration: BoxDecoration(
-                                                borderRadius:
-                                                    BorderRadius.circular(
-                                                      AppSpacing.radiusControl,
-                                                    ),
-                                                border: Border.all(
-                                                  color:
-                                                      AppColors.borderHairline,
-                                                ),
-                                              ),
-                                              clipBehavior: Clip.antiAlias,
+                                    runSpacing: AppSpacing.sm,
+                                    children: List.generate(
+                                      _photos.length,
+                                      (index) => Stack(
+                                        clipBehavior: Clip.none,
+                                        children: [
+                                          ClipRRect(
+                                            borderRadius: BorderRadius.circular(
+                                              AppSpacing.radiusChip,
+                                            ),
+                                            child: SizedBox(
+                                              width: 82,
+                                              height: 82,
                                               child: Image.memory(
                                                 _photos[index].bytes,
                                                 fit: BoxFit.cover,
                                               ),
                                             ),
-                                            Positioned(
-                                              top: -8,
-                                              right: -8,
-                                              child: IconButton(
-                                                tooltip: 'Hapus foto',
-                                                constraints:
-                                                    const BoxConstraints(
-                                                      minWidth: 48,
-                                                      minHeight: 48,
-                                                    ),
-                                                onPressed: () => setState(() {
-                                                  _photos.removeAt(index);
-                                                  if (_photos.isEmpty) {
-                                                    _aiAssisted = false;
-                                                    _analysisNote = null;
-                                                    _estimationSourceLabel =
-                                                        null;
-                                                    _estimatedCarbPct = null;
-                                                    _estimatedProteinPct = null;
-                                                    _estimatedVegPct = null;
-                                                  }
-                                                }),
-                                                icon: Container(
-                                                  padding:
-                                                      const EdgeInsets.all(4),
-                                                  decoration:
-                                                      const BoxDecoration(
-                                                        color: AppColors
-                                                            .surfaceBase,
-                                                        shape: BoxShape.circle,
-                                                      ),
-                                                  child: const Icon(
-                                                    Icons.close_rounded,
-                                                    size: 16,
-                                                    color: AppColors.dangerFg,
-                                                  ),
+                                          ),
+                                          Positioned(
+                                            top: -8,
+                                            right: -8,
+                                            child: IconButton(
+                                              tooltip: 'Hapus foto',
+                                              constraints: const BoxConstraints(
+                                                minWidth: 48,
+                                                minHeight: 48,
+                                              ),
+                                              onPressed: () => setState(() {
+                                                _photos.removeAt(index);
+                                                if (_photos.isEmpty) {
+                                                  _aiAssisted = false;
+                                                  _analysisNote = null;
+                                                  _estimationSourceLabel = null;
+                                                  _estimatedCarbPct = null;
+                                                  _estimatedProteinPct = null;
+                                                  _estimatedVegPct = null;
+                                                }
+                                              }),
+                                              icon: Container(
+                                                padding:
+                                                    const EdgeInsets.all(4),
+                                                decoration: const BoxDecoration(
+                                                  color: AppColors.surfaceBase,
+                                                  shape: BoxShape.circle,
+                                                ),
+                                                child: const Icon(
+                                                  Icons.close_rounded,
+                                                  size: 16,
+                                                  color: AppColors.dangerFg,
                                                 ),
                                               ),
                                             ),
-                                          ],
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                  const SizedBox(height: AppSpacing.md),
-                                  LacakSecondaryButton(
-                                    label: _photos.length >= 5
-                                        ? 'Maksimal 5 Foto Tercapai'
-                                        : 'Tambah Foto Ompreng (${_photos.length}/5)',
-                                    icon: Icons.photo_camera_rounded,
-                                    isLoading: _capturing,
-                                    onPressed: _photos.length >= 5
-                                        ? null
-                                        : () => _addOmprengPhoto(batches),
-                                  ),
-                                  if (_analyzing) ...[
-                                    const SizedBox(height: AppSpacing.sm),
-                                    const LinearProgressIndicator(
-                                      color: AppColors.primary,
-                                      backgroundColor: AppColors.surfaceSubtle,
-                                      minHeight: 3,
-                                    ),
-                                    const SizedBox(height: AppSpacing.xs),
-                                    Text(
-                                      'Menunggu hasil analisis AI dari server...',
-                                      style: AppTypography.bodyMedium,
-                                    ),
-                                  ],
-                                  if (_estimatedCarbPct != null &&
-                                      _estimatedProteinPct != null &&
-                                      _estimatedVegPct != null) ...[
-                                    const SizedBox(height: AppSpacing.md),
-                                    _EstimationResultSummaryCard(
-                                      photoCount: _photos.length,
-                                      sourceLabel: _estimationSourceLabel ??
-                                          'Cek Cepat di HP',
-                                      isUpdatingCloud: _analyzing,
-                                      carbPct: _estimatedCarbPct!,
-                                      proteinPct: _estimatedProteinPct!,
-                                      vegPct: _estimatedVegPct!,
-                                      note: _analysisNote,
-                                    ),
-                                  ] else if (!_analyzing &&
-                                      _analysisNote != null) ...[
-                                    const SizedBox(height: AppSpacing.sm),
-                                    Row(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        const Icon(
-                                          Icons.fact_check_rounded,
-                                          size: 18,
-                                          color: AppColors.textSecondary,
-                                        ),
-                                        const SizedBox(width: AppSpacing.xs),
-                                        Expanded(
-                                          child: Text(
-                                            _analysisNote!,
-                                            style: AppTypography.bodyMedium,
                                           ),
-                                        ),
-                                      ],
+                                        ],
+                                      ),
                                     ),
-                                  ],
-                                  const SizedBox(height: AppSpacing.xl),
-                                  Wrap(
-                                    spacing: AppSpacing.sm,
-                                    runSpacing: AppSpacing.xs,
-                                    alignment: WrapAlignment.spaceBetween,
-                                    crossAxisAlignment:
-                                        WrapCrossAlignment.center,
-                                    children: [
-                                      Text(
-                                        '3. Estimasi Sisa Per Komponen',
-                                        style: AppTypography.titleSection,
-                                      ),
-                                      if (_aiAssisted)
-                                        const LacakStatusTag(
-                                          level: LacakStatusLevel.safe,
-                                          label: 'Terisi Otomatis',
-                                          icon: Icons.fact_check_rounded,
-                                        ),
-                                    ],
                                   ),
-                                  const SizedBox(height: AppSpacing.sm),
-                                  LacakSectionSurface.separated(
-                                    children: [
-                                      _WasteComponentSelector(
-                                        title: 'Nasi / Karbohidrat',
-                                        selectedValue: _carbWastePct,
-                                        onChanged: (v) => setState(() {
-                                          _carbWastePct = v;
-                                          _validationError = null;
-                                        }),
-                                      ),
-                                      _WasteComponentSelector(
-                                        title: 'Lauk / Protein',
-                                        selectedValue: _proteinWastePct,
-                                        onChanged: (v) => setState(() {
-                                          _proteinWastePct = v;
-                                          _validationError = null;
-                                        }),
-                                      ),
-                                      _WasteComponentSelector(
-                                        title: 'Sayuran',
-                                        selectedValue: _vegWastePct,
-                                        onChanged: (v) => setState(() {
-                                          _vegWastePct = v;
-                                          _validationError = null;
-                                        }),
-                                      ),
-                                    ],
-                                  ),
-                                  if (_validationError != null) ...[
-                                    const SizedBox(height: AppSpacing.md),
-                                    Row(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        const Icon(
-                                          Icons.error_outline_rounded,
-                                          size: 20,
-                                          color: AppColors.dangerFg,
-                                        ),
-                                        const SizedBox(width: AppSpacing.xs),
-                                        Expanded(
-                                          child: Text(
-                                            _validationError!,
-                                            style: AppTypography.bodyMedium
-                                                .copyWith(
-                                                  color: AppColors.dangerFg,
-                                                  fontWeight: FontWeight.w500,
-                                                ),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ],
                                 ],
-                              ),
+                                const SizedBox(height: AppSpacing.md),
+                                LacakSecondaryButton(
+                                  label: _photos.length >= 5
+                                      ? 'Maksimal 5 Foto Tercapai'
+                                      : 'Tambah Foto Ompreng (${_photos.length}/5)',
+                                  icon: Icons.photo_camera_rounded,
+                                  isLoading: _capturing,
+                                  onPressed: _photos.length >= 5
+                                      ? null
+                                      : () => _addOmprengPhoto(batches),
+                                ),
+                                if (_analyzing) ...[
+                                  const SizedBox(height: AppSpacing.sm),
+                                  const LinearProgressIndicator(
+                                    color: AppColors.primary,
+                                    backgroundColor: AppColors.surfaceSoft,
+                                    minHeight: 3,
+                                  ),
+                                  const SizedBox(height: AppSpacing.xs),
+                                  Text(
+                                    'Menunggu hasil analisis AI dari server...',
+                                    style: AppTypography.bodyMedium,
+                                  ),
+                                ],
+                                if (_estimatedCarbPct != null &&
+                                    _estimatedProteinPct != null &&
+                                    _estimatedVegPct != null) ...[
+                                  const SizedBox(height: AppSpacing.md),
+                                  _EstimationResultSummaryCard(
+                                    photoCount: _photos.length,
+                                    sourceLabel: _estimationSourceLabel ??
+                                        'Cek Cepat di HP',
+                                    isUpdatingCloud: _analyzing,
+                                    carbPct: _estimatedCarbPct!,
+                                    proteinPct: _estimatedProteinPct!,
+                                    vegPct: _estimatedVegPct!,
+                                    note: _analysisNote,
+                                  ),
+                                ] else if (!_analyzing &&
+                                    _analysisNote != null) ...[
+                                  const SizedBox(height: AppSpacing.sm),
+                                  Row(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      const Icon(
+                                        Icons.fact_check_rounded,
+                                        size: 18,
+                                        color: AppColors.textSecondary,
+                                      ),
+                                      const SizedBox(width: AppSpacing.xs),
+                                      Expanded(
+                                        child: Text(
+                                          _analysisNote!,
+                                          style: AppTypography.bodyMedium,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                                const SizedBox(height: AppSpacing.xl),
+                                Wrap(
+                                  spacing: AppSpacing.sm,
+                                  runSpacing: AppSpacing.xs,
+                                  alignment: WrapAlignment.spaceBetween,
+                                  crossAxisAlignment: WrapCrossAlignment.center,
+                                  children: [
+                                    Text(
+                                      '3. Estimasi Sisa Per Komponen',
+                                      style: AppTypography.titleSection,
+                                    ),
+                                    if (_aiAssisted)
+                                      const LacakStatusTag(
+                                        level: LacakStatusLevel.safe,
+                                        label: 'Terisi Otomatis',
+                                        icon: Icons.fact_check_rounded,
+                                      ),
+                                  ],
+                                ),
+                                const SizedBox(height: AppSpacing.xs),
+                                const Divider(height: 1),
+                                _WasteComponentSelector(
+                                  title: 'Nasi / Karbohidrat',
+                                  selectedValue: _carbWastePct,
+                                  onChanged: (v) => setState(() {
+                                    _carbWastePct = v;
+                                    _validationError = null;
+                                  }),
+                                ),
+                                const Divider(height: 1),
+                                _WasteComponentSelector(
+                                  title: 'Lauk / Protein',
+                                  selectedValue: _proteinWastePct,
+                                  onChanged: (v) => setState(() {
+                                    _proteinWastePct = v;
+                                    _validationError = null;
+                                  }),
+                                ),
+                                const Divider(height: 1),
+                                _WasteComponentSelector(
+                                  title: 'Sayuran',
+                                  selectedValue: _vegWastePct,
+                                  onChanged: (v) => setState(() {
+                                    _vegWastePct = v;
+                                    _validationError = null;
+                                  }),
+                                ),
+                                const Divider(height: 1),
+                                if (_validationError != null) ...[
+                                  const SizedBox(height: AppSpacing.md),
+                                  Row(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      const Icon(
+                                        Icons.error_outline_rounded,
+                                        size: 20,
+                                        color: AppColors.dangerFg,
+                                      ),
+                                      const SizedBox(width: AppSpacing.xs),
+                                      Expanded(
+                                        child: Text(
+                                          _validationError!,
+                                          style: AppTypography.bodyMedium
+                                              .copyWith(
+                                                color: AppColors.dangerFg,
+                                                fontWeight: FontWeight.w500,
+                                              ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ],
                             ),
                           ),
                         ),
                       ),
-                      Container(
-                        decoration: const BoxDecoration(
-                          color: AppColors.surfaceBase,
-                          border: Border(
-                            top: BorderSide(
-                              color: AppColors.borderHairline,
-                              width: 1,
-                            ),
-                          ),
-                        ),
-                        padding: EdgeInsets.fromLTRB(
-                          horizontalPad,
-                          AppSpacing.md,
-                          horizontalPad,
-                          AppSpacing.md,
-                        ),
-                        child: Center(
-                          child: ConstrainedBox(
-                            constraints: BoxConstraints(maxWidth: maxWidth),
-                            child: LacakPrimaryButton(
-                              label: 'Kirim Evaluasi ke Dapur SPPG',
-                              icon: Icons.send_rounded,
-                              isLoading: _submitting,
-                              onPressed: () => _submitFeedback(activeBatchId),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  );
-                },
-              ),
+                    ),
+                    StickyBottomActionBar(
+                      summaryLabel: 'Evaluasi Ompreng',
+                      summaryValue: '${_photos.length} / 5 Foto',
+                      ctaLabel: 'Kirim Estimasi',
+                      ctaIcon: Icons.send_rounded,
+                      isLoading: _submitting,
+                      onCtaPressed: () => _submitFeedback(activeBatchId),
+                    ),
+                  ],
+                );
+              },
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -651,7 +634,7 @@ class _WasteComponentSelector extends StatelessWidget {
     final isHigh = value != null && value >= 50;
 
     return Padding(
-      padding: const EdgeInsets.all(AppSpacing.lg),
+      padding: const EdgeInsets.symmetric(vertical: AppSpacing.lg),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -681,8 +664,7 @@ class _WasteComponentSelector extends StatelessWidget {
           const SizedBox(height: AppSpacing.md),
           LayoutBuilder(
             builder: (context, constraints) {
-              final cellWidth =
-                  (constraints.maxWidth - AppSpacing.sm) / 2;
+              final cellWidth = (constraints.maxWidth - AppSpacing.sm) / 2;
               return Wrap(
                 spacing: AppSpacing.sm,
                 runSpacing: AppSpacing.sm,
@@ -692,47 +674,44 @@ class _WasteComponentSelector extends StatelessWidget {
                     width: cellWidth > 100
                         ? cellWidth
                         : constraints.maxWidth,
-                    child: Material(
-                      color: selected
-                          ? AppColors.primaryTint
-                          : AppColors.surfaceBase,
-                      shape: RoundedRectangleBorder(
+                    child: Semantics(
+                      button: true,
+                      selected: selected,
+                      label: '$title ${option.label}',
+                      child: Material(
+                        color: selected
+                            ? AppColors.primary
+                            : AppColors.surfaceSoft,
                         borderRadius: BorderRadius.circular(
-                          AppSpacing.radiusControl,
+                          AppSpacing.radiusChip,
                         ),
-                        side: BorderSide(
-                          color: selected
-                              ? AppColors.primary
-                              : AppColors.borderHairline,
-                          width: selected ? 2 : 1,
-                        ),
-                      ),
-                      child: InkWell(
-                        onTap: () => onChanged(option.value),
-                        borderRadius: BorderRadius.circular(
-                          AppSpacing.radiusControl,
-                        ),
-                        child: ConstrainedBox(
-                          constraints: const BoxConstraints(
-                            minHeight: AppSpacing.minTouchTarget,
+                        child: InkWell(
+                          onTap: () => onChanged(option.value),
+                          borderRadius: BorderRadius.circular(
+                            AppSpacing.radiusChip,
                           ),
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: AppSpacing.sm,
-                              vertical: AppSpacing.sm,
+                          child: ConstrainedBox(
+                            constraints: const BoxConstraints(
+                              minHeight: AppSpacing.minTouchTarget,
                             ),
-                            child: Center(
-                              child: Text(
-                                option.label,
-                                textAlign: TextAlign.center,
-                                style: AppTypography.tabular(
-                                  AppTypography.labelTag.copyWith(
-                                    color: selected
-                                        ? AppColors.onPrimaryTint
-                                        : AppColors.textPrimary,
-                                    fontWeight: selected
-                                        ? FontWeight.w700
-                                        : FontWeight.w500,
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: AppSpacing.sm,
+                                vertical: AppSpacing.sm,
+                              ),
+                              child: Center(
+                                child: Text(
+                                  option.label,
+                                  textAlign: TextAlign.center,
+                                  style: AppTypography.tabular(
+                                    AppTypography.labelTag.copyWith(
+                                      color: selected
+                                          ? AppColors.onPrimary
+                                          : AppColors.chipInactiveText,
+                                      fontWeight: selected
+                                          ? FontWeight.w700
+                                          : FontWeight.w600,
+                                    ),
                                   ),
                                 ),
                               ),
@@ -776,11 +755,10 @@ class _EstimationResultSummaryCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(AppSpacing.md),
+      padding: const EdgeInsets.all(AppSpacing.lg),
       decoration: BoxDecoration(
         color: AppColors.safeBg,
-        borderRadius: BorderRadius.circular(AppSpacing.radiusControl),
-        border: Border.all(color: AppColors.safeBorder, width: 1),
+        borderRadius: BorderRadius.circular(AppSpacing.radiusSurface),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -806,7 +784,6 @@ class _EstimationResultSummaryCard extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: AppColors.surfaceBase,
                   borderRadius: BorderRadius.circular(AppSpacing.radiusTag),
-                  border: Border.all(color: AppColors.safeBorder, width: 1),
                 ),
                 child: Text(
                   isUpdatingCloud ? 'Menyempurnakan...' : sourceLabel,
@@ -822,8 +799,7 @@ class _EstimationResultSummaryCard extends StatelessWidget {
           Container(
             decoration: BoxDecoration(
               color: AppColors.surfaceBase,
-              borderRadius: BorderRadius.circular(AppSpacing.radiusTag),
-              border: Border.all(color: AppColors.borderHairline, width: 1),
+              borderRadius: BorderRadius.circular(AppSpacing.radiusInput),
             ),
             child: IntrinsicHeight(
               child: Row(
@@ -862,12 +838,10 @@ class _EstimationResultSummaryCard extends StatelessWidget {
               ),
             ),
           ],
-          const SizedBox(height: 2),
+          const SizedBox(height: 4),
           Text(
             'Angka di bagian 3 telah diisi otomatis. Ketuk tombol persentase di bawah jika ingin menyesuaikan.',
-            style: AppTypography.captionLegal.copyWith(
-              color: AppColors.textSecondary,
-            ),
+            style: AppTypography.captionLegal,
           ),
         ],
       ),
@@ -894,12 +868,7 @@ class _EstimatedComponentStat extends StatelessWidget {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Text(
-            label,
-            style: AppTypography.captionLegal.copyWith(
-              color: AppColors.textSecondary,
-            ),
-          ),
+          Text(label, style: AppTypography.captionLegal),
           const SizedBox(height: 2),
           Text(
             valueText,
@@ -940,14 +909,11 @@ class _BatchPickerTrigger extends StatelessWidget {
       button: true,
       label: 'Pilih batch makanan, terpilih ${batch.menuName}',
       child: Material(
-        color: AppColors.surfaceBase,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(AppSpacing.radiusControl),
-          side: const BorderSide(color: AppColors.borderHairline, width: 1),
-        ),
+        color: AppColors.surfaceSoft,
+        borderRadius: BorderRadius.circular(AppSpacing.radiusInput),
         child: InkWell(
           onTap: onTap,
-          borderRadius: BorderRadius.circular(AppSpacing.radiusControl),
+          borderRadius: BorderRadius.circular(AppSpacing.radiusInput),
           child: ConstrainedBox(
             constraints: const BoxConstraints(
               minHeight: AppSpacing.primaryButtonMinHeight,
@@ -969,17 +935,13 @@ class _BatchPickerTrigger extends StatelessWidget {
                           batch.menuName,
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
-                          style: AppTypography.titleItem.copyWith(
-                            color: AppColors.textPrimary,
-                          ),
+                          style: AppTypography.titleItem,
                         ),
                         const SizedBox(height: 2),
                         Text(
                           '${batch.batchCode} · ${_formatBatchTimestamp(batch.sealedAtUtc, nowUtc)}',
                           style: AppTypography.tabular(
-                            AppTypography.bodyMedium.copyWith(
-                              color: AppColors.textSecondary,
-                            ),
+                            AppTypography.captionMuted,
                           ),
                         ),
                       ],
@@ -1037,8 +999,7 @@ class _BatchPickerDialogState extends State<_BatchPickerDialog> {
         vertical: AppSpacing.xl,
       ),
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(AppSpacing.radiusSurface),
-        side: const BorderSide(color: AppColors.borderHairline, width: 1),
+        borderRadius: BorderRadius.circular(AppSpacing.radiusHero),
       ),
       child: ConstrainedBox(
         constraints: BoxConstraints(
@@ -1082,105 +1043,88 @@ class _BatchPickerDialogState extends State<_BatchPickerDialog> {
                 ],
               ),
               const SizedBox(height: AppSpacing.md),
+              const Divider(height: 1),
               Flexible(
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: AppColors.surfaceBase,
-                    borderRadius: BorderRadius.circular(
-                      AppSpacing.radiusSurface,
-                    ),
-                    border: Border.all(
-                      color: AppColors.borderHairline,
-                      width: 1,
-                    ),
-                  ),
-                  clipBehavior: Clip.antiAlias,
-                  child: Scrollbar(
+                child: Scrollbar(
+                  controller: _scrollController,
+                  thumbVisibility: true,
+                  child: ListView.separated(
                     controller: _scrollController,
-                    thumbVisibility: true,
-                    child: ListView.separated(
-                      controller: _scrollController,
-                      shrinkWrap: true,
-                      itemCount: widget.batches.length,
-                      separatorBuilder: (_, _) => const Divider(height: 1),
-                      itemBuilder: (context, index) {
-                        final batch = widget.batches[index];
-                        final isSelected =
-                            batch.batchId == widget.selectedBatchId;
-                        return Material(
-                          color: isSelected
-                              ? AppColors.primaryTint
-                              : AppColors.surfaceBase,
-                          child: InkWell(
-                            onTap: () => Navigator.of(context).pop(batch),
-                            child: Semantics(
-                              button: true,
-                              selected: isSelected,
-                              child: ConstrainedBox(
-                                constraints: const BoxConstraints(
-                                  minHeight: AppSpacing.selectionRowMinHeight,
+                    shrinkWrap: true,
+                    itemCount: widget.batches.length,
+                    separatorBuilder: (_, _) => const Divider(height: 1),
+                    itemBuilder: (context, index) {
+                      final batch = widget.batches[index];
+                      final isSelected =
+                          batch.batchId == widget.selectedBatchId;
+                      return Material(
+                        color: isSelected
+                            ? AppColors.primaryTint
+                            : AppColors.surfaceBase,
+                        child: InkWell(
+                          onTap: () => Navigator.of(context).pop(batch),
+                          child: Semantics(
+                            button: true,
+                            selected: isSelected,
+                            child: ConstrainedBox(
+                              constraints: const BoxConstraints(
+                                minHeight: AppSpacing.selectionRowMinHeight,
+                              ),
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: AppSpacing.md,
+                                  vertical: AppSpacing.md,
                                 ),
-                                child: Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: AppSpacing.lg,
-                                    vertical: AppSpacing.md,
-                                  ),
-                                  child: Row(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.center,
-                                    children: [
-                                      Expanded(
-                                        child: Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          children: [
-                                            Text(
-                                              batch.menuName,
-                                              style: AppTypography.titleItem
-                                                  .copyWith(
-                                                    color: isSelected
-                                                        ? AppColors
-                                                              .onPrimaryTint
-                                                        : AppColors.textPrimary,
-                                                    fontWeight: isSelected
-                                                        ? FontWeight.w700
-                                                        : FontWeight.w600,
-                                                  ),
+                                child: Row(
+                                  crossAxisAlignment: CrossAxisAlignment.center,
+                                  children: [
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            batch.menuName,
+                                            style: AppTypography.titleItem
+                                                .copyWith(
+                                              color: isSelected
+                                                  ? AppColors.onPrimaryTint
+                                                  : AppColors.textPrimary,
+                                              fontWeight: isSelected
+                                                  ? FontWeight.w700
+                                                  : FontWeight.w600,
                                             ),
-                                            const SizedBox(height: 2),
-                                            Text(
-                                              '${batch.batchCode} · ${_formatBatchTimestamp(batch.sealedAtUtc, widget.nowUtc)}',
-                                              style: AppTypography.tabular(
-                                                AppTypography.bodyMedium
-                                                    .copyWith(
-                                                      color: isSelected
-                                                          ? AppColors
-                                                                .onPrimaryTint
-                                                          : AppColors
-                                                                .textSecondary,
-                                                    ),
+                                          ),
+                                          const SizedBox(height: 2),
+                                          Text(
+                                            '${batch.batchCode} · ${_formatBatchTimestamp(batch.sealedAtUtc, widget.nowUtc)}',
+                                            style: AppTypography.tabular(
+                                              AppTypography.bodyMedium.copyWith(
+                                                color: isSelected
+                                                    ? AppColors.onPrimaryTint
+                                                    : AppColors.textSecondary,
                                               ),
                                             ),
-                                          ],
-                                        ),
+                                          ),
+                                        ],
                                       ),
-                                      if (isSelected) ...[
-                                        const SizedBox(width: AppSpacing.sm),
-                                        const Icon(
-                                          Icons.check_circle_rounded,
-                                          size: 22,
-                                          color: AppColors.primary,
-                                        ),
-                                      ],
+                                    ),
+                                    if (isSelected) ...[
+                                      const SizedBox(width: AppSpacing.sm),
+                                      const Icon(
+                                        Icons.check_circle_rounded,
+                                        size: 22,
+                                        color: AppColors.primary,
+                                      ),
                                     ],
-                                  ),
+                                  ],
                                 ),
                               ),
                             ),
                           ),
-                        );
-                      },
-                    ),
+                        ),
+                      );
+                    },
                   ),
                 ),
               ),

@@ -82,7 +82,7 @@ class _LacakFloatingAuthNoticeState extends State<LacakFloatingAuthNotice> {
     final bgColor = isLogin ? AppColors.safeBg : AppColors.infoBg;
     final accentColor = isLogin ? AppColors.safeFg : AppColors.infoFg;
     final iconData = isLogin ? Icons.check_circle_rounded : Icons.logout_rounded;
-    final bottomOffset = width < 600 ? 92.0 : AppSpacing.lg;
+    const bottomOffset = AppSpacing.lg;
 
     return Positioned(
       top: isLogin ? null : 0,

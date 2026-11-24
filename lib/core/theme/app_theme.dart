@@ -5,7 +5,7 @@ import 'app_semantic_colors.dart';
 import 'app_spacing.dart';
 import 'app_typography.dart';
 
-/// Material 3 light theme following DESIGN.md v1.2.0 (90-8-2 anti-slop palette).
+/// Material 3 light theme following DESIGN.md v2.0.0 (Modern Minimalist Editorial).
 abstract final class AppTheme {
   static ThemeData get lightTheme {
     const colorScheme = ColorScheme.light(
@@ -15,16 +15,19 @@ abstract final class AppTheme {
       onPrimaryContainer: AppColors.onPrimaryTint,
       secondary: AppColors.primary,
       onSecondary: AppColors.onPrimary,
-      secondaryContainer: AppColors.surfaceSubtle,
+      secondaryContainer: AppColors.surfaceSoft,
       onSecondaryContainer: AppColors.textPrimary,
-      surface: AppColors.surfaceBase,
+      surface: AppColors.bgCanvas,
+      surfaceContainerLowest: AppColors.bgCanvas,
+      surfaceContainerLow: AppColors.surfaceSoft,
+      surfaceContainer: AppColors.surfaceSoft,
       onSurface: AppColors.textPrimary,
       onSurfaceVariant: AppColors.textSecondary,
       error: AppColors.emergencyBg,
       onError: AppColors.emergencyFg,
       errorContainer: AppColors.dangerBg,
       onErrorContainer: AppColors.dangerFg,
-      outline: AppColors.borderHairline,
+      outline: AppColors.borderStrong,
       outlineVariant: AppColors.borderHairline,
     );
 
@@ -34,28 +37,47 @@ abstract final class AppTheme {
       useMaterial3: true,
       colorScheme: colorScheme,
       scaffoldBackgroundColor: AppColors.bgCanvas,
+      canvasColor: AppColors.bgCanvas,
       textTheme: textTheme,
       extensions: const [LacakSemanticColors.light],
       appBarTheme: AppBarTheme(
-        backgroundColor: AppColors.surfaceBase,
+        backgroundColor: AppColors.bgCanvas,
         foregroundColor: AppColors.textPrimary,
         elevation: 0,
         scrolledUnderElevation: 0,
         surfaceTintColor: Colors.transparent,
         centerTitle: false,
-        titleTextStyle: AppTypography.headlinePage,
-        shape: const Border(
-          bottom: BorderSide(color: AppColors.borderHairline, width: 1),
-        ),
+        titleTextStyle: AppTypography.titleSection,
       ),
       cardTheme: CardThemeData(
         elevation: 0,
+        shadowColor: Colors.transparent,
         color: AppColors.surfaceBase,
         surfaceTintColor: Colors.transparent,
         margin: EdgeInsets.zero,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(AppSpacing.radiusSurface),
+          borderRadius: BorderRadius.circular(AppSpacing.radiusCard),
           side: const BorderSide(color: AppColors.borderHairline, width: 1),
+        ),
+      ),
+      chipTheme: ChipThemeData(
+        backgroundColor: AppColors.surfaceSoft,
+        selectedColor: AppColors.primary,
+        disabledColor: AppColors.surfaceSoft,
+        labelStyle: AppTypography.labelTag.copyWith(
+          color: AppColors.chipInactiveText,
+        ),
+        secondaryLabelStyle: AppTypography.labelTag.copyWith(
+          color: AppColors.onPrimary,
+          fontWeight: FontWeight.w600,
+        ),
+        side: BorderSide.none,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppSpacing.radiusChip),
+        ),
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.md,
+          vertical: AppSpacing.sm,
         ),
       ),
       dividerTheme: const DividerThemeData(
@@ -65,41 +87,49 @@ abstract final class AppTheme {
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: AppColors.surfaceBase,
+        fillColor: AppColors.surfaceSoft,
         contentPadding: const EdgeInsets.symmetric(
           horizontal: AppSpacing.lg,
-          vertical: AppSpacing.lg,
+          vertical: 15,
         ),
-        hintStyle: AppTypography.bodyLarge.copyWith(color: AppColors.textMuted),
-        errorStyle: AppTypography.labelTag.copyWith(color: AppColors.dangerFg),
+        hintStyle: AppTypography.bodyMedium.copyWith(color: AppColors.textMuted),
+        labelStyle: AppTypography.bodyMedium.copyWith(
+          color: AppColors.textSecondary,
+        ),
+        floatingLabelStyle: AppTypography.labelTag.copyWith(
+          color: AppColors.primary,
+          fontWeight: FontWeight.w600,
+        ),
+        errorStyle: AppTypography.captionLegal.copyWith(
+          color: AppColors.dangerFg,
+          fontWeight: FontWeight.w500,
+        ),
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(AppSpacing.radiusControl),
-          borderSide: const BorderSide(
-            color: AppColors.borderHairline,
-            width: 1,
-          ),
+          borderRadius: BorderRadius.circular(AppSpacing.radiusInput),
+          borderSide: BorderSide.none,
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(AppSpacing.radiusControl),
-          borderSide: const BorderSide(
-            color: AppColors.borderHairline,
-            width: 1,
-          ),
+          borderRadius: BorderRadius.circular(AppSpacing.radiusInput),
+          borderSide: BorderSide.none,
+        ),
+        disabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(AppSpacing.radiusInput),
+          borderSide: BorderSide.none,
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(AppSpacing.radiusControl),
+          borderRadius: BorderRadius.circular(AppSpacing.radiusInput),
           borderSide: const BorderSide(
             color: AppColors.borderFocus,
-            width: 2,
+            width: 1.8,
           ),
         ),
         errorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(AppSpacing.radiusControl),
+          borderRadius: BorderRadius.circular(AppSpacing.radiusInput),
           borderSide: const BorderSide(color: AppColors.dangerFg, width: 1.5),
         ),
         focusedErrorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(AppSpacing.radiusControl),
-          borderSide: const BorderSide(color: AppColors.dangerFg, width: 2),
+          borderRadius: BorderRadius.circular(AppSpacing.radiusInput),
+          borderSide: const BorderSide(color: AppColors.dangerFg, width: 1.8),
         ),
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
@@ -109,15 +139,16 @@ abstract final class AppTheme {
           ),
           padding: const WidgetStatePropertyAll(
             EdgeInsets.symmetric(
-              horizontal: AppSpacing.lg,
-              vertical: AppSpacing.md,
+              horizontal: AppSpacing.xl,
+              vertical: 14,
             ),
           ),
           elevation: const WidgetStatePropertyAll(0),
           shadowColor: const WidgetStatePropertyAll(Colors.transparent),
+          surfaceTintColor: const WidgetStatePropertyAll(Colors.transparent),
           backgroundColor: WidgetStateProperty.resolveWith((states) {
             if (states.contains(WidgetState.disabled)) {
-              return AppColors.surfaceSubtle;
+              return AppColors.surfaceSoft;
             }
             if (states.contains(WidgetState.pressed)) {
               return AppColors.primaryPressed;
@@ -133,7 +164,41 @@ abstract final class AppTheme {
           textStyle: WidgetStatePropertyAll(AppTypography.labelButton),
           shape: WidgetStatePropertyAll(
             RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(AppSpacing.radiusControl),
+              borderRadius: BorderRadius.circular(AppSpacing.radiusButton),
+            ),
+          ),
+        ),
+      ),
+      filledButtonTheme: FilledButtonThemeData(
+        style: ButtonStyle(
+          minimumSize: const WidgetStatePropertyAll(
+            Size(AppSpacing.minTouchTarget, AppSpacing.secondaryButtonMinHeight),
+          ),
+          padding: const WidgetStatePropertyAll(
+            EdgeInsets.symmetric(horizontal: AppSpacing.xl, vertical: 14),
+          ),
+          elevation: const WidgetStatePropertyAll(0),
+          shadowColor: const WidgetStatePropertyAll(Colors.transparent),
+          surfaceTintColor: const WidgetStatePropertyAll(Colors.transparent),
+          backgroundColor: WidgetStateProperty.resolveWith((states) {
+            if (states.contains(WidgetState.disabled)) {
+              return AppColors.surfaceSoft;
+            }
+            if (states.contains(WidgetState.pressed)) {
+              return AppColors.primaryPressed;
+            }
+            return AppColors.primary;
+          }),
+          foregroundColor: WidgetStateProperty.resolveWith((states) {
+            if (states.contains(WidgetState.disabled)) {
+              return AppColors.textMuted;
+            }
+            return AppColors.onPrimary;
+          }),
+          textStyle: WidgetStatePropertyAll(AppTypography.labelButton),
+          shape: WidgetStatePropertyAll(
+            RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(AppSpacing.radiusButton),
             ),
           ),
         ),
@@ -145,11 +210,13 @@ abstract final class AppTheme {
           ),
           padding: const WidgetStatePropertyAll(
             EdgeInsets.symmetric(
-              horizontal: AppSpacing.lg,
-              vertical: AppSpacing.md,
+              horizontal: AppSpacing.xl,
+              vertical: 14,
             ),
           ),
           elevation: const WidgetStatePropertyAll(0),
+          shadowColor: const WidgetStatePropertyAll(Colors.transparent),
+          surfaceTintColor: const WidgetStatePropertyAll(Colors.transparent),
           backgroundColor: WidgetStateProperty.resolveWith((states) {
             if (states.contains(WidgetState.pressed)) {
               return AppColors.primaryTint;
@@ -169,12 +236,12 @@ abstract final class AppTheme {
                 width: 1,
               );
             }
-            return const BorderSide(color: AppColors.primary, width: 1.5);
+            return const BorderSide(color: AppColors.borderStrong, width: 1.2);
           }),
           textStyle: WidgetStatePropertyAll(AppTypography.labelButton),
           shape: WidgetStatePropertyAll(
             RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(AppSpacing.radiusControl),
+              borderRadius: BorderRadius.circular(AppSpacing.radiusButton),
             ),
           ),
         ),
@@ -194,7 +261,11 @@ abstract final class AppTheme {
             AppSpacing.minTouchTarget,
             AppSpacing.minTouchTarget,
           ),
+          foregroundColor: AppColors.primary,
           tapTargetSize: MaterialTapTargetSize.padded,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppSpacing.radiusChip),
+          ),
         ),
       ),
       navigationBarTheme: NavigationBarThemeData(
@@ -242,6 +313,16 @@ abstract final class AppTheme {
         ),
         unselectedLabelTextStyle: AppTypography.labelTag.copyWith(
           color: AppColors.textSecondary,
+        ),
+      ),
+      bottomSheetTheme: const BottomSheetThemeData(
+        elevation: 0,
+        backgroundColor: AppColors.surfaceBase,
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(
+            top: Radius.circular(AppSpacing.radiusHero),
+          ),
         ),
       ),
       dialogTheme: DialogThemeData(

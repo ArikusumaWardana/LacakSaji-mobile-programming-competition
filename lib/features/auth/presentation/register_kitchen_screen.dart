@@ -13,7 +13,6 @@ import '../../../core/theme/app_typography.dart';
 import '../../../core/theme/text_scale_provider.dart';
 import '../../../core/widgets/lacak_buttons.dart';
 import '../../../core/widgets/lacak_logo.dart';
-import '../../../core/widgets/lacak_section_surface.dart';
 import '../../../core/widgets/lacak_status_badge.dart';
 import '../../../core/widgets/lacak_text_field.dart';
 import '../domain/auth_error_mapper.dart';
@@ -150,32 +149,33 @@ class _RegisterKitchenScreenState extends ConsumerState<RegisterKitchenScreen> {
                   style: AppTypography.bodyMedium,
                 ),
                 const SizedBox(height: AppSpacing.md),
-                LacakSectionSurface.separated(
-                  children: kSandboxSppgCodes
-                      .map(
-                        (item) => ListTile(
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: AppSpacing.md,
-                            vertical: AppSpacing.xs,
-                          ),
-                          title: Text(
-                            item.regNumber,
-                            style: AppTypography.tabular(
-                              AppTypography.titleItem,
-                            ),
-                          ),
-                          subtitle: Text(
-                            'PIN: ${item.pin} | ${item.officialName}',
-                            style: AppTypography.tabular(
-                              AppTypography.bodyMedium,
-                            ),
-                          ),
-                          trailing: const Icon(Icons.chevron_right_rounded),
-                          onTap: () => Navigator.of(dialogContext).pop(item),
-                        ),
-                      )
-                      .toList(),
-                ),
+                const Divider(height: 1),
+                for (var i = 0; i < kSandboxSppgCodes.length; i++) ...[
+                  if (i > 0) const Divider(height: 1),
+                  ListTile(
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.xs,
+                      vertical: AppSpacing.xs,
+                    ),
+                    title: Text(
+                      kSandboxSppgCodes[i].regNumber,
+                      style: AppTypography.tabular(
+                        AppTypography.titleItem,
+                      ),
+                    ),
+                    subtitle: Text(
+                      'PIN: ${kSandboxSppgCodes[i].pin} · ${kSandboxSppgCodes[i].officialName}',
+                      style: AppTypography.tabular(
+                        AppTypography.bodyMedium,
+                      ),
+                    ),
+                    trailing: const Icon(Icons.chevron_right_rounded),
+                    onTap: () => Navigator.of(dialogContext).pop(
+                      kSandboxSppgCodes[i],
+                    ),
+                  ),
+                ],
+                const Divider(height: 1),
               ],
             ),
           ),
@@ -381,23 +381,11 @@ class _RegisterKitchenScreenState extends ConsumerState<RegisterKitchenScreen> {
 
     return Scaffold(
       backgroundColor: AppColors.bgCanvas,
-      appBar: AppBar(
-        title: const Text('Aktivasi Dapur SPPG'),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_rounded),
-          tooltip: _currentStep > 1 ? 'Langkah Sebelumnya' : 'Kembali',
-          constraints: const BoxConstraints(
-            minWidth: AppSpacing.minTouchTarget,
-            minHeight: AppSpacing.minTouchTarget,
-          ),
-          onPressed: _goBackStep,
-        ),
-      ),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: EdgeInsets.fromLTRB(
             horizontalPad,
-            AppSpacing.lg,
+            AppSpacing.md,
             horizontalPad,
             AppSpacing.xxl,
           ),
@@ -407,6 +395,37 @@ class _RegisterKitchenScreenState extends ConsumerState<RegisterKitchenScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  Row(
+                    children: [
+                      Material(
+                        color: AppColors.surfaceSoft,
+                        shape: const CircleBorder(),
+                        child: IconButton(
+                          icon: const Icon(
+                            Icons.arrow_back_ios_new_rounded,
+                            size: 19,
+                            color: AppColors.textPrimary,
+                          ),
+                          tooltip: _currentStep > 1
+                              ? 'Langkah Sebelumnya'
+                              : 'Kembali',
+                          constraints: const BoxConstraints(
+                            minWidth: AppSpacing.minTouchTarget,
+                            minHeight: AppSpacing.minTouchTarget,
+                          ),
+                          onPressed: _goBackStep,
+                        ),
+                      ),
+                      const SizedBox(width: AppSpacing.md),
+                      Expanded(
+                        child: Text(
+                          'Aktivasi Dapur SPPG',
+                          style: AppTypography.titleSection,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: AppSpacing.xl),
                   if (authState.errorMessage != null) ...[
                     LacakStatusBanner(
                       level: LacakStatusLevel.danger,
@@ -421,7 +440,7 @@ class _RegisterKitchenScreenState extends ConsumerState<RegisterKitchenScreen> {
                     stepTitle: _stepTitle(_currentStep),
                     stepSubtitle: _stepSubtitle(_currentStep),
                   ),
-                  const SizedBox(height: AppSpacing.lg),
+                  const SizedBox(height: AppSpacing.xl),
                   LacakAnimatedStepSwitcher(
                     currentStep: _currentStep,
                     child: switch (_currentStep) {
@@ -724,12 +743,11 @@ class _KitchenActivationResultView extends ConsumerWidget {
 
     return Scaffold(
       backgroundColor: AppColors.bgCanvas,
-      appBar: AppBar(title: const Text('Aktivasi Dapur Selesai')),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: EdgeInsets.fromLTRB(
             horizontalPad,
-            AppSpacing.lg,
+            AppSpacing.xxl,
             horizontalPad,
             AppSpacing.xxl,
           ),
@@ -739,6 +757,11 @@ class _KitchenActivationResultView extends ConsumerWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  Text(
+                    'Aktivasi Dapur Selesai',
+                    style: AppTypography.displayStatus,
+                  ),
+                  const SizedBox(height: AppSpacing.lg),
                   LacakStatusBanner(
                     level: result.requiresEmailConfirmation
                         ? LacakStatusLevel.warning
@@ -753,25 +776,37 @@ class _KitchenActivationResultView extends ConsumerWidget {
                   if (!result.requiresEmailConfirmation &&
                       result.inviteCode.isNotEmpty) ...[
                     const SizedBox(height: AppSpacing.xl),
-                    const LacakLogoMark(size: 48),
-                    const SizedBox(height: AppSpacing.md),
-                    Text(
-                      'Kode Mitra Unik SPPG',
-                      style: AppTypography.labelTag.copyWith(
-                        color: AppColors.textSecondary,
+                    Container(
+                      padding: const EdgeInsets.all(AppSpacing.xl),
+                      decoration: BoxDecoration(
+                        color: AppColors.surfaceSoft,
+                        borderRadius: BorderRadius.circular(
+                          AppSpacing.radiusSurface,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: AppSpacing.xs),
-                    Text(
-                      result.inviteCode,
-                      style: AppTypography.tabular(
-                        AppTypography.displayStatus.copyWith(fontSize: 28),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const LacakLogoMark(size: 44),
+                          const SizedBox(height: AppSpacing.md),
+                          Text(
+                            'Kode Mitra Unik SPPG',
+                            style: AppTypography.captionMuted,
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            result.inviteCode,
+                            style: AppTypography.tabular(
+                              AppTypography.displayStatus.copyWith(fontSize: 28),
+                            ),
+                          ),
+                          const SizedBox(height: AppSpacing.xs),
+                          Text(
+                            'Bagikan kode ini ke Guru / PIC sekolah binaan untuk menautkan akun.',
+                            style: AppTypography.bodyMedium,
+                          ),
+                        ],
                       ),
-                    ),
-                    const SizedBox(height: AppSpacing.xs),
-                    Text(
-                      'Bagikan kode ini ke Guru / PIC sekolah binaan untuk menautkan akun.',
-                      style: AppTypography.bodyMedium,
                     ),
                     const SizedBox(height: AppSpacing.md),
                     LacakSecondaryButton(

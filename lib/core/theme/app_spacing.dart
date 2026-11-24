@@ -1,6 +1,6 @@
 import 'package:material_ui/material_ui.dart';
 
-/// 8dp grid spacing, controlled border radii, touch targets, and breakpoints.
+/// 8dp grid spacing, editorial border radii, touch targets, and breakpoints.
 abstract final class AppSpacing {
   static const double xs = 4;
   static const double sm = 8;
@@ -10,10 +10,18 @@ abstract final class AppSpacing {
   static const double xxl = 24;
   static const double xxxl = 32;
 
-  static const double radiusTag = 6;
-  static const double radiusControl = 8;
-  static const double radiusBanner = 10;
-  static const double radiusSurface = 12;
+  static const double radiusTag = 8;
+  static const double radiusChip = 10;
+  static const double radiusControl = 12;
+  static const double radiusInput = 12;
+  static const double radiusButton = 12;
+  static const double radiusThumb = 12;
+  static const double radiusBanner = 12;
+  static const double radiusSurface = 16;
+  static const double radiusCard = 18;
+  static const double radiusHero = 20;
+  static const double radiusDrawerSurface = 24;
+  static const double radiusDrawerPill = 28;
 
   static const double minTouchTarget = 48;
   static const double secondaryButtonMinHeight = 52;
@@ -21,6 +29,9 @@ abstract final class AppSpacing {
   static const double heroCtaMinHeight = 60;
   static const double selectionRowMinHeight = 60;
   static const double navBarHeight = 72;
+
+  static const double drawerWidthTablet = 260;
+  static const double drawerOpenScale = 0.86;
 
   static const double compactBreakpoint = 360;
   static const double largePhoneBreakpoint = 412;

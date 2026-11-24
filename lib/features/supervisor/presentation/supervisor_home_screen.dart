@@ -6,9 +6,8 @@ import '../../../core/constants/app_routes.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
-import '../../../core/widgets/lacak_buttons.dart';
+import '../../../core/widgets/editorial_widgets.dart';
 import '../../../core/widgets/lacak_feedback_states.dart';
-import '../../../core/widgets/lacak_logo.dart';
 import '../../../core/widgets/lacak_status_badge.dart';
 import '../../alerts/domain/cluster_alert_models.dart';
 import '../../auth/presentation/auth_controller.dart';
@@ -16,7 +15,7 @@ import '../../kitchen/domain/kitchen_models.dart';
 import '../domain/supervisor_models.dart';
 import 'supervisor_providers.dart';
 
-/// B01: Read-only BGN/Dinkes supervisor national and per-SPPG compliance screen.
+/// B01: Editorial read-only BGN/Dinkes supervisor national and per-SPPG compliance screen.
 class SupervisorHomeScreen extends ConsumerWidget {
   const SupervisorHomeScreen({super.key});
 
@@ -29,163 +28,192 @@ class SupervisorHomeScreen extends ConsumerWidget {
 
     final width = MediaQuery.sizeOf(context).width;
     final horizontalPad = AppSpacing.horizontalPadding(width);
-    final maxWidth = AppSpacing.maxContentWidth(width);
+    final maxWidth = width >= 900 ? 920.0 : AppSpacing.maxContentWidth(width);
 
     return Scaffold(
       backgroundColor: AppColors.bgCanvas,
-      appBar: AppBar(
-        title: Row(
-          children: [
-            const LacakLogoMark(size: 28),
-            const SizedBox(width: AppSpacing.sm),
-            const Expanded(
-              child: Text(
-                'Pemantauan Wilayah (Hanya Baca)',
-                overflow: TextOverflow.ellipsis,
+      body: Column(
+        children: [
+          SafeArea(
+            bottom: false,
+            child: Padding(
+              padding: EdgeInsets.fromLTRB(
+                horizontalPad,
+                AppSpacing.md,
+                AppSpacing.sm,
+                AppSpacing.sm,
               ),
-            ),
-          ],
-        ),
-        actions: [
-          IconButton(
-            onPressed: () => ref.invalidate(supervisorOverviewProvider),
-            tooltip: 'Muat Ulang Ringkasan',
-            constraints: const BoxConstraints(
-              minWidth: AppSpacing.minTouchTarget,
-              minHeight: AppSpacing.minTouchTarget,
-            ),
-            icon: const Icon(Icons.refresh_rounded),
-          ),
-          IconButton(
-            onPressed: () => context.push(AppRoutes.settings),
-            tooltip: 'Pengaturan & Keluar',
-            constraints: const BoxConstraints(
-              minWidth: AppSpacing.minTouchTarget,
-              minHeight: AppSpacing.minTouchTarget,
-            ),
-            icon: const Icon(Icons.person_rounded),
-          ),
-        ],
-      ),
-      body: SafeArea(
-        child: RefreshIndicator(
-          color: AppColors.primary,
-          onRefresh: () async {
-            ref.invalidate(supervisorOverviewProvider);
-            await ref.read(supervisorOverviewProvider.future);
-          },
-          child: SingleChildScrollView(
-            physics: const AlwaysScrollableScrollPhysics(),
-            padding: EdgeInsets.fromLTRB(
-              horizontalPad,
-              AppSpacing.lg,
-              horizontalPad,
-              AppSpacing.xxl,
-            ),
-            child: Center(
-              child: ConstrainedBox(
-                constraints: BoxConstraints(maxWidth: maxWidth),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    // Open editorial header on canvas (aligned with D01 & G01)
-                    Wrap(
-                      spacing: AppSpacing.sm,
-                      runSpacing: AppSpacing.sm,
-                      alignment: WrapAlignment.spaceBetween,
-                      crossAxisAlignment: WrapCrossAlignment.center,
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
                       children: [
+                        Text(
+                          'Pemantauan Wilayah · Hanya Baca',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: AppTypography.captionMuted,
+                        ),
+                        const SizedBox(height: 2),
                         Text(
                           profile?.fullName.isNotEmpty == true
                               ? profile!.fullName
                               : 'Pengawas BGN Wilayah',
-                          style: AppTypography.headlinePage.copyWith(
-                            fontSize: 22,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                        const LacakStatusTag(
-                          level: LacakStatusLevel.safe,
-                          icon: Icons.visibility_rounded,
-                          label: 'HANYA BACA',
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: AppTypography.headlinePage,
                         ),
                       ],
                     ),
-                    const SizedBox(height: AppSpacing.xs),
-                    Text(
-                      'Pemantauan agregat keamanan distribusi dan evaluasi sisa pangan seluruh SPPG mitra.',
-                      style: AppTypography.bodyMedium,
+                  ),
+                  const SizedBox(width: AppSpacing.xs),
+                  IconButton(
+                    onPressed: () => ref.invalidate(supervisorOverviewProvider),
+                    tooltip: 'Muat Ulang Ringkasan',
+                    constraints: const BoxConstraints(
+                      minWidth: AppSpacing.minTouchTarget,
+                      minHeight: AppSpacing.minTouchTarget,
                     ),
-                    const SizedBox(height: AppSpacing.xs),
-                    Row(
+                    icon: const Icon(
+                      Icons.refresh_rounded,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  Material(
+                    color: AppColors.surfaceSoft,
+                    borderRadius: BorderRadius.circular(AppSpacing.radiusChip),
+                    child: IconButton(
+                      onPressed: () => context.push(AppRoutes.settings),
+                      tooltip: 'Pengaturan & Keluar',
+                      constraints: const BoxConstraints(
+                        minWidth: AppSpacing.minTouchTarget,
+                        minHeight: AppSpacing.minTouchTarget,
+                      ),
+                      icon: const Icon(
+                        Icons.person_rounded,
+                        color: AppColors.primary,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          Expanded(
+            child: RefreshIndicator(
+              color: AppColors.primary,
+              onRefresh: () async {
+                ref.invalidate(supervisorOverviewProvider);
+                await ref.read(supervisorOverviewProvider.future);
+              },
+              child: SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.only(bottom: AppSpacing.xxxl),
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(maxWidth: maxWidth),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        const Icon(
-                          Icons.verified_user_rounded,
-                          size: 18,
-                          color: AppColors.safeFg,
-                        ),
-                        const SizedBox(width: AppSpacing.xs),
-                        Expanded(
-                          child: Text(
-                            'Audit Lintas Wilayah · ${formatIndonesianDate(DateTime.now().toUtc())}',
-                            style: AppTypography.tabular(
-                              AppTypography.bodyMedium.copyWith(
-                                color: AppColors.safeFg,
-                                fontWeight: FontWeight.w600,
+                        Padding(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: horizontalPad,
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Pemantauan agregat keamanan distribusi dan evaluasi sisa pangan seluruh SPPG mitra.',
+                                style: AppTypography.bodyMedium,
                               ),
+                              const SizedBox(height: 4),
+                              Row(
+                                children: [
+                                  const Icon(
+                                    Icons.verified_user_rounded,
+                                    size: 17,
+                                    color: AppColors.safeFg,
+                                  ),
+                                  const SizedBox(width: AppSpacing.xs),
+                                  Expanded(
+                                    child: Text(
+                                      'Audit Lintas Wilayah · ${formatIndonesianDate(DateTime.now().toUtc())}',
+                                      style: AppTypography.tabular(
+                                        AppTypography.captionMuted.copyWith(
+                                          color: AppColors.safeFg,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: AppSpacing.lg),
+                        FilterChipStrip<SupervisorDateFilter>(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: horizontalPad,
+                          ),
+                          selectedValue: dateFilter,
+                          onSelected: (next) => ref
+                              .read(supervisorDateFilterProvider.notifier)
+                              .setFilter(next),
+                          items: SupervisorDateFilter.values
+                              .map(
+                                (item) => FilterChipItem<SupervisorDateFilter>(
+                                  value: item,
+                                  label: item.label,
+                                ),
+                              )
+                              .toList(growable: false),
+                        ),
+                        const SizedBox(height: AppSpacing.lg),
+                        overviewAsync.when(
+                          loading: () => Padding(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: horizontalPad,
                             ),
+                            child: const LacakSkeletonList(
+                              itemCount: 3,
+                              showHeaderBlock: true,
+                              loadingLabel:
+                                  'Memuat ringkasan kepatuhan lintas SPPG...',
+                            ),
+                          ),
+                          error: (error, _) => Padding(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: horizontalPad,
+                            ),
+                            child: LacakErrorState(
+                              title: 'Ringkasan pengawas belum dapat dimuat',
+                              message:
+                                  'Periksa koneksi internet Anda lalu muat ulang data pengawasan.',
+                              onRetry: () =>
+                                  ref.invalidate(supervisorOverviewProvider),
+                            ),
+                          ),
+                          data: (overview) => _SupervisorOverviewBody(
+                            overview: overview,
+                            selectedRegion: selectedRegion,
+                            horizontalPad: horizontalPad,
+                            onSelectRegion: (region) => ref
+                                .read(supervisorRegionFilterProvider.notifier)
+                                .setRegion(region),
                           ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: AppSpacing.md),
-                    const Divider(height: 1),
-                    const SizedBox(height: AppSpacing.md),
-                    Text('Rentang Waktu', style: AppTypography.titleSection),
-                    const SizedBox(height: AppSpacing.sm),
-                    LacakSegmentedControl<SupervisorDateFilter>(
-                      selectedValue: dateFilter,
-                      onChanged: (next) => ref
-                          .read(supervisorDateFilterProvider.notifier)
-                          .setFilter(next),
-                      options: SupervisorDateFilter.values
-                          .map(
-                            (item) => LacakSegmentOption<SupervisorDateFilter>(
-                              value: item,
-                              label: item.label,
-                            ),
-                          )
-                          .toList(growable: false),
-                    ),
-                    const SizedBox(height: AppSpacing.lg),
-                    overviewAsync.when(
-                      loading: () => const LacakSkeletonList(
-                        itemCount: 3,
-                        showHeaderBlock: true,
-                        loadingLabel:
-                            'Memuat ringkasan kepatuhan lintas SPPG...',
-                      ),
-                      error: (error, _) => LacakErrorState(
-                        title: 'Ringkasan pengawas belum dapat dimuat',
-                        message:
-                            'Periksa koneksi internet Anda lalu muat ulang data pengawasan.',
-                        onRetry: () =>
-                            ref.invalidate(supervisorOverviewProvider),
-                      ),
-                      data: (overview) => _SupervisorOverviewBody(
-                        overview: overview,
-                        selectedRegion: selectedRegion,
-                        onSelectRegion: (region) => ref
-                            .read(supervisorRegionFilterProvider.notifier)
-                            .setRegion(region),
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
               ),
             ),
           ),
-        ),
+        ],
       ),
     );
   }
@@ -195,11 +223,13 @@ class _SupervisorOverviewBody extends StatelessWidget {
   const _SupervisorOverviewBody({
     required this.overview,
     required this.selectedRegion,
+    required this.horizontalPad,
     required this.onSelectRegion,
   });
 
   final SupervisorNationalOverview overview;
   final String selectedRegion;
+  final double horizontalPad;
   final ValueChanged<String> onSelectRegion;
 
   @override
@@ -208,175 +238,156 @@ class _SupervisorOverviewBody extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         if (overview.availableRegions.length > 1) ...[
-          Text('Filter Wilayah', style: AppTypography.titleSection),
-          const SizedBox(height: AppSpacing.sm),
-          Wrap(
-            spacing: AppSpacing.sm,
-            runSpacing: AppSpacing.sm,
-            children: overview.availableRegions
-                .map(
-                  (region) => _RegionFilterChip(
-                    label: region,
-                    selected: region == overview.regionFilter,
-                    onTap: () => onSelectRegion(region),
-                  ),
-                )
+          Padding(
+            padding: EdgeInsets.symmetric(horizontal: horizontalPad),
+            child: Text('Filter Wilayah', style: AppTypography.titleSection),
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          FilterChipStrip<String>(
+            padding: EdgeInsets.symmetric(horizontal: horizontalPad),
+            selectedValue: overview.regionFilter,
+            onSelected: onSelectRegion,
+            items: overview.availableRegions
+                .map((region) => FilterChipItem<String>(value: region, label: region))
                 .toList(growable: false),
           ),
           const SizedBox(height: AppSpacing.lg),
         ],
-        // National summary section using flat tonal block (no white card border, matching D01 & G01)
-        Text('Ringkasan Nasional', style: AppTypography.titleSection),
-        const SizedBox(height: AppSpacing.xs),
-        Text(
-          'Cakupan: ${overview.totalSppgCount} Dapur SPPG · ${overview.totalApprovedSchoolsCount} Sekolah Mitra · ${overview.totalBatches} Total Batch',
-          style: AppTypography.tabular(AppTypography.bodyMedium),
-        ),
-        const SizedBox(height: AppSpacing.sm),
-        _NationalMetricsTonalBlock(overview: overview),
-        const SizedBox(height: AppSpacing.lg),
-        if (overview.activeAlertsCount > 0) ...[
-          _ActiveAlertsSection(
-            activeAlertsCount: overview.activeAlertsCount,
-            alerts: overview.activeAlerts,
-          ),
-          const SizedBox(height: AppSpacing.xl),
-        ] else ...[
-          Container(
-            padding: const EdgeInsets.symmetric(
-              horizontal: AppSpacing.md,
-              vertical: AppSpacing.md,
-            ),
-            decoration: BoxDecoration(
-              color: AppColors.safeBg,
-              borderRadius: BorderRadius.circular(AppSpacing.radiusControl),
-            ),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Icon(
-                  Icons.check_circle_rounded,
-                  size: 20,
-                  color: AppColors.safeFg,
+        Padding(
+          padding: EdgeInsets.symmetric(horizontal: horizontalPad),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text('Ringkasan Nasional', style: AppTypography.titleSection),
+              const SizedBox(height: 2),
+              Text(
+                'Cakupan: ${overview.totalSppgCount} Dapur SPPG · ${overview.totalApprovedSchoolsCount} Sekolah Mitra · ${overview.totalBatches} Total Batch',
+                style: AppTypography.tabular(AppTypography.captionMuted),
+              ),
+              const SizedBox(height: AppSpacing.md),
+              _NationalMetricsTonalBlock(overview: overview),
+              const SizedBox(height: AppSpacing.lg),
+              if (overview.activeAlertsCount > 0) ...[
+                _ActiveAlertsSection(
+                  activeAlertsCount: overview.activeAlertsCount,
+                  alerts: overview.activeAlerts,
                 ),
-                const SizedBox(width: AppSpacing.sm),
-                Expanded(
-                  child: Column(
+                const SizedBox(height: AppSpacing.xl),
+              ] else ...[
+                Container(
+                  padding: const EdgeInsets.all(AppSpacing.lg),
+                  decoration: BoxDecoration(
+                    color: AppColors.safeBg,
+                    borderRadius: BorderRadius.circular(
+                      AppSpacing.radiusSurface,
+                    ),
+                  ),
+                  child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        'Tidak Ada Alarm Anomali Aktif',
-                        style: AppTypography.titleItem.copyWith(
-                          color: AppColors.safeFg,
-                        ),
+                      const Icon(
+                        Icons.check_circle_rounded,
+                        size: 20,
+                        color: AppColors.safeFg,
                       ),
-                      const SizedBox(height: 2),
-                      Text(
-                        'Seluruh distribusi pada wilayah dan rentang waktu terpilih belum memiliki laporan KLB aktif.',
-                        style: AppTypography.bodyMedium.copyWith(
-                          color: AppColors.textPrimary,
+                      const SizedBox(width: AppSpacing.sm),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Tidak Ada Alarm Anomali Aktif',
+                              style: AppTypography.titleItem.copyWith(
+                                color: AppColors.safeFg,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              'Seluruh distribusi pada wilayah dan rentang waktu terpilih belum memiliki laporan KLB aktif.',
+                              style: AppTypography.bodyMedium.copyWith(
+                                color: AppColors.textPrimary,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ],
                   ),
                 ),
+                const SizedBox(height: AppSpacing.xl),
               ],
-            ),
-          ),
-          const SizedBox(height: AppSpacing.xl),
-        ],
-        const Divider(height: 1),
-        const SizedBox(height: AppSpacing.lg),
-        Text(
-          'Kepatuhan & Sisa Pangan Per SPPG (${overview.sppgSummaries.length})',
-          style: AppTypography.tabular(AppTypography.titleSection),
-        ),
-        const SizedBox(height: AppSpacing.xs),
-        Text(
-          'Rincian status distribusi dan rata-rata sisa ompreng di masing-masing dapur mitra.',
-          style: AppTypography.bodyMedium,
-        ),
-        const SizedBox(height: AppSpacing.sm),
-        if (overview.sppgSummaries.isEmpty)
-          const LacakEmptyState(
-            icon: Icons.soup_kitchen_rounded,
-            title: 'Belum ada SPPG pada filter wilayah ini',
-            message:
-                'Pilih Semua Wilayah untuk melihat seluruh dapur SPPG terdaftar.',
-          )
-        else
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              for (var i = 0; i < overview.sppgSummaries.length; i++) ...[
-                _SppgSummaryRow(summary: overview.sppgSummaries[i]),
-                if (i < overview.sppgSummaries.length - 1)
-                  const Divider(
-                    height: 1,
-                    thickness: 1,
-                    color: AppColors.borderHairline,
-                  ),
-              ],
+              const Divider(height: 1),
+              const SizedBox(height: AppSpacing.lg),
+              Text(
+                'Kepatuhan & Sisa Pangan Per SPPG (${overview.sppgSummaries.length})',
+                style: AppTypography.tabular(AppTypography.titleSection),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                'Rincian status distribusi dan rata-rata sisa ompreng di masing-masing dapur mitra.',
+                style: AppTypography.bodyMedium,
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              if (overview.sppgSummaries.isEmpty)
+                const LacakEmptyState(
+                  icon: Icons.soup_kitchen_rounded,
+                  title: 'Belum ada SPPG pada filter wilayah ini',
+                  message:
+                      'Pilih Semua Wilayah untuk melihat seluruh dapur SPPG terdaftar.',
+                )
+              else
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    final useTwoCols = constraints.maxWidth >= 740;
+                    if (!useTwoCols) {
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          for (var i = 0;
+                              i < overview.sppgSummaries.length;
+                              i++) ...[
+                            _SppgSummaryRow(
+                              summary: overview.sppgSummaries[i],
+                            ),
+                            if (i < overview.sppgSummaries.length - 1)
+                              const Divider(height: 1),
+                          ],
+                        ],
+                      );
+                    }
+                    final colWidth =
+                        (constraints.maxWidth - AppSpacing.xl) / 2;
+                    return Wrap(
+                      spacing: AppSpacing.xl,
+                      runSpacing: AppSpacing.md,
+                      children: overview.sppgSummaries
+                          .map(
+                            (summary) => SizedBox(
+                              width: colWidth,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  _SppgSummaryRow(summary: summary),
+                                  const Divider(height: 1),
+                                ],
+                              ),
+                            ),
+                          )
+                          .toList(growable: false),
+                    );
+                  },
+                ),
+              const SizedBox(height: AppSpacing.md),
+              const Divider(height: 1),
+              const SizedBox(height: AppSpacing.md),
+              Text(
+                'Diperbarui: ${formatWibDateTime(overview.generatedAtUtc)}',
+                style: AppTypography.tabular(AppTypography.captionLegal),
+              ),
             ],
           ),
-        const SizedBox(height: AppSpacing.md),
-        const Divider(height: 1),
-        const SizedBox(height: AppSpacing.md),
-        Text(
-          'Diperbarui: ${formatWibDateTime(overview.generatedAtUtc)}',
-          style: AppTypography.tabular(AppTypography.captionLegal),
         ),
       ],
-    );
-  }
-}
-
-class _RegionFilterChip extends StatelessWidget {
-  const _RegionFilterChip({
-    required this.label,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: selected ? AppColors.primary : AppColors.surfaceSubtle,
-      borderRadius: BorderRadius.circular(AppSpacing.radiusControl),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(AppSpacing.radiusControl),
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(
-            minHeight: AppSpacing.minTouchTarget,
-          ),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(
-              horizontal: AppSpacing.md,
-              vertical: AppSpacing.sm,
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(
-                  label,
-                  style: AppTypography.labelTag.copyWith(
-                    color: selected
-                        ? AppColors.onPrimary
-                        : AppColors.textPrimary,
-                    fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
     );
   }
 }
@@ -388,82 +399,94 @@ class _NationalMetricsTonalBlock extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final textScale = MediaQuery.textScalerOf(context).scale(14) / 14;
+    final cells = [
+      _MetricCell(
+        label: 'Batch Aman',
+        value: '${overview.safeBatches}',
+        valueColor: AppColors.safeFg,
+        caption: 'Tersegel & lolos',
+      ),
+      _MetricCell(
+        label: 'Batch Bermasalah',
+        value: '${overview.problemBatches}',
+        valueColor: overview.problemBatches > 0
+            ? AppColors.dangerFg
+            : AppColors.textPrimary,
+        caption: 'Butuh tindak lanjut',
+      ),
+      _MetricCell(
+        label: 'Alarm Aktif',
+        value: '${overview.activeAlertsCount}',
+        valueColor: overview.activeAlertsCount > 0
+            ? AppColors.dangerFg
+            : AppColors.safeFg,
+        caption: 'Laporan anomali/KLB',
+      ),
+      _MetricCell(
+        label: 'Rata Sisa Makan',
+        value: '${overview.avgWastePct}%',
+        valueColor: overview.avgWastePct >= 40
+            ? AppColors.warnFg
+            : AppColors.textPrimary,
+        caption: 'Rata-rata gabungan',
+      ),
+    ];
+
     return Container(
       decoration: BoxDecoration(
-        color: AppColors.surfaceSubtle,
-        borderRadius: BorderRadius.circular(AppSpacing.radiusControl),
+        color: AppColors.surfaceSoft,
+        borderRadius: BorderRadius.circular(AppSpacing.radiusSurface),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          IntrinsicHeight(
-            child: Row(
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final stackAll = constraints.maxWidth < 300 || textScale >= 1.3;
+          if (stackAll) {
+            return Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Expanded(
-                  child: _MetricCell(
-                    label: 'Batch Aman',
-                    value: '${overview.safeBatches}',
-                    valueColor: AppColors.safeFg,
-                    caption: 'Tersegel & lolos',
-                  ),
-                ),
-                const VerticalDivider(
-                  width: 1,
-                  thickness: 1,
-                  color: AppColors.borderHairline,
-                ),
-                Expanded(
-                  child: _MetricCell(
-                    label: 'Batch Bermasalah',
-                    value: '${overview.problemBatches}',
-                    valueColor: overview.problemBatches > 0
-                        ? AppColors.dangerFg
-                        : AppColors.textPrimary,
-                    caption: 'Butuh tindak lanjut',
-                  ),
-                ),
+                for (var i = 0; i < cells.length; i++) ...[
+                  cells[i],
+                  if (i < cells.length - 1) const Divider(height: 1),
+                ],
               ],
-            ),
-          ),
-          const Divider(
-            height: 1,
-            thickness: 1,
-            color: AppColors.borderHairline,
-          ),
-          IntrinsicHeight(
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Expanded(
-                  child: _MetricCell(
-                    label: 'Alarm Aktif',
-                    value: '${overview.activeAlertsCount}',
-                    valueColor: overview.activeAlertsCount > 0
-                        ? AppColors.dangerFg
-                        : AppColors.safeFg,
-                    caption: 'Laporan anomali/KLB',
-                  ),
+            );
+          }
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              IntrinsicHeight(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Expanded(child: cells[0]),
+                    const VerticalDivider(
+                      width: 1,
+                      thickness: 1,
+                      color: AppColors.borderHairline,
+                    ),
+                    Expanded(child: cells[1]),
+                  ],
                 ),
-                const VerticalDivider(
-                  width: 1,
-                  thickness: 1,
-                  color: AppColors.borderHairline,
+              ),
+              const Divider(height: 1),
+              IntrinsicHeight(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Expanded(child: cells[2]),
+                    const VerticalDivider(
+                      width: 1,
+                      thickness: 1,
+                      color: AppColors.borderHairline,
+                    ),
+                    Expanded(child: cells[3]),
+                  ],
                 ),
-                Expanded(
-                  child: _MetricCell(
-                    label: 'Rata Sisa Makan',
-                    value: '${overview.avgWastePct}%',
-                    valueColor: overview.avgWastePct >= 40
-                        ? AppColors.warnFg
-                        : AppColors.textPrimary,
-                    caption: 'Rata-rata gabungan',
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
+              ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -490,7 +513,7 @@ class _MetricCell extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: AppTypography.bodyMedium),
+          Text(label, style: AppTypography.captionMuted),
           const SizedBox(height: AppSpacing.xs),
           Text(
             value,
@@ -499,12 +522,7 @@ class _MetricCell extends StatelessWidget {
             ),
           ),
           const SizedBox(height: AppSpacing.xs),
-          Text(
-            caption,
-            style: AppTypography.captionLegal.copyWith(
-              color: AppColors.textSecondary,
-            ),
-          ),
+          Text(caption, style: AppTypography.captionLegal),
         ],
       ),
     );
@@ -534,12 +552,7 @@ class _ActiveAlertsSection extends StatelessWidget {
         ),
         for (var i = 0; i < alerts.length; i++) ...[
           _SupervisorAlertRow(alert: alerts[i]),
-          if (i < alerts.length - 1)
-            const Divider(
-              height: 1,
-              thickness: 1,
-              color: AppColors.borderHairline,
-            ),
+          if (i < alerts.length - 1) const Divider(height: 1),
         ],
       ],
     );
@@ -558,10 +571,7 @@ class _SupervisorAlertRow extends StatelessWidget {
         : 'Pra-Konsumsi (Tahan Distribusi)';
 
     return Padding(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.xs,
-        vertical: AppSpacing.md,
-      ),
+      padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -587,7 +597,7 @@ class _SupervisorAlertRow extends StatelessWidget {
               AppTypography.bodyLarge.copyWith(fontWeight: FontWeight.w600),
             ),
           ),
-          const SizedBox(height: AppSpacing.xs),
+          const SizedBox(height: 2),
           Text(
             '$stageText · ${formatWibDateTime(alert.createdAtUtc)}',
             style: AppTypography.tabular(AppTypography.bodyMedium),
@@ -651,26 +661,22 @@ class _SppgSummaryRow extends StatelessWidget {
                   vertical: 2,
                 ),
                 decoration: BoxDecoration(
-                  color: AppColors.surfaceSubtle,
+                  color: AppColors.surfaceSoft,
                   borderRadius: BorderRadius.circular(AppSpacing.radiusTag),
-                  border: Border.all(
-                    color: AppColors.borderHairline,
-                    width: 1,
-                  ),
                 ),
                 child: Text(
                   summary.inviteCode,
                   style: AppTypography.tabular(
-                    AppTypography.labelTag.copyWith(
+                    AppTypography.captionLegal.copyWith(
                       color: AppColors.textPrimary,
-                      fontWeight: FontWeight.w600,
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
                 ),
               ),
               Text(
                 '${summary.regionName} · ${summary.approvedSchoolCount} Sekolah',
-                style: AppTypography.tabular(AppTypography.bodyMedium),
+                style: AppTypography.tabular(AppTypography.captionMuted),
               ),
             ],
           ),
@@ -693,7 +699,7 @@ class _SppgSummaryRow extends StatelessWidget {
           else ...[
             Text(
               'Rata-rata sisa pangan (${summary.wasteLogCount} laporan · Gabungan ${summary.avgOverallWastePct}%)',
-              style: AppTypography.tabular(AppTypography.labelTag),
+              style: AppTypography.tabular(AppTypography.captionMuted),
             ),
             const SizedBox(height: AppSpacing.sm),
             _SupervisorWasteBar(
@@ -752,7 +758,7 @@ class _SupervisorWasteBar extends StatelessWidget {
           child: LinearProgressIndicator(
             value: (percent.clamp(0, 100)) / 100.0,
             minHeight: 8,
-            backgroundColor: AppColors.surfaceSubtle,
+            backgroundColor: AppColors.surfaceSoft,
             valueColor: AlwaysStoppedAnimation<Color>(barColor),
           ),
         ),

@@ -12,16 +12,16 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/theme/text_scale_provider.dart';
+import '../../../core/widgets/editorial_widgets.dart';
 import '../../../core/widgets/lacak_buttons.dart';
 import '../../../core/widgets/lacak_feedback_states.dart';
-import '../../../core/widgets/lacak_status_badge.dart';
 import '../../../core/widgets/lacak_text_field.dart';
 import '../../auth/presentation/auth_controller.dart';
 import '../domain/kitchen_models.dart';
 import 'kitchen_providers.dart';
 
-/// D02: Create food batch broken into a 2-step progressive wizard
-/// with automatic local draft persistence in SharedPreferences.
+/// D02: Editorial batch creation detail view with FramedHeroHeader photo preview,
+/// clean risk filter chips, soft-filled inputs, and StickyBottomActionBar seal trigger.
 class CreateBatchScreen extends ConsumerStatefulWidget {
   const CreateBatchScreen({super.key});
 
@@ -32,11 +32,10 @@ class CreateBatchScreen extends ConsumerStatefulWidget {
 class _CreateBatchScreenState extends ConsumerState<CreateBatchScreen> {
   static const String _draftPrefKey = 'lacak_draft_create_batch_v1';
 
-  final _step1FormKey = GlobalKey<FormState>();
+  final _formKey = GlobalKey<FormState>();
   final _menuController = TextEditingController();
   final _portionController = TextEditingController(text: '150');
 
-  int _currentStep = 1;
   FoodRiskCategory _riskCategory = FoodRiskCategory.medium;
   CapturedWebpPhoto? _capturedPhoto;
   bool _capturingPhoto = false;
@@ -81,20 +80,19 @@ class _CreateBatchScreenState extends ConsumerState<CreateBatchScreen> {
         if (riskDb != null) {
           _riskCategory = FoodRiskCategory.fromDb(riskDb);
         }
-        _currentStep = ((map['step'] as int?) ?? 1).clamp(1, 2);
       });
     } catch (_) {
       // Ignore malformed draft.
     }
   }
 
-  Future<void> _saveLocalDraft({int? nextStep}) async {
+  Future<void> _saveLocalDraft() async {
     final prefs = ref.read(sharedPreferencesProvider);
     if (prefs == null) {
       return;
     }
     final payload = jsonEncode({
-      'step': nextStep ?? _currentStep,
+      'step': 1,
       'menu_name': _menuController.text.trim(),
       'portion_count': _portionController.text.trim(),
       'risk_category': _riskCategory.dbValue,
@@ -114,29 +112,6 @@ class _CreateBatchScreenState extends ConsumerState<CreateBatchScreen> {
       _portionController.text = '$next';
     });
     _saveLocalDraft();
-  }
-
-  Future<void> _nextFromStep1() async {
-    if (!(_step1FormKey.currentState?.validate() ?? false)) {
-      return;
-    }
-    await _saveLocalDraft(nextStep: 2);
-    if (!mounted) {
-      return;
-    }
-    setState(() => _currentStep = 2);
-  }
-
-  Future<void> _goBackStep() async {
-    if (_currentStep <= 1) {
-      context.pop();
-      return;
-    }
-    await _saveLocalDraft(nextStep: 1);
-    if (!mounted) {
-      return;
-    }
-    setState(() => _currentStep = 1);
   }
 
   Future<void> _capturePhoto() async {
@@ -174,12 +149,16 @@ class _CreateBatchScreenState extends ConsumerState<CreateBatchScreen> {
     if (_submitting) {
       return;
     }
+    final formValid = _formKey.currentState?.validate() ?? false;
     final photo = _capturedPhoto;
     if (photo == null) {
       setState(() {
         _photoError =
             'Foto pengemasan wajib diambil langsung dari kamera sebelum mengunci segel.';
       });
+      return;
+    }
+    if (!formValid) {
       return;
     }
 
@@ -243,556 +222,369 @@ class _CreateBatchScreenState extends ConsumerState<CreateBatchScreen> {
     final horizontalPad = AppSpacing.horizontalPadding(width);
     final maxWidth = AppSpacing.maxContentWidth(width);
 
+    if (kitchen == null) {
+      return const Scaffold(
+        backgroundColor: AppColors.bgCanvas,
+        body: SafeArea(
+          child: Padding(
+            padding: EdgeInsets.all(AppSpacing.lg),
+            child: LacakErrorState(
+              message: 'Profil dapur SPPG belum termuat.',
+            ),
+          ),
+        ),
+      );
+    }
+
+    final liveMenuTitle = _menuController.text.trim().isEmpty
+        ? 'Buat Batch Makanan Baru'
+        : _menuController.text.trim();
+    final portionLabel = _portionController.text.trim().isEmpty
+        ? '0'
+        : _portionController.text.trim();
+
     return Scaffold(
       backgroundColor: AppColors.bgCanvas,
-      appBar: AppBar(
-        title: const Text('Buat Batch & Segel QR'),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_rounded),
-          tooltip: _currentStep > 1 ? 'Langkah Sebelumnya' : 'Kembali',
-          constraints: const BoxConstraints(
-            minWidth: AppSpacing.minTouchTarget,
-            minHeight: AppSpacing.minTouchTarget,
-          ),
-          onPressed: _goBackStep,
-        ),
-      ),
-      body: SafeArea(
-        child: kitchen == null
-            ? const Padding(
-                padding: EdgeInsets.all(AppSpacing.lg),
-                child: LacakErrorState(
-                  message: 'Profil dapur SPPG belum termuat.',
-                ),
-              )
-            : Column(
-                children: [
-                  Expanded(
-                    child: SingleChildScrollView(
-                      padding: EdgeInsets.fromLTRB(
-                        horizontalPad,
-                        AppSpacing.lg,
-                        horizontalPad,
-                        AppSpacing.xxl,
-                      ),
-                      child: Center(
-                        child: ConstrainedBox(
-                          constraints: BoxConstraints(maxWidth: maxWidth),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              LacakStepProgressHeader(
-                                currentStep: _currentStep,
-                                totalSteps: 2,
-                                stepTitle: _currentStep == 1
-                                    ? 'Detail Menu & Kategori Risiko'
-                                    : 'Foto Pengemasan Langsung & Jam Segel',
-                                stepSubtitle: _currentStep == 1
-                                    ? 'Isi nama menu harian, jumlah porsi, dan pilih kategori risiko pangan untuk penentuan batas aman suhu BMKG.'
-                                    : 'Potret makanan yang siap dikirim dengan kamera langsung, lalu kunci Segel QR Keamanan.',
+      body: Column(
+        children: [
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.only(bottom: AppSpacing.xxl),
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(
+                    maxWidth: maxWidth == double.infinity
+                        ? double.infinity
+                        : maxWidth + horizontalPad * 2,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      SafeArea(
+                        bottom: false,
+                        child: Padding(
+                          padding: const EdgeInsets.only(top: AppSpacing.sm),
+                          child: FramedHeroHeader(
+                            height: 244,
+                            image: _capturedPhoto != null
+                                ? MemoryImage(_capturedPhoto!.bytes)
+                                : null,
+                            imagePlaceholder: Container(
+                              color: AppColors.primaryTint,
+                              alignment: Alignment.center,
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  const Icon(
+                                    Icons.photo_camera_rounded,
+                                    size: 44,
+                                    color: AppColors.primary,
+                                  ),
+                                  const SizedBox(height: AppSpacing.xs),
+                                  Text(
+                                    'Belum ada foto pengemasan',
+                                    style: AppTypography.labelTag.copyWith(
+                                      color: AppColors.onPrimaryTint,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ],
                               ),
-                              const SizedBox(height: AppSpacing.lg),
-                              LacakAnimatedStepSwitcher(
-                                currentStep: _currentStep,
-                                child: _currentStep == 1
-                                    ? _buildStep1MenuAndRisk()
-                                    : _buildStep2LiveCameraAndSeal(isOffline),
+                            ),
+                            onBackTap: () => context.pop(),
+                            actionIcon: Icons.photo_camera_rounded,
+                            actionTooltip: 'Ambil Foto Pengemasan',
+                            onActionTap: _capturePhoto,
+                            title: liveMenuTitle,
+                            subtitle: kitchen.name,
+                            metrics: [
+                              HeroMetricItem(
+                                icon: Icons.restaurant_rounded,
+                                label: '$portionLabel Porsi',
+                              ),
+                              HeroMetricItem(
+                                icon: Icons.shield_outlined,
+                                label: _riskCategory.label,
                               ),
                             ],
                           ),
                         ),
                       ),
-                    ),
-                  ),
-                  Container(
-                    decoration: const BoxDecoration(
-                      color: AppColors.surfaceBase,
-                      border: Border(
-                        top: BorderSide(
-                          color: AppColors.borderHairline,
-                          width: 1,
+                      Padding(
+                        padding: EdgeInsets.fromLTRB(
+                          horizontalPad,
+                          AppSpacing.lg,
+                          horizontalPad,
+                          0,
                         ),
-                      ),
-                    ),
-                    padding: EdgeInsets.fromLTRB(
-                      horizontalPad,
-                      AppSpacing.md,
-                      horizontalPad,
-                      AppSpacing.md,
-                    ),
-                    child: Center(
-                      child: ConstrainedBox(
-                        constraints: BoxConstraints(maxWidth: maxWidth),
-                        child: LacakAnimatedStepSwitcher(
-                          currentStep: _currentStep,
-                          child: _currentStep == 1
-                              ? LacakPrimaryButton(
-                                  label: 'Simpan & Lanjut ke Foto Pengemasan',
-                                  icon: Icons.photo_camera_rounded,
-                                  onPressed: _nextFromStep1,
-                                )
-                              : Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                        child: Form(
+                          key: _formKey,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              LacakSecondaryButton(
+                                label: _capturedPhoto == null
+                                    ? 'Ambil Foto Pengemasan (Kamera)'
+                                    : 'Ambil Ulang Foto Kamera',
+                                icon: Icons.photo_camera_rounded,
+                                isLoading: _capturingPhoto,
+                                onPressed: _capturePhoto,
+                              ),
+                              if (_capturedPhoto != null) ...[
+                                const SizedBox(height: AppSpacing.xs),
+                                Row(
                                   children: [
-                                    LacakPrimaryButton(
-                                      label: 'Kunci & Buat QR Segel',
-                                      icon: Icons.qr_code_2_rounded,
-                                      isLoading: _submitting,
-                                      onPressed: _submit,
+                                    const Icon(
+                                      Icons.check_circle_rounded,
+                                      size: 18,
+                                      color: AppColors.safeFg,
                                     ),
-                                    const SizedBox(height: AppSpacing.sm),
-                                    LacakSecondaryButton(
-                                      label: 'Ubah Detail Menu (Langkah 1)',
-                                      onPressed:
-                                          _submitting ? null : _goBackStep,
+                                    const SizedBox(width: AppSpacing.xs),
+                                    Expanded(
+                                      child: Text(
+                                        'Foto pengemasan siap (${_capturedPhoto!.formattedSizeKb})',
+                                        style: AppTypography.tabular(
+                                          AppTypography.captionMuted.copyWith(
+                                            color: AppColors.safeFg,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                      ),
                                     ),
                                   ],
                                 ),
+                              ],
+                              if (_photoError != null) ...[
+                                const SizedBox(height: AppSpacing.xs),
+                                Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Icon(
+                                      Icons.error_outline_rounded,
+                                      size: 18,
+                                      color: AppColors.dangerFg,
+                                    ),
+                                    const SizedBox(width: AppSpacing.xs),
+                                    Expanded(
+                                      child: Text(
+                                        _photoError!,
+                                        style: AppTypography.captionMuted
+                                            .copyWith(
+                                          color: AppColors.dangerFg,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                              const SizedBox(height: AppSpacing.xl),
+                              LacakTextField(
+                                label: 'Nama Menu Harian',
+                                controller: _menuController,
+                                hintText:
+                                    'Contoh: Nasi Ayam Goreng & Sayur Bening',
+                                textCapitalization:
+                                    TextCapitalization.sentences,
+                                textInputAction: TextInputAction.next,
+                                onChanged: (_) {
+                                  setState(() {});
+                                  _saveLocalDraft();
+                                },
+                                validator: (value) {
+                                  if (value == null ||
+                                      value.trim().length < 3) {
+                                    return 'Masukkan nama menu minimal 3 karakter.';
+                                  }
+                                  return null;
+                                },
+                              ),
+                              const SizedBox(height: AppSpacing.lg),
+                              Text(
+                                'Jumlah Porsi (Ompreng)',
+                                style: AppTypography.labelTag.copyWith(
+                                  color: AppColors.textPrimary,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              const SizedBox(height: AppSpacing.sm),
+                              Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  _SoftStepperButton(
+                                    icon: Icons.remove_rounded,
+                                    tooltip: 'Kurangi 10 porsi',
+                                    onPressed: () => _stepPortions(-10),
+                                  ),
+                                  const SizedBox(width: AppSpacing.sm),
+                                  Expanded(
+                                    child: TextFormField(
+                                      controller: _portionController,
+                                      keyboardType: TextInputType.number,
+                                      textAlign: TextAlign.center,
+                                      onChanged: (_) {
+                                        setState(() {});
+                                        _saveLocalDraft();
+                                      },
+                                      inputFormatters: [
+                                        FilteringTextInputFormatter.digitsOnly,
+                                      ],
+                                      style: AppTypography.tabular(
+                                        AppTypography.headlinePage,
+                                      ),
+                                      decoration: const InputDecoration(
+                                        hintText: '150',
+                                        contentPadding: EdgeInsets.symmetric(
+                                          horizontal: AppSpacing.md,
+                                          vertical: 14,
+                                        ),
+                                      ),
+                                      validator: (value) {
+                                        final n = int.tryParse(
+                                          (value ?? '').trim(),
+                                        );
+                                        if (n == null || n < 1) {
+                                          return 'Minimal 1 porsi.';
+                                        }
+                                        return null;
+                                      },
+                                    ),
+                                  ),
+                                  const SizedBox(width: AppSpacing.sm),
+                                  _SoftStepperButton(
+                                    icon: Icons.add_rounded,
+                                    tooltip: 'Tambah 10 porsi',
+                                    onPressed: () => _stepPortions(10),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: AppSpacing.xl),
+                              Text(
+                                'Kategori Risiko Menu',
+                                style: AppTypography.labelTag.copyWith(
+                                  color: AppColors.textPrimary,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              const SizedBox(height: AppSpacing.sm),
+                              FilterChipStrip<FoodRiskCategory>(
+                                padding: EdgeInsets.zero,
+                                selectedValue: _riskCategory,
+                                onSelected: (selected) {
+                                  setState(() => _riskCategory = selected);
+                                  _saveLocalDraft();
+                                },
+                                items: FoodRiskCategory.values
+                                    .map(
+                                      (cat) => FilterChipItem(
+                                        value: cat,
+                                        label: cat.label,
+                                      ),
+                                    )
+                                    .toList(growable: false),
+                              ),
+                              const SizedBox(height: AppSpacing.md),
+                              Container(
+                                padding: const EdgeInsets.all(AppSpacing.lg),
+                                decoration: BoxDecoration(
+                                  color: AppColors.surfaceSoft,
+                                  borderRadius: BorderRadius.circular(
+                                    AppSpacing.radiusInput,
+                                  ),
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      _riskCategory.examples,
+                                      style: AppTypography.bodyMedium.copyWith(
+                                        color: AppColors.textPrimary,
+                                      ),
+                                    ),
+                                    const SizedBox(height: AppSpacing.sm),
+                                    Row(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        const Icon(
+                                          Icons.schedule_rounded,
+                                          size: 18,
+                                          color: AppColors.primary,
+                                        ),
+                                        const SizedBox(width: AppSpacing.sm),
+                                        Expanded(
+                                          child: Text(
+                                            _riskCategory.safetyNote,
+                                            style: AppTypography.tabular(
+                                              AppTypography.captionMuted
+                                                  .copyWith(
+                                                color: AppColors.primary,
+                                                fontWeight: FontWeight.w600,
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(height: AppSpacing.lg),
+                              const Divider(height: 1),
+                              Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: AppSpacing.md,
+                                ),
+                                child: Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Icon(
+                                      isOffline
+                                          ? Icons.cloud_off_rounded
+                                          : Icons.verified_user_rounded,
+                                      size: 20,
+                                      color: isOffline
+                                          ? AppColors.infoFg
+                                          : AppColors.safeFg,
+                                    ),
+                                    const SizedBox(width: AppSpacing.sm),
+                                    Expanded(
+                                      child: Text(
+                                        isOffline
+                                            ? 'Mode Tanpa Sinyal: Segel Ed25519 dan stempel waktu lokal tetap dikunci aman di HP.'
+                                            : 'Stempel Waktu Resmi Server & tanda tangan digital Ed25519 aktif.',
+                                        style: AppTypography.bodyMedium,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-      ),
-    );
-  }
-
-  Widget _buildStep1MenuAndRisk() {
-    return Form(
-      key: _step1FormKey,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          LacakTextField(
-            label: 'Nama Menu Harian',
-            controller: _menuController,
-            hintText: 'Contoh: Nasi Ayam Goreng & Sayur Bening',
-            textCapitalization: TextCapitalization.sentences,
-            textInputAction: TextInputAction.next,
-            onChanged: (_) => _saveLocalDraft(),
-            validator: (value) {
-              if (value == null || value.trim().length < 3) {
-                return 'Masukkan nama menu minimal 3 karakter.';
-              }
-              return null;
-            },
-          ),
-          const SizedBox(height: AppSpacing.md),
-          Text(
-            'Jumlah Porsi (Ompreng)',
-            style: AppTypography.labelTag.copyWith(
-              color: AppColors.textPrimary,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(height: AppSpacing.xs),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _PortionStepperButton(
-                icon: Icons.remove_rounded,
-                tooltip: 'Kurangi 10 porsi',
-                onPressed: () => _stepPortions(-10),
-              ),
-              const SizedBox(width: AppSpacing.sm),
-              Expanded(
-                child: TextFormField(
-                  controller: _portionController,
-                  keyboardType: TextInputType.number,
-                  textAlign: TextAlign.center,
-                  onChanged: (_) => _saveLocalDraft(),
-                  inputFormatters: [
-                    FilteringTextInputFormatter.digitsOnly,
-                  ],
-                  style: AppTypography.tabular(
-                    AppTypography.headlinePage.copyWith(fontSize: 20),
-                  ),
-                  decoration: const InputDecoration(
-                    hintText: '150',
-                    contentPadding: EdgeInsets.symmetric(
-                      horizontal: AppSpacing.md,
-                      vertical: 14,
-                    ),
-                  ),
-                  validator: (value) {
-                    final n = int.tryParse((value ?? '').trim());
-                    if (n == null || n < 1) {
-                      return 'Minimal 1 porsi.';
-                    }
-                    return null;
-                  },
-                ),
-              ),
-              const SizedBox(width: AppSpacing.sm),
-              _PortionStepperButton(
-                icon: Icons.add_rounded,
-                tooltip: 'Tambah 10 porsi',
-                onPressed: () => _stepPortions(10),
-              ),
-            ],
-          ),
-          const SizedBox(height: AppSpacing.lg),
-          Text(
-            'Kategori Risiko Menu',
-            style: AppTypography.labelTag.copyWith(
-              color: AppColors.textPrimary,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(height: AppSpacing.xs),
-          ...FoodRiskCategory.values.map(
-            (category) => Padding(
-              padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-              child: _RiskCategoryOptionTile(
-                category: category,
-                selected: _riskCategory == category,
-                onTap: () {
-                  setState(() => _riskCategory = category);
-                  _saveLocalDraft();
-                },
-              ),
-            ),
-          ),
-          Container(
-            padding: const EdgeInsets.symmetric(
-              horizontal: AppSpacing.md,
-              vertical: AppSpacing.sm,
-            ),
-            decoration: BoxDecoration(
-              color: AppColors.surfaceSubtle,
-              borderRadius: BorderRadius.circular(AppSpacing.radiusControl),
-            ),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Icon(
-                  Icons.schedule_rounded,
-                  size: 18,
-                  color: AppColors.primary,
-                ),
-                const SizedBox(width: AppSpacing.sm),
-                Expanded(
-                  child: Text(
-                    _riskCategory.safetyNote,
-                    style: AppTypography.tabular(
-                      AppTypography.bodyMedium.copyWith(
-                        color: AppColors.textPrimary,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildStep2LiveCameraAndSeal(bool isOffline) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Container(
-          padding: const EdgeInsets.all(AppSpacing.md),
-          decoration: BoxDecoration(
-            color: AppColors.surfaceSubtle,
-            borderRadius: BorderRadius.circular(AppSpacing.radiusControl),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Menu Tersimpan (Langkah 1):',
-                style: AppTypography.labelTag.copyWith(
-                  color: AppColors.textSecondary,
-                ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                _menuController.text.trim(),
-                style: AppTypography.titleItem,
-              ),
-              Text(
-                '${_portionController.text.trim()} porsi · ${_riskCategory.label}',
-                style: AppTypography.tabular(AppTypography.bodyMedium),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: AppSpacing.lg),
-        Container(
-          constraints: _capturedPhoto == null
-              ? const BoxConstraints(minHeight: 168)
-              : const BoxConstraints(
-                  minHeight: 168,
-                  maxHeight: 220,
-                ),
-          decoration: BoxDecoration(
-            color: AppColors.surfaceSubtle,
-            borderRadius: BorderRadius.circular(AppSpacing.radiusControl),
-            border: Border.all(
-              color: _photoError != null
-                  ? AppColors.dangerBorder
-                  : AppColors.borderHairline,
-              width: 1,
-            ),
-          ),
-          clipBehavior: Clip.antiAlias,
-          child: _capturedPhoto == null
-              ? Padding(
-                  padding: const EdgeInsets.all(AppSpacing.lg),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Icon(
-                        Icons.photo_camera_rounded,
-                        size: 36,
-                        color: AppColors.textSecondary,
-                      ),
-                      const SizedBox(height: AppSpacing.sm),
-                      Text(
-                        'Belum ada foto pengemasan',
-                        textAlign: TextAlign.center,
-                        style: AppTypography.titleItem,
-                      ),
-                      const SizedBox(height: AppSpacing.xs),
-                      Text(
-                        'Gunakan kamera langsung (akses galeri dinonaktifkan). Ukuran foto disesuaikan otomatis agar ringan dikirim.',
-                        textAlign: TextAlign.center,
-                        style: AppTypography.bodyMedium,
                       ),
                     ],
                   ),
-                )
-              : Image.memory(
-                  _capturedPhoto!.bytes,
-                  fit: BoxFit.cover,
-                  width: double.infinity,
                 ),
-        ),
-        if (_capturedPhoto != null) ...[
-          const SizedBox(height: AppSpacing.sm),
-          Row(
-            children: [
-              const Icon(
-                Icons.check_circle_rounded,
-                size: 18,
-                color: AppColors.safeFg,
-              ),
-              const SizedBox(width: AppSpacing.xs),
-              Expanded(
-                child: Text(
-                  'Foto pengemasan siap (${_capturedPhoto!.formattedSizeKb})',
-                  style: AppTypography.tabular(
-                    AppTypography.bodyMedium.copyWith(
-                      color: AppColors.safeFg,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ],
-        if (_photoError != null) ...[
-          const SizedBox(height: AppSpacing.sm),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Icon(
-                Icons.error_outline_rounded,
-                size: 18,
-                color: AppColors.dangerFg,
-              ),
-              const SizedBox(width: AppSpacing.xs),
-              Expanded(
-                child: Text(
-                  _photoError!,
-                  style: AppTypography.bodyMedium.copyWith(
-                    color: AppColors.dangerFg,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ],
-        const SizedBox(height: AppSpacing.md),
-        LacakSecondaryButton(
-          label: _capturedPhoto == null
-              ? 'Ambil Foto Pengemasan'
-              : 'Ambil Ulang Foto Kamera',
-          icon: Icons.photo_camera_rounded,
-          isLoading: _capturingPhoto,
-          onPressed: _capturePhoto,
-        ),
-        const SizedBox(height: AppSpacing.md),
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Icon(
-              isOffline ? Icons.cloud_off_rounded : Icons.schedule_rounded,
-              size: 20,
-              color: isOffline ? AppColors.infoFg : AppColors.textSecondary,
-            ),
-            const SizedBox(width: AppSpacing.sm),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    isOffline
-                        ? 'Stempel Waktu: Waktu Perangkat (Dicek Saat Ada Sinyal)'
-                        : 'Stempel Waktu: Dikunci otomatis dari Waktu Resmi Server',
-                    style: AppTypography.bodyMedium.copyWith(
-                      color: AppColors.textPrimary,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  if (isOffline) ...[
-                    const SizedBox(height: AppSpacing.xs),
-                    const LacakStatusTag(
-                      level: LacakStatusLevel.offline,
-                      label: 'Mode Tanpa Sinyal',
-                    ),
-                  ],
-                ],
               ),
             ),
-          ],
-        ),
-      ],
-    );
-  }
-}
-
-class _RiskCategoryOptionTile extends StatelessWidget {
-  const _RiskCategoryOptionTile({
-    required this.category,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final FoodRiskCategory category;
-  final bool selected;
-  final VoidCallback onTap;
-
-  String _windowBadgeText() {
-    return switch (category) {
-      FoodRiskCategory.high => 'Maks 1,5 - 2 Jam',
-      FoodRiskCategory.medium => 'Maks 3 - 3,5 Jam',
-      FoodRiskCategory.low => 'Maks 4 - 6 Jam',
-    };
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final fgColor = selected ? AppColors.onPrimaryTint : AppColors.textPrimary;
-    final subColor = selected
-        ? AppColors.onPrimaryTint
-        : AppColors.textSecondary;
-
-    return Material(
-      color: selected ? AppColors.primaryTint : AppColors.surfaceBase,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(AppSpacing.radiusControl),
-        side: BorderSide(
-          color: selected ? AppColors.primary : AppColors.borderHairline,
-          width: selected ? 2 : 1,
-        ),
-      ),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(AppSpacing.radiusControl),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.md,
-            vertical: AppSpacing.md,
           ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Padding(
-                padding: const EdgeInsets.only(top: 2),
-                child: Icon(
-                  selected
-                      ? Icons.check_circle_rounded
-                      : Icons.radio_button_unchecked_rounded,
-                  size: 22,
-                  color: selected ? AppColors.primary : AppColors.textMuted,
-                ),
-              ),
-              const SizedBox(width: AppSpacing.sm),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Wrap(
-                      spacing: AppSpacing.sm,
-                      runSpacing: 4,
-                      alignment: WrapAlignment.spaceBetween,
-                      crossAxisAlignment: WrapCrossAlignment.center,
-                      children: [
-                        Text(
-                          category.label,
-                          style: AppTypography.titleItem.copyWith(
-                            color: fgColor,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: AppSpacing.sm,
-                            vertical: 2,
-                          ),
-                          decoration: BoxDecoration(
-                            color: selected
-                                ? AppColors.surfaceBase
-                                : AppColors.surfaceSubtle,
-                            borderRadius: BorderRadius.circular(
-                              AppSpacing.radiusTag,
-                            ),
-                            border: Border.all(
-                              color: selected
-                                  ? AppColors.primary
-                                  : AppColors.borderHairline,
-                              width: 1,
-                            ),
-                          ),
-                          child: Text(
-                            _windowBadgeText(),
-                            style: AppTypography.tabular(
-                              AppTypography.captionLegal.copyWith(
-                                color: fgColor,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      category.examples,
-                      style: AppTypography.bodyMedium.copyWith(
-                        color: subColor,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
+          StickyBottomActionBar(
+            summaryLabel:
+                '${_riskCategory.label} · ${isOffline ? 'Mode Offline' : 'Waktu Server'}',
+            summaryValue: '$portionLabel Porsi',
+            ctaLabel: 'Kunci & Buat QR',
+            ctaIcon: Icons.qr_code_2_rounded,
+            isLoading: _submitting,
+            onCtaPressed: _submit,
           ),
-        ),
+        ],
       ),
     );
   }
 }
 
-class _PortionStepperButton extends StatelessWidget {
-  const _PortionStepperButton({
+class _SoftStepperButton extends StatelessWidget {
+  const _SoftStepperButton({
     required this.icon,
     required this.tooltip,
     required this.onPressed,
@@ -804,20 +596,19 @@ class _PortionStepperButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      width: 56,
-      height: 56,
-      child: OutlinedButton(
-        onPressed: onPressed,
-        style: OutlinedButton.styleFrom(
-          minimumSize: const Size(56, 56),
-          padding: EdgeInsets.zero,
-          side: const BorderSide(color: AppColors.borderHairline, width: 1),
-          backgroundColor: AppColors.surfaceSubtle,
-        ),
-        child: Tooltip(
-          message: tooltip,
-          child: Icon(icon, size: 24, color: AppColors.textPrimary),
+    return Tooltip(
+      message: tooltip,
+      child: Material(
+        color: AppColors.surfaceSoft,
+        borderRadius: BorderRadius.circular(AppSpacing.radiusInput),
+        child: InkWell(
+          onTap: onPressed,
+          borderRadius: BorderRadius.circular(AppSpacing.radiusInput),
+          child: SizedBox(
+            width: 52,
+            height: 52,
+            child: Icon(icon, size: 22, color: AppColors.textPrimary),
+          ),
         ),
       ),
     );

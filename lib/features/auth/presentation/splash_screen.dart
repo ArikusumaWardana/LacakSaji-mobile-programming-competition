@@ -39,24 +39,24 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const LacakLogoMark(size: 64),
-                  const SizedBox(height: AppSpacing.lg),
+                  const LacakLogoMark(size: 68),
+                  const SizedBox(height: AppSpacing.xl),
                   Text(
                     'LacakSaji',
-                    style: AppTypography.headlinePage.copyWith(fontSize: 22),
+                    style: AppTypography.displayStatus,
                   ),
-                  const SizedBox(height: AppSpacing.sm),
+                  const SizedBox(height: AppSpacing.xs),
                   Text(
                     'Menyiapkan data keamanan pangan...',
                     textAlign: TextAlign.center,
-                    style: AppTypography.bodyMedium,
+                    style: AppTypography.captionMuted,
                   ),
-                  const SizedBox(height: AppSpacing.xl),
+                  const SizedBox(height: AppSpacing.xxl),
                   ClipRRect(
                     borderRadius: BorderRadius.circular(2),
                     child: const LinearProgressIndicator(
                       minHeight: 3,
-                      backgroundColor: AppColors.surfaceSubtle,
+                      backgroundColor: AppColors.surfaceSoft,
                       valueColor: AlwaysStoppedAnimation<Color>(
                         AppColors.primary,
                       ),

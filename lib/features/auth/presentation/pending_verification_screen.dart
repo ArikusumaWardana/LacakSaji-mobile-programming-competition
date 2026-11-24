@@ -6,13 +6,12 @@ import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/widgets/lacak_buttons.dart';
 import '../../../core/widgets/lacak_confirm_dialog.dart';
-import '../../../core/widgets/lacak_section_surface.dart';
 import '../../../core/widgets/lacak_status_badge.dart';
 import '../../../core/widgets/lacak_text_field.dart';
 import '../domain/auth_models.dart';
 import 'auth_controller.dart';
 
-/// S04: Waiting approval / rejected verification screen for newly linked schools.
+/// S04: Borderless editorial waiting approval / rejected verification screen for newly linked schools.
 class PendingVerificationScreen extends ConsumerWidget {
   const PendingVerificationScreen({super.key});
 
@@ -50,7 +49,7 @@ class PendingVerificationScreen extends ConsumerWidget {
       builder: (dialogContext) => AlertDialog(
         title: const Text('Pindai QR Kotak Makanan'),
         content: Text(
-          'Pemindaian QR kotak makanan untuk tautan otomatis akan aktif pada modul inspeksi sekolah (Tahap 3). Sementara ini Anda dapat meminta persetujuan langsung kepada petugas dapur SPPG atau mengubah kode mitra.',
+          'Pemindaian QR kotak makanan untuk tautan otomatis akan aktif pada modul inspeksi sekolah. Sementara ini Anda dapat meminta persetujuan langsung kepada petugas dapur SPPG atau mengubah kode mitra.',
           style: AppTypography.bodyLarge,
         ),
         actions: [
@@ -75,35 +74,11 @@ class PendingVerificationScreen extends ConsumerWidget {
 
     return Scaffold(
       backgroundColor: AppColors.bgCanvas,
-      appBar: AppBar(
-        title: const Text('Status Verifikasi Sekolah'),
-        actions: [
-          TextButton.icon(
-            onPressed: authState.isBusy
-                ? null
-                : () async {
-                    final confirm = await showLacakConfirmDialog(
-                      context: context,
-                      title: 'Keluar dari Akun?',
-                      message:
-                          'Anda akan keluar dari akun sekolah ini dan kembali ke layar masuk.',
-                      confirmLabel: 'Ya, Keluar',
-                      isDanger: true,
-                    );
-                    if (confirm && context.mounted) {
-                      await ref.read(authControllerProvider.notifier).signOut();
-                    }
-                  },
-            icon: const Icon(Icons.logout_rounded, size: 20),
-            label: const Text('Keluar'),
-          ),
-        ],
-      ),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: EdgeInsets.fromLTRB(
             horizontalPad,
-            AppSpacing.lg,
+            AppSpacing.md,
             horizontalPad,
             AppSpacing.xxl,
           ),
@@ -113,6 +88,57 @@ class PendingVerificationScreen extends ConsumerWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              'Verifikasi Akun Sekolah',
+                              style: AppTypography.captionMuted,
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              'Status Verifikasi',
+                              style: AppTypography.headlinePage,
+                            ),
+                          ],
+                        ),
+                      ),
+                      TextButton.icon(
+                        onPressed: authState.isBusy
+                            ? null
+                            : () async {
+                                final confirm = await showLacakConfirmDialog(
+                                  context: context,
+                                  title: 'Keluar dari Akun?',
+                                  message:
+                                      'Anda akan keluar dari akun sekolah ini dan kembali ke layar masuk.',
+                                  confirmLabel: 'Ya, Keluar',
+                                  isDanger: true,
+                                );
+                                if (confirm && context.mounted) {
+                                  await ref
+                                      .read(authControllerProvider.notifier)
+                                      .signOut();
+                                }
+                              },
+                        style: TextButton.styleFrom(
+                          minimumSize: const Size(
+                            AppSpacing.minTouchTarget,
+                            AppSpacing.minTouchTarget,
+                          ),
+                          foregroundColor: AppColors.dangerFg,
+                        ),
+                        icon: const Icon(Icons.logout_rounded, size: 20),
+                        label: const Text('Keluar'),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: AppSpacing.lg),
                   LacakStatusBanner(
                     level: isRejected
                         ? LacakStatusLevel.danger
@@ -132,32 +158,31 @@ class PendingVerificationScreen extends ConsumerWidget {
                       description: authState.errorMessage,
                     ),
                   ],
-                  const SizedBox(height: AppSpacing.lg),
-                  LacakSectionSurface.separated(
-                    children: [
-                      _DetailRow(
-                        label: 'Nama Sekolah',
-                        value: school?.name ?? authState.profile?.fullName ?? '-',
-                      ),
-                      _DetailRow(
-                        label: 'NPSN',
-                        value: school?.npsn ?? '-',
-                        tabular: true,
-                      ),
-                      _DetailRow(
-                        label: 'SPPG Tujuan',
-                        value: school?.partnerKitchenName != null
-                            ? '${school!.partnerKitchenName} (${school.partnerInviteCode ?? '-'})'
-                            : 'Belum tertaut ke dapur SPPG',
-                      ),
-                      _DetailRow(
-                        label: 'Status',
-                        value: school?.verificationStatus.label ??
-                            'Menunggu Persetujuan SPPG',
-                      ),
-                    ],
-                  ),
                   const SizedBox(height: AppSpacing.xl),
+                  _BorderlessDetailRow(
+                    label: 'Nama Sekolah',
+                    value: school?.name ?? authState.profile?.fullName ?? '-',
+                  ),
+                  const Divider(height: 1),
+                  _BorderlessDetailRow(
+                    label: 'NPSN',
+                    value: school?.npsn ?? '-',
+                    tabular: true,
+                  ),
+                  const Divider(height: 1),
+                  _BorderlessDetailRow(
+                    label: 'SPPG Tujuan',
+                    value: school?.partnerKitchenName != null
+                        ? '${school!.partnerKitchenName} (${school.partnerInviteCode ?? '-'})'
+                        : 'Belum tertaut ke dapur SPPG',
+                  ),
+                  const Divider(height: 1),
+                  _BorderlessDetailRow(
+                    label: 'Status',
+                    value: school?.verificationStatus.label ??
+                        'Menunggu Persetujuan SPPG',
+                  ),
+                  const SizedBox(height: AppSpacing.xxl),
                   LacakPrimaryButton(
                     label: 'Periksa Status Sekarang',
                     icon: Icons.refresh_rounded,
@@ -191,8 +216,7 @@ class PendingVerificationScreen extends ConsumerWidget {
                   LacakSecondaryButton(
                     label: 'Ubah Kode Mitra SPPG',
                     icon: Icons.edit_rounded,
-                    isLoading:
-                        authState.busyAction ==
+                    isLoading: authState.busyAction ==
                         AuthBusyAction.updatePartnerCode,
                     onPressed: authState.isBusy
                         ? null
@@ -216,8 +240,8 @@ class PendingVerificationScreen extends ConsumerWidget {
   }
 }
 
-class _DetailRow extends StatelessWidget {
-  const _DetailRow({
+class _BorderlessDetailRow extends StatelessWidget {
+  const _BorderlessDetailRow({
     required this.label,
     required this.value,
     this.tabular = false,
@@ -229,30 +253,44 @@ class _DetailRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final textScale = MediaQuery.textScalerOf(context).scale(14) / 14;
+    final valueStyle = tabular
+        ? AppTypography.tabular(AppTypography.titleItem)
+        : AppTypography.titleItem;
+
     return Padding(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.lg,
-        vertical: AppSpacing.md,
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(
-            flex: 2,
-            child: Text(label, style: AppTypography.bodyMedium),
-          ),
-          const SizedBox(width: AppSpacing.md),
-          Expanded(
-            flex: 3,
-            child: Text(
-              value,
-              textAlign: TextAlign.right,
-              style: tabular
-                  ? AppTypography.tabular(AppTypography.titleItem)
-                  : AppTypography.titleItem,
-            ),
-          ),
-        ],
+      padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          if (constraints.maxWidth < 310 || textScale >= 1.25) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(label, style: AppTypography.captionMuted),
+                const SizedBox(height: 2),
+                Text(value, style: valueStyle),
+              ],
+            );
+          }
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                flex: 2,
+                child: Text(label, style: AppTypography.bodyMedium),
+              ),
+              const SizedBox(width: AppSpacing.md),
+              Expanded(
+                flex: 3,
+                child: Text(
+                  value,
+                  textAlign: TextAlign.right,
+                  style: valueStyle,
+                ),
+              ),
+            ],
+          );
+        },
       ),
     );
   }

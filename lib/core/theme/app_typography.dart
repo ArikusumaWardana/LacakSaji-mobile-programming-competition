@@ -1,15 +1,15 @@
-
 import 'package:google_fonts/google_fonts.dart';
 import 'package:material_ui/material_ui.dart';
 
 import 'app_colors.dart';
 
-/// Typography scale defined in DESIGN.md Section 3 (Plus Jakarta Sans + Roboto fallback).
+/// Typography scale defined in DESIGN.md v2.0.0 (Plus Jakarta Sans + Roboto fallback).
 abstract final class AppTypography {
   static TextStyle _base({
     required double fontSize,
     required FontWeight fontWeight,
     required double height,
+    double? letterSpacing,
     Color color = AppColors.textPrimary,
     List<FontFeature>? fontFeatures,
   }) {
@@ -17,6 +17,7 @@ abstract final class AppTypography {
       fontSize: fontSize,
       fontWeight: fontWeight,
       height: height,
+      letterSpacing: letterSpacing,
       color: color,
       fontFeatures: fontFeatures,
     ).copyWith(fontFamilyFallback: const ['Roboto']);
@@ -25,25 +26,28 @@ abstract final class AppTypography {
   static final TextStyle displayStatus = _base(
     fontSize: 24,
     fontWeight: FontWeight.w700,
-    height: 1.25,
+    height: 1.22,
+    letterSpacing: -0.35,
   );
 
   static final TextStyle headlinePage = _base(
-    fontSize: 21,
-    fontWeight: FontWeight.w600,
-    height: 1.30,
+    fontSize: 22,
+    fontWeight: FontWeight.w700,
+    height: 1.25,
+    letterSpacing: -0.25,
   );
 
   static final TextStyle titleSection = _base(
-    fontSize: 17,
+    fontSize: 18,
     fontWeight: FontWeight.w600,
-    height: 1.35,
+    height: 1.30,
+    letterSpacing: -0.1,
   );
 
   static final TextStyle titleItem = _base(
     fontSize: 16,
     fontWeight: FontWeight.w600,
-    height: 1.40,
+    height: 1.35,
   );
 
   static final TextStyle bodyLarge = _base(
@@ -53,7 +57,7 @@ abstract final class AppTypography {
   );
 
   static final TextStyle bodyMedium = _base(
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: FontWeight.w400,
     height: 1.45,
     color: AppColors.textSecondary,
@@ -63,16 +67,25 @@ abstract final class AppTypography {
     fontSize: 16,
     fontWeight: FontWeight.w600,
     height: 1.20,
+    letterSpacing: 0.05,
   );
 
   static final TextStyle labelTag = _base(
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: FontWeight.w500,
     height: 1.25,
+    letterSpacing: 0.1,
+  );
+
+  static final TextStyle captionMuted = _base(
+    fontSize: 13,
+    fontWeight: FontWeight.w400,
+    height: 1.35,
+    color: AppColors.textSecondary,
   );
 
   static final TextStyle captionLegal = _base(
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: FontWeight.w400,
     height: 1.35,
     color: AppColors.textMuted,
@@ -85,10 +98,11 @@ abstract final class AppTypography {
   static TextTheme buildTextTheme() {
     return TextTheme(
       displaySmall: displayStatus,
+      headlineMedium: displayStatus,
       headlineSmall: headlinePage,
-      titleLarge: headlinePage,
-      titleMedium: titleSection,
-      titleSmall: titleItem,
+      titleLarge: titleSection,
+      titleMedium: titleItem,
+      titleSmall: labelTag,
       bodyLarge: bodyLarge,
       bodyMedium: bodyMedium,
       bodySmall: captionLegal,

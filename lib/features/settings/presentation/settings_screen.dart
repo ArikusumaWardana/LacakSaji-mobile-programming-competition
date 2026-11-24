@@ -9,9 +9,9 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/theme/text_scale_provider.dart';
+import '../../../core/widgets/editorial_widgets.dart';
 import '../../../core/widgets/lacak_buttons.dart';
 import '../../../core/widgets/lacak_confirm_dialog.dart';
-import '../../../core/widgets/lacak_section_surface.dart';
 import '../../../core/widgets/lacak_status_badge.dart';
 import '../../../core/widgets/lacak_sync_queue_sheet.dart';
 import '../../../core/widgets/lacak_text_field.dart';
@@ -22,7 +22,8 @@ import '../../auth/presentation/widgets/location_helper.dart';
 import '../../kitchen/presentation/kitchen_providers.dart';
 import '../../school/presentation/school_providers.dart';
 
-/// C01: Shared profile, comfortable text scale, offline sync status, and logout screen.
+/// C01: Editorial flat grouped profile, comfortable text scale chips,
+/// sync status, operational settings, and sign-out screen.
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
 
@@ -126,9 +127,6 @@ class SettingsScreen extends ConsumerWidget {
     }
   }
 
-  /// Strips trailing parenthetical role notes from seeded `fullName` values
-  /// (e.g. `Ibu Ratna (Petugas SPPG Purwokerto Utara)` -> `Ibu Ratna`)
-  /// so we never render double parentheses like `(Petugas...) (Petugas Dapur SPPG)`.
   String? _cleanPersonName(String? rawName) {
     if (rawName == null) {
       return null;
@@ -160,6 +158,7 @@ class SettingsScreen extends ConsumerWidget {
     final width = MediaQuery.sizeOf(context).width;
     final horizontalPad = AppSpacing.horizontalPadding(width);
     final maxWidth = AppSpacing.maxContentWidth(width);
+    final inAppShell = AppShellScope.maybeOf(context) != null;
 
     final profile = authState.profile;
     final kitchen = authState.kitchen;
@@ -167,344 +166,506 @@ class SettingsScreen extends ConsumerWidget {
 
     return Scaffold(
       backgroundColor: AppColors.bgCanvas,
-      appBar: AppBar(title: const Text('Profil & Pengaturan')),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: EdgeInsets.fromLTRB(
-            horizontalPad,
-            AppSpacing.lg,
-            horizontalPad,
-            AppSpacing.xxl,
-          ),
-          child: Center(
-            child: ConstrainedBox(
-              constraints: BoxConstraints(maxWidth: maxWidth),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  // Open profile header directly on canvas (inspired by reference 2 profile header, no nested box)
-                  Wrap(
-                    spacing: AppSpacing.sm,
-                    runSpacing: AppSpacing.sm,
-                    alignment: WrapAlignment.spaceBetween,
-                    crossAxisAlignment: WrapCrossAlignment.center,
-                    children: [
-                      Text(
-                        kitchen?.name ??
-                            school?.name ??
-                            _cleanPersonName(profile?.fullName) ??
-                            'Pengguna LacakSaji',
-                        style: AppTypography.headlinePage.copyWith(
-                          fontSize: 22,
-                          fontWeight: FontWeight.w700,
+      body: Column(
+        children: [
+          if (inAppShell)
+            const MinimalTopHeader(
+              contextLabel: 'Akun & Aplikasi',
+              title: 'Profil & Pengaturan',
+            )
+          else
+            SafeArea(
+              bottom: false,
+              child: Padding(
+                padding: EdgeInsets.fromLTRB(
+                  horizontalPad,
+                  AppSpacing.md,
+                  horizontalPad,
+                  AppSpacing.sm,
+                ),
+                child: Row(
+                  children: [
+                    Material(
+                      color: AppColors.surfaceSoft,
+                      shape: const CircleBorder(),
+                      child: IconButton(
+                        onPressed: () => Navigator.of(context).maybePop(),
+                        tooltip: 'Kembali',
+                        constraints: const BoxConstraints(
+                          minWidth: AppSpacing.minTouchTarget,
+                          minHeight: AppSpacing.minTouchTarget,
+                        ),
+                        icon: const Icon(
+                          Icons.arrow_back_ios_new_rounded,
+                          size: 19,
+                          color: AppColors.textPrimary,
                         ),
                       ),
-                      LacakStatusTag(
-                        level: school?.verificationStatus ==
-                                SchoolVerificationStatus.pending
-                            ? LacakStatusLevel.warning
-                            : (school?.verificationStatus ==
-                                      SchoolVerificationStatus.rejected
-                                  ? LacakStatusLevel.danger
-                                  : LacakStatusLevel.safe),
-                        label: school != null
-                            ? school.verificationStatus.label.toUpperCase()
-                            : 'TERVERIFIKASI',
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: AppSpacing.xs),
-                  Text(
-                    _formatPicAndRole(profile),
-                    style: AppTypography.bodyLarge.copyWith(
-                      color: AppColors.textPrimary,
-                      fontWeight: FontWeight.w500,
                     ),
-                  ),
-                  if ((profile?.email ?? '').isNotEmpty) ...[
-                    const SizedBox(height: 2),
-                    Text(
-                      profile!.email,
-                      style: AppTypography.bodyMedium,
+                    const SizedBox(width: AppSpacing.md),
+                    Expanded(
+                      child: Text(
+                        'Profil & Pengaturan',
+                        style: AppTypography.headlinePage,
+                      ),
                     ),
                   ],
-                  if (kitchen != null || school != null) ...[
-                    const SizedBox(height: AppSpacing.md),
-                    LacakSectionSurface.separated(
-                      children: [
+                ),
+              ),
+            ),
+          Expanded(
+            child: SingleChildScrollView(
+              padding: EdgeInsets.fromLTRB(
+                horizontalPad,
+                AppSpacing.md,
+                horizontalPad,
+                AppSpacing.xxxl,
+              ),
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(maxWidth: maxWidth),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Wrap(
+                        spacing: AppSpacing.sm,
+                        runSpacing: AppSpacing.sm,
+                        alignment: WrapAlignment.spaceBetween,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        children: [
+                          Text(
+                            kitchen?.name ??
+                                school?.name ??
+                                _cleanPersonName(profile?.fullName) ??
+                                'Pengguna LacakSaji',
+                            style: AppTypography.titleSection.copyWith(
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          LacakStatusTag(
+                            level: school?.verificationStatus ==
+                                    SchoolVerificationStatus.pending
+                                ? LacakStatusLevel.warning
+                                : (school?.verificationStatus ==
+                                          SchoolVerificationStatus.rejected
+                                      ? LacakStatusLevel.danger
+                                      : LacakStatusLevel.safe),
+                            label: school != null
+                                ? school.verificationStatus.label.toUpperCase()
+                                : 'TERVERIFIKASI',
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        _formatPicAndRole(profile),
+                        style: AppTypography.bodyLarge.copyWith(
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      if ((profile?.email ?? '').isNotEmpty) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          profile!.email,
+                          style: AppTypography.captionMuted,
+                        ),
+                      ],
+                      if (kitchen != null || school != null) ...[
+                        const SizedBox(height: AppSpacing.md),
+                        const Divider(height: 1),
                         if (kitchen != null) ...[
-                          _SettingsRow(
+                          _FlatSettingsRow(
                             label: 'Kode Mitra SPPG',
                             value: kitchen.inviteCode,
                             tabular: true,
                           ),
-                          _SettingsRow(
+                          const Divider(height: 1),
+                          _FlatSettingsRow(
                             label: 'Nomor Registrasi',
                             value: kitchen.regNumber,
                             tabular: true,
                           ),
                         ],
                         if (school != null) ...[
-                          _SettingsRow(
+                          _FlatSettingsRow(
                             label: 'NPSN Sekolah',
                             value: school.npsn,
                             tabular: true,
                           ),
-                          _SettingsRow(
+                          const Divider(height: 1),
+                          _FlatSettingsRow(
                             label: 'Mitra SPPG',
                             value: school.partnerKitchenName ?? '-',
                           ),
                         ],
+                        const Divider(height: 1),
                       ],
-                    ),
-                  ],
-                  const SizedBox(height: AppSpacing.xl),
-                  Text(
-                    'Ukuran Teks Nyaman',
-                    style: AppTypography.titleSection,
-                  ),
-                  const SizedBox(height: AppSpacing.sm),
-                  LacakSegmentedControl<ComfortableTextScale>(
-                    options: const [
-                      LacakSegmentOption(
-                        value: ComfortableTextScale.standard,
-                        label: 'Standar',
-                        subtitle: '100%',
+                      const SizedBox(height: AppSpacing.xxl),
+                      Text(
+                        'Ukuran Teks Nyaman',
+                        style: AppTypography.titleSection,
                       ),
-                      LacakSegmentOption(
-                        value: ComfortableTextScale.large,
-                        label: 'Besar',
-                        subtitle: '115%',
+                      const SizedBox(height: AppSpacing.sm),
+                      _TextScaleSegmentedChips(
+                        selected: textScale,
+                        onChanged: (selected) {
+                          ref
+                              .read(textScaleProvider.notifier)
+                              .setScale(selected);
+                        },
                       ),
-                      LacakSegmentOption(
-                        value: ComfortableTextScale.extraLarge,
-                        label: 'Ekstra Besar',
-                        subtitle: '130%',
+                      const SizedBox(height: AppSpacing.sm),
+                      Text(
+                        'Pratinjau: Pastikan suhu penyimpanan sampel makanan selalu terjaga di bawah 5 C selama 48 jam.',
+                        style: AppTypography.bodyMedium,
                       ),
-                    ],
-                    selectedValue: textScale,
-                    onChanged: (selected) {
-                      ref
-                          .read(textScaleProvider.notifier)
-                          .setScale(selected);
-                    },
-                  ),
-                  const SizedBox(height: AppSpacing.sm),
-                  Text(
-                    'Pratinjau: Pastikan suhu penyimpanan sampel makanan selalu terjaga di bawah 5 C selama 48 jam.',
-                    style: AppTypography.bodyLarge.copyWith(
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
-                  const SizedBox(height: AppSpacing.xl),
-                  Text(
-                    'Sinkronisasi & Operasional',
-                    style: AppTypography.titleSection,
-                  ),
-                  const SizedBox(height: AppSpacing.sm),
-                  LacakSectionSurface.separated(
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.all(AppSpacing.lg),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            Row(
-                              children: [
-                                Icon(
-                                  isOffline
-                                      ? Icons.cloud_off_rounded
-                                      : Icons.cloud_done_rounded,
-                                  size: 22,
-                                  color: AppColors.textSecondary,
-                                ),
-                                const SizedBox(width: AppSpacing.md),
-                                Expanded(
-                                  child: Text(
-                                    isOffline
-                                        ? 'Mode Tanpa Sinyal'
-                                        : 'Terhubung ke Server',
-                                    style: AppTypography.titleItem,
-                                  ),
-                                ),
-                                Text(
-                                  '$pendingCount antrean',
-                                  style: AppTypography.tabular(
-                                    AppTypography.bodyMedium,
-                                  ),
-                                ),
-                              ],
+                      const SizedBox(height: AppSpacing.xxl),
+                      const Divider(height: 1),
+                      const SizedBox(height: AppSpacing.xl),
+                      Text(
+                        'Sinkronisasi & Operasional',
+                        style: AppTypography.titleSection,
+                      ),
+                      const SizedBox(height: AppSpacing.md),
+                      Row(
+                        children: [
+                          Icon(
+                            isOffline
+                                ? Icons.cloud_off_rounded
+                                : Icons.cloud_done_rounded,
+                            size: 22,
+                            color: isOffline
+                                ? AppColors.infoFg
+                                : AppColors.primary,
+                          ),
+                          const SizedBox(width: AppSpacing.md),
+                          Expanded(
+                            child: Text(
+                              isOffline
+                                  ? 'Mode Tanpa Sinyal'
+                                  : 'Terhubung ke Server',
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: AppTypography.titleItem,
                             ),
-                            const SizedBox(height: AppSpacing.md),
-                            LacakSecondaryButton(
-                              label: 'Sinkronkan & Perbarui Sekarang',
-                              icon: Icons.sync_rounded,
-                              isLoading:
-                                  syncState.isSyncing ||
-                                  authState.busyAction ==
-                                      AuthBusyAction.refreshStatus,
-                              onPressed: anyBusy
-                                  ? null
-                                  : () async {
-                                      final report = await ref
-                                          .read(
-                                            offlineSyncControllerProvider
-                                                .notifier,
-                                          )
-                                          .syncNowWithReport();
-                                      final totalSynced = report.syncedCount;
-                                      if (totalSynced > 0) {
-                                        if (kitchen != null) {
-                                          invalidateKitchenProviders(ref);
-                                        }
-                                        if (school != null) {
-                                          invalidateSchoolProviders(ref);
-                                        }
-                                      }
-                                      final ok = await ref
-                                          .read(authControllerProvider.notifier)
-                                          .refreshStatus();
-                                      if (context.mounted) {
-                                        final syncFeedback =
-                                            report.remainingCount > 0 ||
-                                                totalSynced > 0
-                                            ? report.buildFeedbackMessage()
-                                            : (ok
-                                                  ? 'Status akun dan profil berhasil disinkronkan.'
-                                                  : (ref
-                                                            .read(
-                                                              authControllerProvider,
-                                                            )
-                                                            .errorMessage ??
-                                                        'Sinkronisasi belum berhasil.'));
-                                        ScaffoldMessenger.of(
-                                          context,
-                                        ).showSnackBar(
-                                          SnackBar(
-                                            content: Text(syncFeedback),
-                                            action: report.remainingCount > 0
-                                                ? SnackBarAction(
-                                                    label: 'Lihat Rincian',
-                                                    onPressed: () {
-                                                      if (context.mounted) {
-                                                        showPendingSyncQueueSheet(
-                                                          context,
-                                                          ref,
-                                                        );
-                                                      }
-                                                    },
-                                                  )
-                                                : null,
-                                          ),
-                                        );
-                                      }
-                                    },
-                            ),
-                            if (pendingCount > 0) ...[
-                              const SizedBox(height: AppSpacing.xs),
-                              Align(
-                                alignment: Alignment.centerLeft,
-                                child: TextButton.icon(
-                                  onPressed: () =>
-                                      showPendingSyncQueueSheet(context, ref),
-                                  icon: const Icon(
-                                    Icons.list_alt_rounded,
-                                    size: 18,
-                                  ),
-                                  label: Text(
-                                    'Lihat Rincian $pendingCount Data Belum Terkirim',
-                                  ),
-                                ),
+                          ),
+                          const SizedBox(width: AppSpacing.sm),
+                          Flexible(
+                            flex: 0,
+                            child: Text(
+                              '$pendingCount antrean',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: AppTypography.tabular(
+                                AppTypography.captionMuted,
                               ),
-                            ],
-                          ],
-                        ),
+                            ),
+                          ),
+                        ],
                       ),
+                      const SizedBox(height: AppSpacing.md),
+                      LacakSecondaryButton(
+                        label: 'Sinkronkan & Perbarui Sekarang',
+                        icon: Icons.sync_rounded,
+                        isLoading: syncState.isSyncing ||
+                            authState.busyAction ==
+                                AuthBusyAction.refreshStatus,
+                        onPressed: anyBusy
+                            ? null
+                            : () async {
+                                final report = await ref
+                                    .read(
+                                      offlineSyncControllerProvider.notifier,
+                                    )
+                                    .syncNowWithReport();
+                                final totalSynced = report.syncedCount;
+                                if (totalSynced > 0) {
+                                  if (kitchen != null) {
+                                    invalidateKitchenProviders(ref);
+                                  }
+                                  if (school != null) {
+                                    invalidateSchoolProviders(ref);
+                                  }
+                                }
+                                final ok = await ref
+                                    .read(authControllerProvider.notifier)
+                                    .refreshStatus();
+                                if (context.mounted) {
+                                  final syncFeedback =
+                                      report.remainingCount > 0 ||
+                                          totalSynced > 0
+                                      ? report.buildFeedbackMessage()
+                                      : (ok
+                                            ? 'Status akun dan profil berhasil disinkronkan.'
+                                            : (ref
+                                                      .read(
+                                                        authControllerProvider,
+                                                      )
+                                                      .errorMessage ??
+                                                  'Sinkronisasi belum berhasil.'));
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text(syncFeedback),
+                                      action: report.remainingCount > 0
+                                          ? SnackBarAction(
+                                              label: 'Lihat Rincian',
+                                              onPressed: () {
+                                                if (context.mounted) {
+                                                  showPendingSyncQueueSheet(
+                                                    context,
+                                                    ref,
+                                                  );
+                                                }
+                                              },
+                                            )
+                                          : null,
+                                    ),
+                                  );
+                                }
+                              },
+                      ),
+                      if (pendingCount > 0) ...[
+                        const SizedBox(height: AppSpacing.xs),
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: TextButton.icon(
+                            onPressed: () =>
+                                showPendingSyncQueueSheet(context, ref),
+                            icon: const Icon(Icons.list_alt_rounded, size: 18),
+                            label: Text(
+                              'Lihat Rincian $pendingCount Data Belum Terkirim',
+                            ),
+                          ),
+                        ),
+                      ],
                       if (school != null) ...[
-                        _SettingsRow(
+                        const SizedBox(height: AppSpacing.md),
+                        const Divider(height: 1),
+                        _FlatSettingsRow(
                           label: 'WhatsApp Puskesmas',
                           value: school.formattedPuskesmasWa,
                           tabular: true,
                         ),
-                        _SettingsRow(
+                        const Divider(height: 1),
+                        _FlatSettingsRow(
                           label: 'Kode Wilayah Kelurahan',
                           value: school.adm4Code,
                           tabular: true,
                         ),
-                        Padding(
-                          padding: const EdgeInsets.all(AppSpacing.lg),
-                          child: LacakSecondaryButton(
-                            label: 'Ubah WA Puskesmas & Wilayah',
-                            icon: Icons.edit_rounded,
-                            isLoading:
-                                authState.busyAction ==
-                                AuthBusyAction.updateSchoolSettings,
-                            onPressed: anyBusy
-                                ? null
-                                : () => _editSchoolSettings(
-                                    context,
-                                    ref,
-                                    school,
-                                  ),
-                          ),
+                        const Divider(height: 1),
+                        const SizedBox(height: AppSpacing.md),
+                        LacakSecondaryButton(
+                          label: 'Ubah WA Puskesmas & Wilayah',
+                          icon: Icons.edit_rounded,
+                          isLoading: authState.busyAction ==
+                              AuthBusyAction.updateSchoolSettings,
+                          onPressed: anyBusy
+                              ? null
+                              : () => _editSchoolSettings(
+                                  context,
+                                  ref,
+                                  school,
+                                ),
                         ),
                       ],
                       if (kitchen != null) ...[
-                        _SettingsRow(
+                        const SizedBox(height: AppSpacing.md),
+                        const Divider(height: 1),
+                        _FlatSettingsRow(
                           label: 'Kode Wilayah Kelurahan',
                           value: kitchen.adm4Code,
                           tabular: true,
                         ),
-                        _SettingsRow(
+                        const Divider(height: 1),
+                        _FlatSettingsRow(
                           label: 'Koordinat Dapur',
                           value:
                               '${kitchen.lat.toStringAsFixed(5)}, ${kitchen.lng.toStringAsFixed(5)}',
                           tabular: true,
                         ),
-                        Padding(
-                          padding: const EdgeInsets.all(AppSpacing.lg),
-                          child: LacakSecondaryButton(
-                            label: 'Perbarui Lokasi GPS Dapur',
-                            icon: Icons.location_on_rounded,
-                            isLoading:
-                                authState.busyAction ==
-                                AuthBusyAction.updateKitchenLocation,
-                            onPressed: anyBusy
-                                ? null
-                                : () => _updateKitchenGps(
-                                    context,
-                                    ref,
-                                    kitchen,
-                                  ),
-                          ),
+                        const Divider(height: 1),
+                        const SizedBox(height: AppSpacing.md),
+                        LacakSecondaryButton(
+                          label: 'Perbarui Lokasi GPS Dapur',
+                          icon: Icons.location_on_rounded,
+                          isLoading: authState.busyAction ==
+                              AuthBusyAction.updateKitchenLocation,
+                          onPressed: anyBusy
+                              ? null
+                              : () => _updateKitchenGps(
+                                  context,
+                                  ref,
+                                  kitchen,
+                                ),
                         ),
                       ],
+                      const SizedBox(height: AppSpacing.xxl),
+                      LacakDangerButton(
+                        label: 'Keluar Akun',
+                        icon: Icons.logout_rounded,
+                        isLoading: authState.busyAction == AuthBusyAction.signOut,
+                        onPressed: anyBusy
+                            ? null
+                            : () => _confirmSignOut(context, ref),
+                      ),
+                      const SizedBox(height: AppSpacing.xl),
+                      Text(
+                        '${AppConstants.appName} v${AppConstants.appVersion}',
+                        textAlign: TextAlign.center,
+                        style: AppTypography.tabular(
+                          AppTypography.captionMuted,
+                        ),
+                      ),
+                      const SizedBox(height: AppSpacing.xs),
+                      Text(
+                        AppConstants.bmkgFullAttribution,
+                        textAlign: TextAlign.center,
+                        style: AppTypography.captionLegal,
+                      ),
                     ],
                   ),
-                  const SizedBox(height: AppSpacing.xl),
-                  LacakDangerButton(
-                    label: 'Keluar Akun',
-                    icon: Icons.logout_rounded,
-                    isLoading: authState.busyAction == AuthBusyAction.signOut,
-                    onPressed: anyBusy
-                        ? null
-                        : () => _confirmSignOut(context, ref),
-                  ),
-                  const SizedBox(height: AppSpacing.lg),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TextScaleSegmentedChips extends StatelessWidget {
+  const _TextScaleSegmentedChips({
+    required this.selected,
+    required this.onChanged,
+  });
+
+  final ComfortableTextScale selected;
+  final ValueChanged<ComfortableTextScale> onChanged;
+
+  static const _options = [
+    (
+      value: ComfortableTextScale.standard,
+      label: 'Standar',
+      percent: '100%',
+    ),
+    (
+      value: ComfortableTextScale.large,
+      label: 'Besar',
+      percent: '115%',
+    ),
+    (
+      value: ComfortableTextScale.extraLarge,
+      label: 'Ekstra Besar',
+      percent: '130%',
+    ),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    final textScale = MediaQuery.textScalerOf(context).scale(14) / 14;
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final stackChips = constraints.maxWidth < 310 || textScale >= 1.25;
+        if (stackChips) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              for (var i = 0; i < _options.length; i++) ...[
+                if (i > 0) const SizedBox(height: AppSpacing.sm),
+                _ScaleChipTile(
+                  label: _options[i].label,
+                  percent: _options[i].percent,
+                  selected: selected == _options[i].value,
+                  onTap: () => onChanged(_options[i].value),
+                ),
+              ],
+            ],
+          );
+        }
+        return Row(
+          children: [
+            for (var i = 0; i < _options.length; i++) ...[
+              if (i > 0) const SizedBox(width: AppSpacing.sm),
+              Expanded(
+                child: _ScaleChipTile(
+                  label: _options[i].label,
+                  percent: _options[i].percent,
+                  selected: selected == _options[i].value,
+                  onTap: () => onChanged(_options[i].value),
+                ),
+              ),
+            ],
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _ScaleChipTile extends StatelessWidget {
+  const _ScaleChipTile({
+    required this.label,
+    required this.percent,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final String percent;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final bgColor = selected ? AppColors.primary : AppColors.surfaceSoft;
+    final fgColor = selected ? AppColors.onPrimary : AppColors.chipInactiveText;
+    final subColor = selected
+        ? AppColors.onPrimary.withValues(alpha: 0.88)
+        : AppColors.textSecondary;
+
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: '$label $percent',
+      child: Material(
+        color: bgColor,
+        borderRadius: BorderRadius.circular(AppSpacing.radiusChip),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(AppSpacing.radiusChip),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(
+              minHeight: AppSpacing.secondaryButtonMinHeight,
+            ),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.sm,
+                vertical: AppSpacing.sm,
+              ),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
                   Text(
-                    '${AppConstants.appName} v${AppConstants.appVersion}',
+                    label,
                     textAlign: TextAlign.center,
-                    style: AppTypography.tabular(
-                      AppTypography.labelTag.copyWith(
-                        color: AppColors.textSecondary,
-                      ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppTypography.labelTag.copyWith(
+                      color: fgColor,
+                      fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
                     ),
                   ),
-                  const SizedBox(height: AppSpacing.xs),
+                  const SizedBox(height: 2),
                   Text(
-                    AppConstants.bmkgFullAttribution,
+                    percent,
                     textAlign: TextAlign.center,
-                    style: AppTypography.captionLegal,
+                    style: AppTypography.tabular(
+                      AppTypography.captionLegal.copyWith(
+                        color: subColor,
+                        fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+                      ),
+                    ),
                   ),
                 ],
               ),
@@ -516,8 +677,8 @@ class SettingsScreen extends ConsumerWidget {
   }
 }
 
-class _SettingsRow extends StatelessWidget {
-  const _SettingsRow({
+class _FlatSettingsRow extends StatelessWidget {
+  const _FlatSettingsRow({
     required this.label,
     required this.value,
     this.tabular = false,
@@ -529,30 +690,44 @@ class _SettingsRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final textScale = MediaQuery.textScalerOf(context).scale(14) / 14;
+    final valueStyle = tabular
+        ? AppTypography.tabular(AppTypography.titleItem)
+        : AppTypography.titleItem;
+
     return Padding(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.lg,
-        vertical: AppSpacing.md,
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(
-            flex: 2,
-            child: Text(label, style: AppTypography.bodyMedium),
-          ),
-          const SizedBox(width: AppSpacing.md),
-          Expanded(
-            flex: 3,
-            child: Text(
-              value,
-              textAlign: TextAlign.right,
-              style: tabular
-                  ? AppTypography.tabular(AppTypography.titleItem)
-                  : AppTypography.titleItem,
-            ),
-          ),
-        ],
+      padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          if (constraints.maxWidth < 310 || textScale >= 1.25) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(label, style: AppTypography.captionMuted),
+                const SizedBox(height: 2),
+                Text(value, style: valueStyle),
+              ],
+            );
+          }
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                flex: 2,
+                child: Text(label, style: AppTypography.bodyMedium),
+              ),
+              const SizedBox(width: AppSpacing.md),
+              Expanded(
+                flex: 3,
+                child: Text(
+                  value,
+                  textAlign: TextAlign.right,
+                  style: valueStyle,
+                ),
+              ),
+            ],
+          );
+        },
       ),
     );
   }

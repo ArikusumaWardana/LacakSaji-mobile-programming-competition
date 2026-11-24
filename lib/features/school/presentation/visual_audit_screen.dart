@@ -8,16 +8,19 @@ import '../../../core/network/connectivity_provider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
+import '../../../core/widgets/editorial_widgets.dart';
 import '../../../core/widgets/lacak_buttons.dart';
 import '../../../core/widgets/lacak_feedback_states.dart';
-import '../../../core/widgets/lacak_section_surface.dart';
 import '../../../core/widgets/lacak_status_badge.dart';
 import '../../auth/presentation/auth_controller.dart';
 import '../data/hybrid_vision_service.dart';
+import '../domain/danger_zone_calculator.dart';
 import '../domain/school_models.dart';
 import 'school_providers.dart';
+import 'widgets/audit_detail_sections.dart';
 
-/// G04: Langkah 2 dari 3 - Hybrid Visual Organoleptic Audit (TFLite Isolate + Gemini Edge Function + 3-Tap Manual Checklist).
+/// G04: Langkah 2 dari 3 - Editorial Hybrid Visual Organoleptic Audit
+/// (FramedHeroHeader + Expandable summary + Partner contact + 4-slot Gallery + Borderless checklist + StickyBottomActionBar).
 class VisualAuditScreen extends ConsumerStatefulWidget {
   const VisualAuditScreen({super.key, this.scanContext});
 
@@ -237,248 +240,284 @@ class _VisualAuditScreenState extends ConsumerState<VisualAuditScreen> {
   @override
   Widget build(BuildContext context) {
     final ctx = widget.scanContext;
+    final school = ref.watch(authControllerProvider).school;
     final width = MediaQuery.sizeOf(context).width;
     final horizontalPad = AppSpacing.horizontalPadding(width);
     final maxWidth = AppSpacing.maxContentWidth(width);
 
+    if (ctx == null) {
+      return Scaffold(
+        backgroundColor: AppColors.bgCanvas,
+        body: SafeArea(
+          child: Padding(
+            padding: EdgeInsets.all(horizontalPad),
+            child: LacakErrorState(
+              title: 'Data pemeriksaan belum tersedia',
+              message:
+                  'Pindai ulang Kode QR makanan masuk dari Beranda Sekolah.',
+              onRetry: () => context.go(AppRoutes.schoolHome),
+              retryLabel: 'Kembali ke Beranda',
+            ),
+          ),
+        ),
+      );
+    }
+
+    final String footerStatusValue;
+    final Color footerStatusColor;
+    if (_hasManualAnomaly) {
+      footerStatusValue = 'Tahan Distribusi';
+      footerStatusColor = AppColors.dangerFg;
+    } else if (_allChecklistAnswered) {
+      footerStatusValue = 'Aman Dibagikan';
+      footerStatusColor = AppColors.safeFg;
+    } else {
+      footerStatusValue = 'Lengkapi Cek Manual';
+      footerStatusColor = AppColors.textSecondary;
+    }
+
+    final photoImage = _samplePhoto != null
+        ? MemoryImage(_samplePhoto!.bytes)
+        : null;
+
     return Scaffold(
       backgroundColor: AppColors.bgCanvas,
-      appBar: AppBar(title: const Text('Cek Kondisi Makanan')),
-      body: SafeArea(
-        child: ctx == null
-            ? Padding(
-                padding: EdgeInsets.all(horizontalPad),
-                child: LacakErrorState(
-                  title: 'Data pemeriksaan belum tersedia',
-                  message:
-                      'Pindai ulang Kode QR makanan masuk dari Beranda Sekolah.',
-                  onRetry: () => context.go(AppRoutes.schoolHome),
-                  retryLabel: 'Kembali ke Beranda',
-                ),
-              )
-            : Column(
-                children: [
-                  Expanded(
-                    child: SingleChildScrollView(
-                      padding: EdgeInsets.fromLTRB(
-                        horizontalPad,
-                        AppSpacing.lg,
-                        horizontalPad,
-                        AppSpacing.xxl,
-                      ),
-                      child: Center(
-                        child: ConstrainedBox(
-                          constraints: BoxConstraints(maxWidth: maxWidth),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              Text(
-                                'Langkah 2 dari 3: Cek Kondisi Makanan',
-                                style: AppTypography.titleSection,
-                              ),
-                              const SizedBox(height: AppSpacing.xs),
-                              Text(
-                                '${ctx.payload.menuName} · ${ctx.payload.batchCode}',
-                                style: AppTypography.tabular(
-                                  AppTypography.bodyMedium,
-                                ),
-                              ),
-                              const SizedBox(height: AppSpacing.lg),
-                              Container(
-                                constraints: _samplePhoto == null
-                                    ? const BoxConstraints(minHeight: 152)
-                                    : const BoxConstraints(
-                                        minHeight: 152,
-                                        maxHeight: 220,
-                                      ),
-                                decoration: BoxDecoration(
-                                  color: AppColors.surfaceSubtle,
-                                  borderRadius: BorderRadius.circular(
-                                    AppSpacing.radiusControl,
-                                  ),
-                                  border: Border.all(
-                                    color: AppColors.borderHairline,
-                                    width: 1,
-                                  ),
-                                ),
-                                clipBehavior: Clip.antiAlias,
-                                child: _samplePhoto == null
-                                    ? Padding(
-                                        padding: const EdgeInsets.all(
-                                          AppSpacing.lg,
-                                        ),
-                                        child: Column(
-                                          mainAxisAlignment:
-                                              MainAxisAlignment.center,
-                                          children: [
-                                            const Icon(
-                                              Icons.photo_camera_rounded,
-                                              size: 36,
-                                              color: AppColors.textSecondary,
-                                            ),
-                                            const SizedBox(
-                                              height: AppSpacing.sm,
-                                            ),
-                                            Text(
-                                              'Potret 1 Porsi Sampel Makanan',
-                                              textAlign: TextAlign.center,
-                                              style: AppTypography.titleItem,
-                                            ),
-                                            const SizedBox(
-                                              height: AppSpacing.xs,
-                                            ),
-                                            Text(
-                                              'Gunakan kamera langsung untuk pra-skrining visual cepat dan bukti inspeksi sekolah.',
-                                              textAlign: TextAlign.center,
-                                              style: AppTypography.bodyMedium,
-                                            ),
-                                          ],
-                                        ),
-                                      )
-                                    : Image.memory(
-                                        _samplePhoto!.bytes,
-                                        fit: BoxFit.cover,
-                                        width: double.infinity,
-                                      ),
-                              ),
-                              const SizedBox(height: AppSpacing.md),
-                              LacakSecondaryButton(
-                                label: _samplePhoto == null
-                                    ? 'Ambil Foto Sampel'
-                                    : 'Foto Ulang',
-                                icon: Icons.photo_camera_rounded,
-                                isLoading: _capturing,
-                                onPressed: () => _captureSamplePhoto(ctx),
-                              ),
-                              if (_samplePhoto != null) ...[
-                                const SizedBox(height: AppSpacing.lg),
-                                Text(
-                                  'Hasil Pemeriksaan Foto',
-                                  style: AppTypography.titleSection,
-                                ),
-                                const SizedBox(height: AppSpacing.sm),
-                                _UnifiedPhotoAuditCard(
-                                  isRunningOnDevice: _runningOnDevice,
-                                  isRunningCloud: _runningCloud,
-                                  onDeviceResult: _onDeviceResult,
-                                  cloudResult: _cloudResult,
-                                  onSkipCloud: _skipCloudAndUseManual,
-                                ),
-                              ],
-                              const SizedBox(height: AppSpacing.xl),
-                              Text(
-                                'Pemeriksaan Manual Kondisi Makanan (Wajib)',
-                                style: AppTypography.titleSection,
-                              ),
-                              const SizedBox(height: AppSpacing.sm),
-                              LacakSectionSurface.separated(
+      body: Column(
+        children: [
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.only(bottom: AppSpacing.xxl),
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(
+                    maxWidth: maxWidth == double.infinity
+                        ? double.infinity
+                        : maxWidth + horizontalPad * 2,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      SafeArea(
+                        bottom: false,
+                        child: Padding(
+                          padding: const EdgeInsets.only(top: AppSpacing.sm),
+                          child: FramedHeroHeader(
+                            height: 252,
+                            image: photoImage,
+                            imagePlaceholder: Container(
+                              color: AppColors.primaryTint,
+                              alignment: Alignment.center,
+                              padding: const EdgeInsets.only(bottom: 44),
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
-                                  _ManualCheckQuestionRow(
-                                    question: '1. Bau Makanan',
-                                    safeLabel: 'Bau Normal',
-                                    issueLabel: 'Asam / Basi',
-                                    value: _smellOk,
-                                    onSelect: (val) => setState(() {
-                                      _smellOk = val;
-                                      _validationError = null;
-                                    }),
+                                  const Icon(
+                                    Icons.photo_camera_rounded,
+                                    size: 48,
+                                    color: AppColors.primary,
                                   ),
-                                  _ManualCheckQuestionRow(
-                                    question: '2. Tampilan & Lendir',
-                                    safeLabel: 'Tampak Segar',
-                                    issueLabel: 'Berlendir / Berubah Warna',
-                                    value: _visualOk,
-                                    onSelect: (val) => setState(() {
-                                      _visualOk = val;
-                                      _validationError = null;
-                                    }),
-                                  ),
-                                  _ManualCheckQuestionRow(
-                                    question: '3. Kemasan / Susu',
-                                    safeLabel: 'Kemasan Utuh',
-                                    issueLabel: 'Menggembung / Bocor',
-                                    value: _packOk,
-                                    onSelect: (val) => setState(() {
-                                      _packOk = val;
-                                      _validationError = null;
-                                    }),
+                                  const SizedBox(height: AppSpacing.xs),
+                                  Text(
+                                    'Potret 1 porsi sampel makanan',
+                                    style: AppTypography.labelTag.copyWith(
+                                      color: AppColors.onPrimaryTint,
+                                      fontWeight: FontWeight.w600,
+                                    ),
                                   ),
                                 ],
                               ),
-                              if (_validationError != null) ...[
-                                const SizedBox(height: AppSpacing.md),
-                                Row(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    const Icon(
-                                      Icons.error_outline_rounded,
-                                      size: 20,
-                                      color: AppColors.dangerFg,
-                                    ),
-                                    const SizedBox(width: AppSpacing.xs),
-                                    Expanded(
-                                      child: Text(
-                                        _validationError!,
-                                        style: AppTypography.bodyMedium
-                                            .copyWith(
-                                              color: AppColors.dangerFg,
-                                              fontWeight: FontWeight.w500,
-                                            ),
-                                      ),
-                                    ),
-                                  ],
+                            ),
+                            onBackTap: () => Navigator.of(context).maybePop(),
+                            actionIcon: Icons.photo_camera_rounded,
+                            actionTooltip: 'Ambil Foto Sampel',
+                            onActionTap: () => _captureSamplePhoto(ctx),
+                            title: ctx.payload.menuName,
+                            subtitle:
+                                'Langkah 2 dari 3 · ${ctx.payload.batchCode}',
+                            metrics: [
+                              HeroMetricItem(
+                                icon: Icons.schedule_rounded,
+                                label: formatDurationMinutes(
+                                  ctx.dangerEvaluation.elapsedMinutes,
                                 ),
-                              ],
+                              ),
+                              HeroMetricItem(
+                                icon: Icons.thermostat_rounded,
+                                label: ctx.weather.formattedTemperature,
+                              ),
                             ],
                           ),
                         ),
                       ),
-                    ),
-                  ),
-                  Container(
-                    decoration: const BoxDecoration(
-                      color: AppColors.surfaceBase,
-                      border: Border(
-                        top: BorderSide(
-                          color: AppColors.borderHairline,
-                          width: 1,
+                      Padding(
+                        padding: EdgeInsets.fromLTRB(
+                          horizontalPad,
+                          AppSpacing.lg,
+                          horizontalPad,
+                          0,
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            LacakSecondaryButton(
+                              label: _samplePhoto == null
+                                  ? 'Ambil Foto Sampel'
+                                  : 'Foto Ulang Sampel',
+                              icon: Icons.photo_camera_rounded,
+                              isLoading: _capturing,
+                              onPressed: () => _captureSamplePhoto(ctx),
+                            ),
+                            const SizedBox(height: AppSpacing.xl),
+                            if (_samplePhoto != null) ...[
+                              _UnifiedPhotoAuditSummary(
+                                isRunningOnDevice: _runningOnDevice,
+                                isRunningCloud: _runningCloud,
+                                onDeviceResult: _onDeviceResult,
+                                cloudResult: _cloudResult,
+                                onSkipCloud: _skipCloudAndUseManual,
+                              ),
+                              const SizedBox(height: AppSpacing.xl),
+                            ] else ...[
+                              ExpandableAuditSummary(
+                                title: 'Ringkasan Pemeriksaan',
+                                text:
+                                    'Ambil foto 1 porsi makanan menggunakan kamera langsung untuk menjalankan pemeriksaan cepat di HP dan verifikasi AI. Lengkapi 3 pengecekan bau, tampilan, dan kemasan di bawah.',
+                              ),
+                              const SizedBox(height: AppSpacing.lg),
+                            ],
+                            const Divider(height: 1),
+                            const SizedBox(height: AppSpacing.lg),
+                            PartnerContactRow(
+                              name: ctx.sppgName,
+                              roleLabel: 'Dapur SPPG Mitra · PIC Pengiriman',
+                              phoneOrWaNumber: school?.puskesmasWa,
+                              copyFallbackCode: school?.partnerInviteCode,
+                              waPrefillMessage:
+                                  'Laporan audit organoleptik batch ${ctx.payload.batchCode} (${ctx.payload.menuName}) di ${school?.name ?? 'Sekolah'}.',
+                            ),
+                            const SizedBox(height: AppSpacing.xl),
+                            AuditEvidenceGallery(
+                              title: 'Galeri Bukti Audit',
+                              slots: [
+                                AuditGallerySlot(
+                                  label: 'Sampel',
+                                  fallbackIcon: Icons.photo_camera_rounded,
+                                  image: photoImage,
+                                  active: _samplePhoto != null,
+                                ),
+                                const AuditGallerySlot(
+                                  label: 'Segel QR',
+                                  fallbackIcon: Icons.qr_code_2_rounded,
+                                  active: true,
+                                ),
+                                const AuditGallerySlot(
+                                  label: 'Suhu BMKG',
+                                  fallbackIcon: Icons.thermostat_rounded,
+                                  active: true,
+                                ),
+                                AuditGallerySlot(
+                                  label: 'Kulkas 48j',
+                                  fallbackIcon: Icons.kitchen_rounded,
+                                  active: _allChecklistAnswered &&
+                                      !_hasManualAnomaly,
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: AppSpacing.xl),
+                            const Divider(height: 1),
+                            const SizedBox(height: AppSpacing.lg),
+                            Text(
+                              'Checklist Organoleptik Manual (Wajib)',
+                              style: AppTypography.titleSection,
+                            ),
+                            const SizedBox(height: AppSpacing.xs),
+                            _ManualCheckQuestionRow(
+                              question: '1. Bau Makanan',
+                              safeLabel: 'Bau Normal',
+                              issueLabel: 'Asam / Basi',
+                              value: _smellOk,
+                              onSelect: (val) => setState(() {
+                                _smellOk = val;
+                                _validationError = null;
+                              }),
+                            ),
+                            const Divider(height: 1),
+                            _ManualCheckQuestionRow(
+                              question: '2. Tampilan & Lendir',
+                              safeLabel: 'Tampak Segar',
+                              issueLabel: 'Berlendir / Berubah Warna',
+                              value: _visualOk,
+                              onSelect: (val) => setState(() {
+                                _visualOk = val;
+                                _validationError = null;
+                              }),
+                            ),
+                            const Divider(height: 1),
+                            _ManualCheckQuestionRow(
+                              question: '3. Kemasan / Susu',
+                              safeLabel: 'Kemasan Utuh',
+                              issueLabel: 'Menggembung / Bocor',
+                              value: _packOk,
+                              onSelect: (val) => setState(() {
+                                _packOk = val;
+                                _validationError = null;
+                              }),
+                            ),
+                            const Divider(height: 1),
+                            if (_validationError != null) ...[
+                              const SizedBox(height: AppSpacing.md),
+                              Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Icon(
+                                    Icons.error_outline_rounded,
+                                    size: 20,
+                                    color: AppColors.dangerFg,
+                                  ),
+                                  const SizedBox(width: AppSpacing.xs),
+                                  Expanded(
+                                    child: Text(
+                                      _validationError!,
+                                      style: AppTypography.bodyMedium.copyWith(
+                                        color: AppColors.dangerFg,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ],
                         ),
                       ),
-                    ),
-                    padding: EdgeInsets.fromLTRB(
-                      horizontalPad,
-                      AppSpacing.md,
-                      horizontalPad,
-                      AppSpacing.md,
-                    ),
-                    child: Center(
-                      child: ConstrainedBox(
-                        constraints: BoxConstraints(maxWidth: maxWidth),
-                        child: _hasManualAnomaly
-                            ? LacakDangerButton(
-                                label:
-                                    'Temukan Masalah, Hentikan & Laporkan',
-                                isLoading: _submitting,
-                                onPressed: () => _submitDecision(ctx),
-                              )
-                            : LacakPrimaryButton(
-                                label: 'Makanan Aman, Lanjut Simpan Sampel',
-                                icon: Icons.kitchen_rounded,
-                                isLoading: _submitting,
-                                onPressed: () => _submitDecision(ctx),
-                              ),
-                      ),
-                    ),
+                    ],
                   ),
-                ],
+                ),
               ),
+            ),
+          ),
+          StickyBottomActionBar(
+            summaryLabel: 'Status Akhir',
+            summaryValue: footerStatusValue,
+            summaryValueColor: footerStatusColor,
+            ctaLabel:
+                _hasManualAnomaly ? 'Hentikan & Lapor' : 'Simpan & Lanjut',
+            ctaIcon: _hasManualAnomaly
+                ? Icons.notification_important_rounded
+                : Icons.kitchen_rounded,
+            ctaColor:
+                _hasManualAnomaly ? AppColors.emergencyBg : AppColors.primary,
+            isLoading: _submitting,
+            onCtaPressed: () => _submitDecision(ctx),
+          ),
+        ],
       ),
     );
   }
 }
 
-class _UnifiedPhotoAuditCard extends StatelessWidget {
-  const _UnifiedPhotoAuditCard({
+class _UnifiedPhotoAuditSummary extends StatelessWidget {
+  const _UnifiedPhotoAuditSummary({
     required this.isRunningOnDevice,
     required this.isRunningCloud,
     required this.onDeviceResult,
@@ -534,13 +573,9 @@ class _UnifiedPhotoAuditCard extends StatelessWidget {
           : LacakStatusLevel.warning;
       final statusTitle = isPack
           ? 'PERLU CEK KEMASAN'
-          : (isHighRisk
-                ? 'TERINDIKASI TIDAK LAYAK'
-                : 'PERLU PERIKSA KETAT');
+          : (isHighRisk ? 'TERINDIKASI TIDAK LAYAK' : 'PERLU PERIKSA KETAT');
       final badgeLabel = (isPack || isHighRisk) ? 'BAHAYA' : 'PERHATIAN';
-      final summary = cloudFlagged
-          ? cloud.summaryText
-          : local.summaryText;
+      final summary = cloudFlagged ? cloud.summaryText : local.summaryText;
       return (
         level: level,
         statusTitle: statusTitle,
@@ -565,7 +600,6 @@ class _UnifiedPhotoAuditCard extends StatelessWidget {
       );
     }
 
-    // Offline mode keeps local quick-check verdict; online server failure never claims WAJAR falsely.
     final isOfflineFallback = cloud == null || cloud.provider == 'offline_mode';
     if (isOfflineFallback) {
       return (
@@ -628,13 +662,7 @@ class _UnifiedPhotoAuditCard extends StatelessWidget {
       LacakStatusLevel.danger => AppColors.dangerBg,
       LacakStatusLevel.warning => AppColors.warnBg,
       LacakStatusLevel.offline => AppColors.infoBg,
-      _ => AppColors.surfaceBase,
-    };
-    final borderColor = switch (verdict.level) {
-      LacakStatusLevel.danger => AppColors.dangerBorder,
-      LacakStatusLevel.warning => AppColors.warnBorder,
-      LacakStatusLevel.offline => AppColors.infoBorder,
-      _ => AppColors.borderHairline,
+      _ => AppColors.surfaceSoft,
     };
     final titleColor = switch (verdict.level) {
       LacakStatusLevel.danger => AppColors.dangerFg,
@@ -643,164 +671,145 @@ class _UnifiedPhotoAuditCard extends StatelessWidget {
       _ => AppColors.textPrimary,
     };
 
-    return Container(
-      padding: const EdgeInsets.all(AppSpacing.lg),
-      decoration: BoxDecoration(
-        color: bgColor,
-        borderRadius: BorderRadius.circular(AppSpacing.radiusSurface),
-        border: Border.all(
-          color: borderColor,
-          width: isWarningOrDanger ? 1.5 : 1,
-        ),
-      ),
-      child: Column(
+    Widget? detailsWidget;
+    if (!isRunningCloud &&
+        cloudResult != null &&
+        cloudResult!.ok &&
+        _hasComponentDetails(cloudResult!)) {
+      detailsWidget = Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Wrap(
-            spacing: AppSpacing.sm,
-            runSpacing: AppSpacing.xs,
-            alignment: WrapAlignment.spaceBetween,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            children: [
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    isWarningOrDanger
-                        ? Icons.warning_amber_rounded
-                        : Icons.fact_check_rounded,
-                    size: 20,
-                    color: titleColor,
-                  ),
-                  const SizedBox(width: AppSpacing.sm),
-                  Flexible(
-                    child: Text(
-                      verdict.statusTitle,
-                      style: AppTypography.titleItem.copyWith(
-                        color: titleColor,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              if (!isRunningOnDevice && !isRunningCloud && onDeviceResult != null)
-                LacakStatusTag(
-                  level: verdict.level,
-                  label: verdict.badgeLabel,
-                ),
-            ],
-          ),
-          const SizedBox(height: AppSpacing.sm),
-          if (isRunningOnDevice) ...[
-            const LinearProgressIndicator(
-              color: AppColors.primary,
-              backgroundColor: AppColors.surfaceSubtle,
-              minHeight: 3,
+          if ((cloudResult!.riceCheck ?? '').isNotEmpty)
+            _ComponentCheckBullet(
+              label: 'Nasi',
+              detail: cloudResult!.riceCheck!,
             ),
+          if ((cloudResult!.vegetableCheck ?? '').isNotEmpty)
+            _ComponentCheckBullet(
+              label: 'Sayur',
+              detail: cloudResult!.vegetableCheck!,
+            ),
+          if ((cloudResult!.proteinCheck ?? '').isNotEmpty)
+            _ComponentCheckBullet(
+              label: 'Lauk',
+              detail: cloudResult!.proteinCheck!,
+            ),
+          if ((cloudResult!.fruitAndPackCheck ?? '').isNotEmpty)
+            _ComponentCheckBullet(
+              label: 'Buah & Kemasan',
+              detail: cloudResult!.fruitAndPackCheck!,
+            ),
+          if (cloudResult!.anomaliesFound.isNotEmpty)
+            _ComponentCheckBullet(
+              label: 'Temuan Utama',
+              detail: cloudResult!.anomaliesFound.join('; '),
+            ),
+          if (verdict.helperNote != null &&
+              verdict.helperNote != verdict.summary) ...[
             const SizedBox(height: AppSpacing.xs),
-            Text(
-              'Memeriksa kondisi makanan dari foto...',
-              style: AppTypography.bodyMedium,
-            ),
-          ] else ...[
-            Text(
-              verdict.summary,
-              style: AppTypography.bodyLarge.copyWith(
-                color: AppColors.textPrimary,
-              ),
-            ),
-            if (!isRunningCloud &&
-                cloudResult != null &&
-                cloudResult!.ok &&
-                _hasComponentDetails(cloudResult!)) ...[
-              const SizedBox(height: AppSpacing.md),
-              Container(
-                padding: const EdgeInsets.all(AppSpacing.md),
-                decoration: BoxDecoration(
-                  color: AppColors.surfaceBase,
-                  borderRadius: BorderRadius.circular(
-                    AppSpacing.radiusControl,
-                  ),
-                  border: Border.all(
-                    color: AppColors.borderHairline,
-                    width: 1,
-                  ),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Text(
-                      'Rincian Pemeriksaan AI per Komponen',
-                      style: AppTypography.labelTag.copyWith(
-                        color: AppColors.textSecondary,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    const SizedBox(height: AppSpacing.xs),
-                    if ((cloudResult!.riceCheck ?? '').isNotEmpty)
-                      _ComponentCheckBullet(
-                        label: 'Nasi',
-                        detail: cloudResult!.riceCheck!,
-                      ),
-                    if ((cloudResult!.vegetableCheck ?? '').isNotEmpty)
-                      _ComponentCheckBullet(
-                        label: 'Sayur',
-                        detail: cloudResult!.vegetableCheck!,
-                      ),
-                    if ((cloudResult!.proteinCheck ?? '').isNotEmpty)
-                      _ComponentCheckBullet(
-                        label: 'Lauk',
-                        detail: cloudResult!.proteinCheck!,
-                      ),
-                    if ((cloudResult!.fruitAndPackCheck ?? '').isNotEmpty)
-                      _ComponentCheckBullet(
-                        label: 'Buah & Kemasan',
-                        detail: cloudResult!.fruitAndPackCheck!,
-                      ),
-                    if (cloudResult!.anomaliesFound.isNotEmpty) ...[
-                      const SizedBox(height: AppSpacing.sm),
-                      _ComponentCheckBullet(
-                        label: 'Temuan Utama',
-                        detail: cloudResult!.anomaliesFound.join('; '),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-            ],
-            if (isRunningCloud) ...[
-              const SizedBox(height: AppSpacing.md),
-              const LinearProgressIndicator(
-                color: AppColors.primary,
-                backgroundColor: AppColors.surfaceSubtle,
-                minHeight: 3,
-              ),
-              const SizedBox(height: AppSpacing.xs),
-              Text(
-                'Menyempurnakan pemeriksaan lanjutan...',
-                style: AppTypography.captionLegal.copyWith(
-                  color: AppColors.textSecondary,
-                ),
-              ),
-              const SizedBox(height: AppSpacing.md),
-              LacakSecondaryButton(
-                label: 'Lewati & Gunakan Cek Manual',
-                onPressed: onSkipCloud,
-              ),
-            ] else if (verdict.helperNote != null &&
-                verdict.helperNote != verdict.summary) ...[
-              const SizedBox(height: AppSpacing.xs),
-              Text(
-                verdict.helperNote!,
-                style: AppTypography.captionLegal.copyWith(
-                  color: AppColors.textSecondary,
-                ),
-              ),
-            ],
+            Text(verdict.helperNote!, style: AppTypography.captionMuted),
           ],
         ],
-      ),
+      );
+    } else if (verdict.helperNote != null &&
+        verdict.helperNote != verdict.summary) {
+      detailsWidget = Text(
+        verdict.helperNote!,
+        style: AppTypography.captionMuted,
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Container(
+          padding: const EdgeInsets.all(AppSpacing.lg),
+          decoration: BoxDecoration(
+            color: bgColor,
+            borderRadius: BorderRadius.circular(AppSpacing.radiusSurface),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Wrap(
+                spacing: AppSpacing.sm,
+                runSpacing: AppSpacing.xs,
+                alignment: WrapAlignment.spaceBetween,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        isWarningOrDanger
+                            ? Icons.warning_amber_rounded
+                            : Icons.fact_check_rounded,
+                        size: 20,
+                        color: titleColor,
+                      ),
+                      const SizedBox(width: AppSpacing.sm),
+                      Flexible(
+                        child: Text(
+                          verdict.statusTitle,
+                          style: AppTypography.titleItem.copyWith(
+                            color: titleColor,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (!isRunningOnDevice &&
+                      !isRunningCloud &&
+                      onDeviceResult != null)
+                    LacakStatusTag(
+                      level: verdict.level,
+                      label: verdict.badgeLabel,
+                    ),
+                ],
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              if (isRunningOnDevice) ...[
+                const LinearProgressIndicator(
+                  color: AppColors.primary,
+                  backgroundColor: AppColors.surfaceBase,
+                  minHeight: 3,
+                ),
+                const SizedBox(height: AppSpacing.xs),
+                Text(
+                  'Memeriksa kondisi makanan dari foto...',
+                  style: AppTypography.bodyMedium,
+                ),
+              ] else ...[
+                ExpandableAuditSummary(
+                  title: 'Ringkasan Pemeriksaan',
+                  text: verdict.summary,
+                  collapsedMaxLines: 3,
+                  extraDetails: detailsWidget,
+                ),
+                if (isRunningCloud) ...[
+                  const SizedBox(height: AppSpacing.md),
+                  const LinearProgressIndicator(
+                    color: AppColors.primary,
+                    backgroundColor: AppColors.surfaceBase,
+                    minHeight: 3,
+                  ),
+                  const SizedBox(height: AppSpacing.xs),
+                  Text(
+                    'Menyempurnakan pemeriksaan lanjutan...',
+                    style: AppTypography.captionMuted,
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                  LacakSecondaryButton(
+                    label: 'Lewati & Gunakan Cek Manual',
+                    onPressed: onSkipCloud,
+                  ),
+                ],
+              ],
+            ],
+          ),
+        ),
+      ],
     );
   }
 }
@@ -856,25 +865,50 @@ class _ManualCheckQuestionRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final textScale = MediaQuery.textScalerOf(context).scale(14) / 14;
     return Padding(
-      padding: const EdgeInsets.all(AppSpacing.lg),
+      padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text(question, style: AppTypography.titleItem),
           const SizedBox(height: AppSpacing.sm),
-          _ChecklistChoiceButton(
-            label: safeLabel,
-            selected: value == true,
-            isIssue: false,
-            onTap: () => onSelect(true),
-          ),
-          const SizedBox(height: AppSpacing.sm),
-          _ChecklistChoiceButton(
-            label: issueLabel,
-            selected: value == false,
-            isIssue: true,
-            onTap: () => onSelect(false),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final stack = constraints.maxWidth < 320 || textScale >= 1.25;
+              final safeChip = _ChecklistToggleChip(
+                label: safeLabel,
+                selected: value == true,
+                isIssue: false,
+                onTap: () => onSelect(true),
+              );
+              final issueChip = _ChecklistToggleChip(
+                label: issueLabel,
+                selected: value == false,
+                isIssue: true,
+                onTap: () => onSelect(false),
+              );
+              if (stack) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    safeChip,
+                    const SizedBox(height: AppSpacing.sm),
+                    issueChip,
+                  ],
+                );
+              }
+              return IntrinsicHeight(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Expanded(child: safeChip),
+                    const SizedBox(width: AppSpacing.sm),
+                    Expanded(child: issueChip),
+                  ],
+                ),
+              );
+            },
           ),
         ],
       ),
@@ -882,8 +916,8 @@ class _ManualCheckQuestionRow extends StatelessWidget {
   }
 }
 
-class _ChecklistChoiceButton extends StatelessWidget {
-  const _ChecklistChoiceButton({
+class _ChecklistToggleChip extends StatelessWidget {
+  const _ChecklistToggleChip({
     required this.label,
     required this.selected,
     required this.isIssue,
@@ -898,55 +932,55 @@ class _ChecklistChoiceButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final bgColor = selected
-        ? (isIssue ? AppColors.dangerBg : AppColors.primaryTint)
-        : AppColors.surfaceBase;
-    final borderColor = selected
-        ? (isIssue ? AppColors.dangerFg : AppColors.primary)
-        : AppColors.borderHairline;
-    final fgColor = selected
-        ? (isIssue ? AppColors.dangerFg : AppColors.onPrimaryTint)
-        : AppColors.textPrimary;
+        ? (isIssue ? AppColors.emergencyBg : AppColors.primary)
+        : AppColors.surfaceSoft;
+    final fgColor = selected ? AppColors.onPrimary : AppColors.chipInactiveText;
 
-    return Material(
-      color: bgColor,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(AppSpacing.radiusControl),
-        side: BorderSide(color: borderColor, width: selected ? 2 : 1),
-      ),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(AppSpacing.radiusControl),
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(minHeight: 52),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(
-              horizontal: AppSpacing.md,
-              vertical: AppSpacing.md,
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: label,
+      child: Material(
+        color: bgColor,
+        borderRadius: BorderRadius.circular(AppSpacing.radiusChip),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(AppSpacing.radiusChip),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(
+              minHeight: AppSpacing.minTouchTarget,
             ),
-            child: Row(
-              children: [
-                Icon(
-                  selected
-                      ? (isIssue
-                            ? Icons.dangerous_rounded
-                            : Icons.check_circle_rounded)
-                      : Icons.radio_button_unchecked_rounded,
-                  size: 22,
-                  color: selected ? fgColor : AppColors.textMuted,
-                ),
-                const SizedBox(width: AppSpacing.md),
-                Expanded(
-                  child: Text(
-                    label,
-                    textAlign: TextAlign.left,
-                    style: AppTypography.labelButton.copyWith(
-                      color: fgColor,
-                      fontWeight:
-                          selected ? FontWeight.w700 : FontWeight.w600,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.md,
+                vertical: AppSpacing.sm,
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    selected
+                        ? (isIssue
+                              ? Icons.dangerous_rounded
+                              : Icons.check_circle_rounded)
+                        : Icons.radio_button_unchecked_rounded,
+                    size: 19,
+                    color: fgColor,
+                  ),
+                  const SizedBox(width: AppSpacing.sm),
+                  Expanded(
+                    child: Text(
+                      label,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppTypography.labelTag.copyWith(
+                        color: fgColor,
+                        fontWeight:
+                            selected ? FontWeight.w700 : FontWeight.w600,
+                      ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),

@@ -9,16 +9,12 @@ import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/widgets/lacak_buttons.dart';
 import '../../../core/widgets/lacak_logo.dart';
-import '../../../core/widgets/lacak_section_surface.dart';
 import '../../../core/widgets/lacak_status_badge.dart';
 import '../../../core/widgets/lacak_text_field.dart';
 import '../domain/auth_models.dart';
 import 'auth_controller.dart';
 
-/// S02: Centered focal login screen modeled after the user's reference layout
-/// (top bar with help button, centered hero emblem on subtle halo, centered headline & subtitle,
-/// open-canvas email/password inputs with live valid-check indicator, primary CTA,
-/// side-by-side quick demo buttons, and underlined registration link) using DESIGN.md 90-8-2 tokens.
+/// S02: Editorial open-canvas login screen with soft-filled inputs and separated Quick Demo access.
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
 
@@ -76,7 +72,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       backgroundColor: AppColors.bgCanvas,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(
-          top: Radius.circular(AppSpacing.radiusSurface),
+          top: Radius.circular(AppSpacing.radiusHero),
         ),
       ),
       builder: (sheetContext) => _QuickDemoSheet(filterKitchen: filterKitchen),
@@ -112,7 +108,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 ),
                 const SizedBox(height: AppSpacing.sm),
                 Text(
-                  '3. Uji Coba Cepat: Gunakan tombol Masuk Cepat (Akun Demo) untuk mencoba seluruh fitur Dapur, Sekolah, atau Pengawas secara langsung.',
+                  '3. Uji Coba Cepat: Gunakan tombol Masuk Cepat - Akun Demo di bagian bawah untuk mencoba fitur Dapur, Sekolah, atau Pengawas.',
                   style: AppTypography.bodyMedium.copyWith(
                     color: AppColors.textPrimary,
                   ),
@@ -156,34 +152,26 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    // 1. Minimal top header bar (centered "LacakSaji" title + help button on the right)
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const SizedBox(
-                          width: AppSpacing.minTouchTarget,
-                          height: AppSpacing.minTouchTarget,
-                        ),
-                        Expanded(
-                          child: Text(
-                            'LacakSaji',
-                            textAlign: TextAlign.center,
-                            style: AppTypography.titleItem.copyWith(
-                              color: AppColors.textPrimary,
-                              fontWeight: FontWeight.w600,
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const LacakLogoMark(size: 32),
+                            const SizedBox(width: AppSpacing.sm),
+                            Text(
+                              'LacakSaji',
+                              style: AppTypography.titleSection.copyWith(
+                                fontWeight: FontWeight.w700,
+                              ),
                             ),
-                          ),
+                          ],
                         ),
                         Material(
-                          color: AppColors.surfaceBase,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(
-                              AppSpacing.radiusSurface,
-                            ),
-                            side: const BorderSide(
-                              color: AppColors.borderHairline,
-                              width: 1,
-                            ),
+                          color: AppColors.surfaceSoft,
+                          borderRadius: BorderRadius.circular(
+                            AppSpacing.radiusInput,
                           ),
                           child: IconButton(
                             onPressed: _showLoginGuideDialog,
@@ -201,58 +189,17 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         ),
                       ],
                     ),
-                    const SizedBox(height: AppSpacing.xl),
-
-                    // 2. Centered focal hero emblem with layered tonal pine halo
-                    Center(
-                      child: Container(
-                        width: 120,
-                        height: 120,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: AppColors.primaryTint.withValues(alpha: 0.55),
-                          border: Border.all(
-                            color: AppColors.borderHairline,
-                            width: 1,
-                          ),
-                        ),
-                        alignment: Alignment.center,
-                        child: Container(
-                          width: 88,
-                          height: 88,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: AppColors.primaryTint,
-                            border: Border.all(
-                              color: AppColors.primary.withValues(alpha: 0.18),
-                              width: 1,
-                            ),
-                          ),
-                          alignment: Alignment.center,
-                          child: const LacakLogoMark(size: 56),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: AppSpacing.xl),
-
-                    // 3. Centered bold welcome title & subtitle
+                    const SizedBox(height: AppSpacing.xxxl),
                     Text(
-                      'Masuk LacakSaji',
-                      textAlign: TextAlign.center,
-                      style: AppTypography.displayStatus.copyWith(
-                        fontSize: 26,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: -0.3,
-                      ),
+                      'Masuk Akun',
+                      style: AppTypography.displayStatus,
                     ),
                     const SizedBox(height: AppSpacing.xs),
                     Text(
-                      'Masuk untuk memantau segel waktu-suhu dan kelayakan pangan Makan Bergizi Gratis.',
-                      textAlign: TextAlign.center,
+                      'Pantau segel waktu-suhu dan kelayakan pangan Makan Bergizi Gratis.',
                       style: AppTypography.bodyMedium,
                     ),
-                    const SizedBox(height: AppSpacing.xl),
-
+                    const SizedBox(height: AppSpacing.xxl),
                     if (authState.errorMessage != null) ...[
                       LacakStatusBanner(
                         level: LacakStatusLevel.danger,
@@ -261,8 +208,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       ),
                       const SizedBox(height: AppSpacing.lg),
                     ],
-
-                    // 4. Clean open-canvas inputs with email check indicator and password visibility toggle
                     LacakTextField(
                       label: 'Email',
                       controller: _emailController,
@@ -272,7 +217,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       prefixIcon: Icons.email_rounded,
                       suffixWidget: _isEmailValid
                           ? const Icon(
-                              Icons.check_circle_outline_rounded,
+                              Icons.check_circle_rounded,
                               size: 22,
                               color: AppColors.primary,
                             )
@@ -285,7 +230,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         return null;
                       },
                     ),
-                    const SizedBox(height: AppSpacing.md),
+                    const SizedBox(height: AppSpacing.lg),
                     LacakTextField(
                       label: 'Kata Sandi',
                       controller: _passwordController,
@@ -301,116 +246,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         return null;
                       },
                     ),
-                    const SizedBox(height: AppSpacing.xs),
-
-                    // Right-aligned helper link (mirroring "Forgot password?" placement in the reference)
-                    Align(
-                      alignment: Alignment.centerRight,
-                      child: TextButton(
-                        onPressed: authState.isBusy ? null : _openDemoSheet,
-                        style: TextButton.styleFrom(
-                          minimumSize: const Size(
-                            48,
-                            AppSpacing.minTouchTarget,
-                          ),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: AppSpacing.xs,
-                          ),
-                          foregroundColor: AppColors.textSecondary,
-                        ),
-                        child: Text(
-                          'Ingin mencoba tanpa daftar? Pilih Akun Demo',
-                          style: AppTypography.labelTag.copyWith(
-                            color: AppColors.textSecondary,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: AppSpacing.sm),
-
-                    // 5. Full-width solid pine Primary CTA button
+                    const SizedBox(height: AppSpacing.xxl),
                     LacakPrimaryButton(
                       label: 'Masuk',
                       icon: Icons.login_rounded,
                       isLoading: authState.busyAction == AuthBusyAction.signIn,
                       onPressed: authState.isBusy ? null : _submitLogin,
                     ),
-                    const SizedBox(height: AppSpacing.xl),
-
-                    // 6. Divider ("atau") + Side-by-side quick demo buttons + Main demo trigger
-                    Row(
-                      children: [
-                        const Expanded(child: Divider()),
-                        Padding(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: AppSpacing.md,
-                          ),
-                          child: Text(
-                            'atau',
-                            style: AppTypography.labelTag.copyWith(
-                              color: AppColors.textSecondary,
-                            ),
-                          ),
-                        ),
-                        const Expanded(child: Divider()),
-                      ],
-                    ),
                     const SizedBox(height: AppSpacing.md),
-                    LayoutBuilder(
-                      builder: (context, constraints) {
-                        final textScaler = MediaQuery.textScalerOf(context);
-                        final stack = constraints.maxWidth < 330 ||
-                            textScaler.scale(16) > 19.0;
-                        final kitchenPill = _QuickRoleButton(
-                          label: 'Demo Dapur',
-                          icon: Icons.soup_kitchen_rounded,
-                          onTap: authState.isBusy
-                              ? null
-                              : () => _openDemoSheet(filterKitchen: true),
-                        );
-                        final schoolPill = _QuickRoleButton(
-                          label: 'Demo Sekolah',
-                          icon: Icons.school_rounded,
-                          onTap: authState.isBusy
-                              ? null
-                              : () => _openDemoSheet(filterKitchen: false),
-                        );
-                        if (stack) {
-                          return Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              kitchenPill,
-                              const SizedBox(height: AppSpacing.sm),
-                              schoolPill,
-                            ],
-                          );
-                        }
-                        return IntrinsicHeight(
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              Expanded(child: kitchenPill),
-                              const SizedBox(width: AppSpacing.md),
-                              Expanded(child: schoolPill),
-                            ],
-                          ),
-                        );
-                      },
-                    ),
-                    const SizedBox(height: AppSpacing.sm),
-                    LacakSecondaryButton(
-                      label: 'Masuk Cepat (Akun Demo)',
-                      icon: Icons.switch_account_rounded,
-                      isLoading:
-                          authState.busyAction == AuthBusyAction.signInDemo,
-                      onPressed: authState.isBusy
-                          ? null
-                          : () => _openDemoSheet(),
-                    ),
-                    const SizedBox(height: AppSpacing.xl),
-
-                    // 7. Bottom registration link with bold underlined action text
                     Wrap(
                       alignment: WrapAlignment.center,
                       crossAxisAlignment: WrapCrossAlignment.center,
@@ -418,9 +261,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       children: [
                         Text(
                           'Belum punya akun?',
-                          style: AppTypography.bodyMedium.copyWith(
-                            color: AppColors.textSecondary,
-                          ),
+                          style: AppTypography.bodyMedium,
                         ),
                         TextButton(
                           onPressed: authState.isBusy
@@ -433,7 +274,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                 },
                           style: TextButton.styleFrom(
                             minimumSize: const Size(
-                              48,
+                              AppSpacing.minTouchTarget,
                               AppSpacing.minTouchTarget,
                             ),
                             padding: const EdgeInsets.symmetric(
@@ -443,15 +284,78 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           ),
                           child: Text(
                             'Daftar di Sini',
-                            style: AppTypography.bodyLarge.copyWith(
+                            style: AppTypography.titleItem.copyWith(
                               color: AppColors.primary,
                               fontWeight: FontWeight.w700,
-                              decoration: TextDecoration.underline,
-                              decorationColor: AppColors.primary,
                             ),
                           ),
                         ),
                       ],
+                    ),
+                    const SizedBox(height: AppSpacing.xxxl),
+                    Row(
+                      children: [
+                        const Expanded(child: Divider()),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: AppSpacing.md,
+                          ),
+                          child: Text(
+                            'Uji Coba Cepat',
+                            style: AppTypography.captionMuted,
+                          ),
+                        ),
+                        const Expanded(child: Divider()),
+                      ],
+                    ),
+                    const SizedBox(height: AppSpacing.lg),
+                    LacakSecondaryButton(
+                      label: 'Masuk Cepat - Akun Demo',
+                      icon: Icons.switch_account_rounded,
+                      isLoading:
+                          authState.busyAction == AuthBusyAction.signInDemo,
+                      onPressed: authState.isBusy
+                          ? null
+                          : () => _openDemoSheet(),
+                    ),
+                    const SizedBox(height: AppSpacing.sm),
+                    LayoutBuilder(
+                      builder: (context, constraints) {
+                        final textScaler = MediaQuery.textScalerOf(context);
+                        final stack = constraints.maxWidth < 320 ||
+                            textScaler.scale(14) > 17.5;
+                        final kitchenBtn = _SoftRolePillButton(
+                          label: 'Demo Dapur',
+                          icon: Icons.soup_kitchen_rounded,
+                          onTap: authState.isBusy
+                              ? null
+                              : () => _openDemoSheet(filterKitchen: true),
+                        );
+                        final schoolBtn = _SoftRolePillButton(
+                          label: 'Demo Sekolah',
+                          icon: Icons.school_rounded,
+                          onTap: authState.isBusy
+                              ? null
+                              : () => _openDemoSheet(filterKitchen: false),
+                        );
+                        if (stack) {
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              kitchenBtn,
+                              const SizedBox(height: AppSpacing.sm),
+                              schoolBtn,
+                            ],
+                          );
+                        }
+                        return Row(
+                          children: [
+                            Expanded(child: kitchenBtn),
+                            const SizedBox(width: AppSpacing.sm),
+                            Expanded(child: schoolBtn),
+                          ],
+                        );
+                      },
                     ),
                   ],
                 ),
@@ -464,8 +368,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   }
 }
 
-class _QuickRoleButton extends StatelessWidget {
-  const _QuickRoleButton({
+class _SoftRolePillButton extends StatelessWidget {
+  const _SoftRolePillButton({
     required this.label,
     required this.icon,
     required this.onTap,
@@ -478,17 +382,14 @@ class _QuickRoleButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: AppColors.surfaceBase,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(AppSpacing.radiusControl),
-        side: const BorderSide(color: AppColors.borderHairline, width: 1),
-      ),
+      color: AppColors.surfaceSoft,
+      borderRadius: BorderRadius.circular(AppSpacing.radiusChip),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(AppSpacing.radiusControl),
+        borderRadius: BorderRadius.circular(AppSpacing.radiusChip),
         child: ConstrainedBox(
           constraints: const BoxConstraints(
-            minHeight: AppSpacing.secondaryButtonMinHeight,
+            minHeight: AppSpacing.minTouchTarget,
           ),
           child: Padding(
             padding: const EdgeInsets.symmetric(
@@ -498,12 +399,13 @@ class _QuickRoleButton extends StatelessWidget {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(icon, size: 20, color: AppColors.primary),
+                Icon(icon, size: 19, color: AppColors.primary),
                 const SizedBox(width: AppSpacing.sm),
                 Flexible(
                   child: Text(
                     label,
-                    textAlign: TextAlign.center,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: AppTypography.labelTag.copyWith(
                       color: AppColors.textPrimary,
                       fontWeight: FontWeight.w600,
@@ -571,42 +473,54 @@ class _QuickDemoSheet extends StatelessWidget {
                 style: AppTypography.bodyMedium,
               ),
               const SizedBox(height: AppSpacing.md),
+              const Divider(height: 1),
               Flexible(
-                child: SingleChildScrollView(
-                  child: LacakSectionSurface.separated(
-                    children: accounts
-                        .map(
-                          (preset) => ListTile(
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: AppSpacing.lg,
-                              vertical: AppSpacing.sm,
-                            ),
-                            leading: Icon(
-                              preset.isSupervisor
-                                  ? Icons.visibility_rounded
-                                  : preset.isKitchen
-                                      ? Icons.soup_kitchen_rounded
-                                      : Icons.school_rounded,
-                              size: 24,
-                              color: AppColors.textPrimary,
-                            ),
-                            title: Text(
-                              preset.title,
-                              style: AppTypography.titleItem,
-                            ),
-                            subtitle: Text(
-                              preset.subtitle,
-                              style: AppTypography.bodyMedium,
-                            ),
-                            trailing: const Icon(
-                              Icons.chevron_right_rounded,
-                              color: AppColors.textSecondary,
-                            ),
-                            onTap: () => Navigator.of(context).pop(preset),
+                child: ListView.separated(
+                  shrinkWrap: true,
+                  itemCount: accounts.length,
+                  separatorBuilder: (_, _) => const Divider(height: 1),
+                  itemBuilder: (context, index) {
+                    final preset = accounts[index];
+                    return ListTile(
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: AppSpacing.xs,
+                        vertical: AppSpacing.sm,
+                      ),
+                      leading: Container(
+                        width: 44,
+                        height: 44,
+                        decoration: BoxDecoration(
+                          color: AppColors.surfaceSoft,
+                          borderRadius: BorderRadius.circular(
+                            AppSpacing.radiusThumb,
                           ),
-                        )
-                        .toList(),
-                  ),
+                        ),
+                        alignment: Alignment.center,
+                        child: Icon(
+                          preset.isSupervisor
+                              ? Icons.visibility_rounded
+                              : preset.isKitchen
+                                  ? Icons.soup_kitchen_rounded
+                                  : Icons.school_rounded,
+                          size: 22,
+                          color: AppColors.primary,
+                        ),
+                      ),
+                      title: Text(
+                        preset.title,
+                        style: AppTypography.titleItem,
+                      ),
+                      subtitle: Text(
+                        preset.subtitle,
+                        style: AppTypography.bodyMedium,
+                      ),
+                      trailing: const Icon(
+                        Icons.chevron_right_rounded,
+                        color: AppColors.textSecondary,
+                      ),
+                      onTap: () => Navigator.of(context).pop(preset),
+                    );
+                  },
                 ),
               ),
             ],
