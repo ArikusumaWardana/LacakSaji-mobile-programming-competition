@@ -22,6 +22,7 @@ import '../../alerts/data/cluster_alert_repository.dart';
 import '../../alerts/domain/cluster_alert_models.dart';
 import '../../auth/presentation/auth_controller.dart';
 import '../../kitchen/domain/kitchen_models.dart';
+import '../../traceability/presentation/traceability_providers.dart';
 import '../data/klb_pdf_service.dart';
 import '../domain/danger_zone_calculator.dart';
 
@@ -178,11 +179,41 @@ class _PuskesmasReportDraftScreenState
 
   @override
   Widget build(BuildContext context) {
-    final args = widget.args;
+    final rawArgs = widget.args;
     final school = ref.watch(authControllerProvider).school;
     final isOffline = ref.watch(isOfflineProvider).value ?? false;
     final pendingSyncCount = ref.watch(pendingSyncCountProvider).value ?? 0;
     final syncState = ref.watch(offlineSyncControllerProvider);
+
+    final liveIngredients = rawArgs != null
+        ? ref
+              .watch(
+                batchIngredientLogsProvider((
+                  sppgId: rawArgs.sppgId,
+                  batchId: rawArgs.batchId,
+                )),
+              )
+              .value
+        : null;
+    final liveTimeline = rawArgs != null
+        ? ref
+              .watch(
+                batchSupplyChainTimelineProvider((
+                  sppgId: rawArgs.sppgId,
+                  batchId: rawArgs.batchId,
+                  sealedAtUtc: rawArgs.sealedAtUtc,
+                  schoolScannedAtUtc: rawArgs.scannedAtUtc,
+                )),
+              )
+              .value
+        : null;
+
+    final args = rawArgs?.withTraceability(
+      ingredientLogs: rawArgs.ingredientLogs.isNotEmpty
+          ? rawArgs.ingredientLogs
+          : liveIngredients,
+      transitHandover: rawArgs.transitHandover ?? liveTimeline?.handover,
+    );
 
     final width = MediaQuery.sizeOf(context).width;
     final horizontalPad = AppSpacing.horizontalPadding(width);
@@ -376,8 +407,36 @@ class _PuskesmasReportDraftScreenState
                                       args.elapsedMinutes,
                                     ),
                                   ),
+                                  if (args.transitHandover != null) ...[
+                                    const SizedBox(height: 4),
+                                    _TimelineMiniRow(
+                                      label: 'Durasi Transit Kurir',
+                                      value: args.transitHandover!
+                                                  .transitDurationMinutes !=
+                                              null
+                                          ? formatDurationMinutes(
+                                              args.transitHandover!
+                                                  .transitDurationMinutes!,
+                                            )
+                                          : 'Dimuat ${formatWibTime(args.transitHandover!.effectiveDepartedAtUtc)}',
+                                    ),
+                                  ],
                                 ],
                               ),
+                            ),
+                            const Divider(height: 1),
+                            _DraftStackedRow(
+                              label: 'Riwayat Hulu Bahan Baku',
+                              value: args.ingredientLogs.isEmpty
+                                  ? 'Belum ada log pemasok bahan tertaut'
+                                  : args.ingredientLogs
+                                        .take(4)
+                                        .map(
+                                          (item) =>
+                                              '${item.ingredientName} (${item.supplierName}, Lot ${item.supplierBatchNo}, Exp ${item.formattedExpiryDate})',
+                                        )
+                                        .join('; '),
+                              mutedValue: args.ingredientLogs.isEmpty,
                             ),
                             const Divider(height: 1),
                             _DraftStackedRow(

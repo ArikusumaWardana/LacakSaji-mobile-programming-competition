@@ -2,7 +2,11 @@ import 'dart:convert';
 
 import '../../../core/constants/demo_accounts.dart';
 import '../../../core/crypto/batch_qr_payload.dart';
+import '../../alerts/domain/cluster_alert_models.dart';
 import '../../auth/domain/auth_models.dart';
+
+export '../../alerts/domain/cluster_alert_models.dart'
+    show AlertResolutionStatus;
 
 enum FoodRiskCategory {
   high(
@@ -102,6 +106,8 @@ class FoodBatchItem {
     required this.timestampSource,
     required this.signatureB64,
     required this.createdAtUtc,
+    this.signingKeyId,
+    this.allergenTags = const [],
     this.packagingPhotoUrl,
     this.localPhotoPath,
     this.inspectedSchoolIds = const [],
@@ -118,6 +124,8 @@ class FoodBatchItem {
   final FoodRiskCategory riskCategory;
   final DateTime sealedAtUtc;
   final BatchTimestampSource timestampSource;
+  final String? signingKeyId;
+  final List<String> allergenTags;
   final String? packagingPhotoUrl;
   final String? localPhotoPath;
   final String signatureB64;
@@ -138,11 +146,16 @@ class FoodBatchItem {
         sealedAtEpochSec: sealedAtEpochSec,
         timestampSource: timestampSource.dbValue,
         signatureB64: signatureB64,
+        keyId: signingKeyId,
+        allergenTags: allergenTags,
       );
 
   String get qrPayloadJson => qrPayload.toMinifiedJson();
 
   Map<String, dynamic> toDbInsertMap() {
+    final normalizedAllergens = BatchQrPayload.normalizeAllergenTags(
+      allergenTags,
+    );
     return {
       'id': id,
       'sppg_id': sppgId,
@@ -152,6 +165,9 @@ class FoodBatchItem {
       'risk_category': riskCategory.dbValue,
       'sealed_at': sealedAtUtc.toUtc().toIso8601String(),
       'timestamp_source': timestampSource.dbValue,
+      if (signingKeyId != null && signingKeyId!.isNotEmpty)
+        'signing_key_id': signingKeyId,
+      'allergen_tags': normalizedAllergens,
       'packaging_photo_url': packagingPhotoUrl,
       'signature_b64': signatureB64,
       'created_at': createdAtUtc.toUtc().toIso8601String(),
@@ -202,6 +218,12 @@ class FoodBatchItem {
       timestampSource: BatchTimestampSource.fromDb(
         map['timestamp_source'] as String?,
       ),
+      signingKeyId: map['signing_key_id'] as String?,
+      allergenTags: (map['allergen_tags'] is List)
+          ? BatchQrPayload.normalizeAllergenTags(
+              (map['allergen_tags'] as List).whereType<String>(),
+            )
+          : const [],
       packagingPhotoUrl: map['packaging_photo_url'] as String?,
       signatureB64: map['signature_b64'] as String,
       createdAtUtc: DateTime.parse(map['created_at'] as String).toUtc(),
@@ -227,6 +249,12 @@ class FoodBatchItem {
       timestampSource: BatchTimestampSource.fromDb(
         map['timestamp_source'] as String?,
       ),
+      signingKeyId: map['signing_key_id'] as String?,
+      allergenTags: (map['allergen_tags'] is List)
+          ? BatchQrPayload.normalizeAllergenTags(
+              (map['allergen_tags'] as List).whereType<String>(),
+            )
+          : const [],
       packagingPhotoUrl: map['packaging_photo_url'] as String?,
       localPhotoPath: localPhotoPath,
       signatureB64: map['signature_b64'] as String,
@@ -385,6 +413,11 @@ class ActiveClusterAlertItem {
     required this.stage,
     required this.symptomCount,
     required this.createdAtUtc,
+    this.reporterSchoolId = '',
+    this.resolutionStatus = AlertResolutionStatus.active,
+    this.resolutionNote,
+    this.resolvedByName,
+    this.resolvedAtUtc,
   });
 
   final String id;
@@ -395,6 +428,11 @@ class ActiveClusterAlertItem {
   final String stage;
   final int symptomCount;
   final DateTime createdAtUtc;
+  final String reporterSchoolId;
+  final AlertResolutionStatus resolutionStatus;
+  final String? resolutionNote;
+  final String? resolvedByName;
+  final DateTime? resolvedAtUtc;
 }
 
 class KitchenDashboardData {

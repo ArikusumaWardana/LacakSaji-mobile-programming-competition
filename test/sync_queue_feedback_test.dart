@@ -42,7 +42,8 @@ class _NoopKitchenRepository extends Fake implements KitchenRepository {}
 class _NoopClusterAlertRepository extends Fake
     implements ClusterAlertRepository {
   @override
-  Future<int> syncPendingAlerts({String? schoolId}) async => 0;
+  Future<int> syncPendingAlerts({String? schoolId, String? kitchenId}) async =>
+      0;
 }
 
 class _StubSchoolRepository extends Fake implements SchoolRepository {

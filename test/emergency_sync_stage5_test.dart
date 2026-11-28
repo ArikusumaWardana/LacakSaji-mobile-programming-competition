@@ -332,7 +332,26 @@ class _FakeClusterAlertRepository implements ClusterAlertRepository {
   }) => _realtimeCtrl.stream;
 
   @override
-  Future<int> syncPendingAlerts({String? schoolId}) async {
+  Future<ClusterAlertEvent> resolveClusterAlert({
+    required ClusterAlertEvent alert,
+    required AlertResolutionStatus newStatus,
+    required String resolutionNote,
+    required String resolverUserId,
+    required String resolverName,
+    required bool isOffline,
+  }) async {
+    return alert.copyWith(
+      resolutionStatus: newStatus,
+      resolutionNote: resolutionNote,
+      resolvedByUserId: resolverUserId,
+      resolvedByName: resolverName,
+      resolvedAtUtc: DateTime.now().toUtc(),
+      isPendingSync: isOffline,
+    );
+  }
+
+  @override
+  Future<int> syncPendingAlerts({String? schoolId, String? kitchenId}) async {
     syncCalls++;
     onSynced?.call();
     return 1;
@@ -461,6 +480,7 @@ class _FakeStage5KitchenRepository implements KitchenRepository {
     required FoodRiskCategory riskCategory,
     required CapturedWebpPhoto photo,
     required bool isOffline,
+    List<String> allergenTags = const [],
   }) => throw UnimplementedError();
 
   @override

@@ -112,6 +112,12 @@ Future<String> _saveInspectionRemoteForSync(
     }
     return fallbackId;
   } on PostgrestException catch (pgError) {
+    if (pgError.code == 'PGRST204') {
+      final stripped = Map<String, dynamic>.from(dbMap)
+        ..remove('actual_temp_celsius')
+        ..remove('temp_source');
+      return _saveInspectionRemoteForSync(client, stripped);
+    }
     if (!_isSyncUniqueViolation(pgError)) {
       rethrow;
     }
@@ -141,7 +147,23 @@ Future<String> _saveInspectionRemoteForSync(
         return updatedRows.first['id'] as String;
       }
     } on PostgrestException catch (updateError) {
-      if (!_isSyncPermissionDenied(updateError)) {
+      if (updateError.code == 'PGRST204') {
+        final strippedUpdate = Map<String, dynamic>.from(updatePayload)
+          ..remove('actual_temp_celsius')
+          ..remove('temp_source');
+        final updatedRows = List<Map<String, dynamic>>.from(
+          await client
+                  .from('school_inspections')
+                  .update(strippedUpdate)
+                  .eq('batch_id', batchId)
+                  .eq('school_id', schoolId)
+                  .select('id')
+              as List,
+        );
+        if (updatedRows.isNotEmpty && updatedRows.first['id'] is String) {
+          return updatedRows.first['id'] as String;
+        }
+      } else if (!_isSyncPermissionDenied(updateError)) {
         rethrow;
       }
     }
@@ -190,7 +212,13 @@ Future<bool> _processSyncRow({
       try {
         await client.from('food_batches').insert(map);
       } on PostgrestException catch (pgError) {
-        if (pgError.code != '23505') {
+        if (pgError.code == 'PGRST204' ||
+            pgError.message.toLowerCase().contains('signing_key_id')) {
+          final legacyMap = Map<String, dynamic>.from(map)
+            ..remove('signing_key_id')
+            ..remove('allergen_tags');
+          await client.from('food_batches').insert(legacyMap);
+        } else if (pgError.code != '23505') {
           rethrow;
         }
       }
@@ -211,6 +239,7 @@ Future<bool> _processSyncRow({
       }
       map.remove('batch_code');
       map.remove('menu_name');
+      map.remove('allergen_tags');
       final localInspectionId = map['id'] as String?;
       final persistedId = await _saveInspectionRemoteForSync(client, map);
       if (localInspectionId != null && persistedId != localInspectionId) {
@@ -335,8 +364,255 @@ Future<bool> _processSyncRow({
       }
       return true;
 
+    case 'rotate_signing_key':
+      if (kitchenId != null && map['sppg_id'] != kitchenId) {
+        return false;
+      }
+      await database.updateSyncItemStatus(id: row.id, status: 'syncing');
+      await client.rpc(
+        'rotate_sppg_signing_key',
+        params: {
+          'p_sppg_id': map['sppg_id'],
+          'p_new_key_id': map['key_id'],
+          'p_new_public_key': map['public_key'],
+          'p_revoke_previous': (map['revoke_previous'] as bool?) ?? false,
+          'p_device_label': map['device_label'],
+        },
+      );
+      return true;
+
+    case 'revoke_signing_key':
+      if (kitchenId != null && map['sppg_id'] != kitchenId) {
+        return false;
+      }
+      await database.updateSyncItemStatus(id: row.id, status: 'syncing');
+      await client.rpc(
+        'revoke_sppg_signing_key',
+        params: {
+          'p_sppg_id': map['sppg_id'],
+          'p_key_id': map['key_id'],
+        },
+      );
+      return true;
+
+    case 'upsert_institution_member':
+      final instType = map['institution_type'] as String?;
+      final instId = map['institution_id'] as String?;
+      if (instType == 'sppg' && kitchenId != null && instId != kitchenId) {
+        return false;
+      }
+      if (instType == 'school' && schoolId != null && instId != schoolId) {
+        return false;
+      }
+      await database.updateSyncItemStatus(id: row.id, status: 'syncing');
+      await client.rpc(
+        'add_institution_member',
+        params: {
+          'p_institution_type': instType,
+          'p_institution_id': instId,
+          'p_member_name': map['member_name'],
+          'p_member_email': map['member_email'],
+          'p_role': map['role'],
+        },
+      );
+      return true;
+
+    case 'toggle_institution_member':
+      final instType = map['institution_type'] as String?;
+      final instId = map['institution_id'] as String?;
+      if (instType == 'sppg' && kitchenId != null && instId != kitchenId) {
+        return false;
+      }
+      if (instType == 'school' && schoolId != null && instId != schoolId) {
+        return false;
+      }
+      await database.updateSyncItemStatus(id: row.id, status: 'syncing');
+      await client.rpc(
+        'set_institution_member_active',
+        params: {
+          'p_member_id': row.entityId,
+          'p_is_active': (map['is_active'] as bool?) ?? false,
+        },
+      );
+      return true;
+
+    case 'create_ingredient_log':
+      if (kitchenId != null && map['sppg_id'] != kitchenId) {
+        return false;
+      }
+      await database.updateSyncItemStatus(id: row.id, status: 'syncing');
+      final ingredientMap = Map<String, dynamic>.from(map)
+        ..remove('batch_code')
+        ..remove('menu_name');
+      try {
+        await client.from('ingredient_logs').insert(ingredientMap);
+      } on PostgrestException catch (pgError) {
+        if (pgError.code != '23505') {
+          rethrow;
+        }
+      }
+      await database.markTraceabilityDraftSynced(row.entityId);
+      return true;
+
+    case 'upsert_transit_handover':
+      if (kitchenId != null && map['sppg_id'] != kitchenId) {
+        return false;
+      }
+      await database.updateSyncItemStatus(id: row.id, status: 'syncing');
+      final transitMap = Map<String, dynamic>.from(map)
+        ..remove('batch_code')
+        ..remove('menu_name')
+        ..remove('school_name');
+      await _upsertWithColumnFallback(
+        client: client,
+        table: 'transit_handovers',
+        payload: transitMap,
+        optionalColumns: const ['load_lat', 'load_lng', 'arrive_lat', 'arrive_lng'],
+      );
+      await database.markTraceabilityDraftSynced(row.entityId);
+      return true;
+
+    case 'create_tray_return':
+    case 'update_tray_return_sanitation':
+      if (row.operationType == 'create_tray_return') {
+        if (schoolId != null && map['school_id'] != schoolId) {
+          return false;
+        }
+        if (kitchenId != null &&
+            schoolId == null &&
+            map['sppg_id'] != kitchenId) {
+          return false;
+        }
+      } else {
+        if (kitchenId != null && map['sppg_id'] != kitchenId) {
+          return false;
+        }
+      }
+      await database.updateSyncItemStatus(id: row.id, status: 'syncing');
+      final trayMap = Map<String, dynamic>.from(map)
+        ..remove('batch_code')
+        ..remove('menu_name')
+        ..remove('school_name')
+        ..remove('missing_trays');
+      await _upsertWithColumnFallback(
+        client: client,
+        table: 'tray_return_logs',
+        payload: trayMap,
+        optionalColumns: const ['sanitization_checklist'],
+      );
+      await database.markTraceabilityDraftSynced(row.entityId);
+      return true;
+
+    case 'sync_school_allergens':
+      if (schoolId != null && map['school_id'] != schoolId) {
+        return false;
+      }
+      await database.updateSyncItemStatus(id: row.id, status: 'syncing');
+      final rawEntries = (map['entries'] as List?) ?? const [];
+      final targetSchoolId = map['school_id'] as String;
+      final tags = <String>[];
+      final upsertPayloads = <Map<String, dynamic>>[];
+      for (final raw in rawEntries) {
+        if (raw is Map<String, dynamic>) {
+          final tag = raw['allergen_tag'] as String?;
+          if (tag != null && tag.isNotEmpty) {
+            tags.add(tag);
+          }
+          upsertPayloads.add(Map<String, dynamic>.from(raw));
+        }
+      }
+      final existingRows = List<Map<String, dynamic>>.from(
+        await client
+                .from('school_allergen_profiles')
+                .select('id, allergen_tag')
+                .eq('school_id', targetSchoolId)
+            as List,
+      );
+      final idsToDelete = <String>[];
+      for (final existing in existingRows) {
+        final existingTag = existing['allergen_tag'] as String?;
+        final existingId = existing['id'] as String?;
+        if (existingId != null &&
+            existingTag != null &&
+            !tags.contains(existingTag)) {
+          idsToDelete.add(existingId);
+        }
+      }
+      if (idsToDelete.isNotEmpty) {
+        await client
+            .from('school_allergen_profiles')
+            .delete()
+            .inFilter('id', idsToDelete);
+      }
+      if (upsertPayloads.isNotEmpty) {
+        await client
+            .from('school_allergen_profiles')
+            .upsert(upsertPayloads, onConflict: 'school_id,allergen_tag');
+      }
+      return true;
+
+    case 'resolve_cluster_alert':
+      if (kitchenId != null && map['sppg_id'] != kitchenId) {
+        return false;
+      }
+      if (schoolId != null && map['reporter_school_id'] != schoolId) {
+        return false;
+      }
+      await database.updateSyncItemStatus(id: row.id, status: 'syncing');
+      final alertId = (map['id'] ?? map['alert_id'] ?? row.entityId) as String;
+      final newStatus =
+          (map['resolution_status'] ?? map['new_status']) as String;
+      final resolutionNote = map['resolution_note'] as String;
+      try {
+        await client.rpc(
+          'resolve_cluster_alert',
+          params: {
+            'p_alert_id': alertId,
+            'p_new_status': newStatus,
+            'p_resolution_note': resolutionNote,
+          },
+        );
+      } on PostgrestException catch (pgError) {
+        if (pgError.code == 'PGRST202' || pgError.code == '42883') {
+          await client
+              .from('cluster_alerts')
+              .update({
+                'resolution_status': newStatus,
+                'resolution_note': resolutionNote,
+                'resolved_by': map['resolved_by'],
+                'resolved_at': map['resolved_at'],
+              })
+              .eq('id', alertId);
+        } else {
+          rethrow;
+        }
+      }
+      await database.markTraceabilityDraftSynced('alert_res_$alertId');
+      return true;
+
     default:
       return false;
+  }
+}
+
+Future<void> _upsertWithColumnFallback({
+  required SupabaseClient client,
+  required String table,
+  required Map<String, dynamic> payload,
+  required List<String> optionalColumns,
+}) async {
+  try {
+    await client.from(table).upsert(payload, onConflict: 'id');
+  } on PostgrestException catch (pgError) {
+    if (pgError.code == 'PGRST204') {
+      final fallback = Map<String, dynamic>.from(payload);
+      for (final col in optionalColumns) {
+        fallback.remove(col);
+      }
+      await client.from(table).upsert(fallback, onConflict: 'id');
+    } else if (pgError.code != '23505') {
+      rethrow;
+    }
   }
 }
 

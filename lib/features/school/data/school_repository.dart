@@ -16,6 +16,7 @@ import '../../../core/media/live_camera_webp_service.dart';
 import '../../../core/network/bmkg_weather_service.dart';
 import '../../../core/notifications/local_notification_service.dart';
 import '../../../core/sync/workmanager_sync_dispatcher.dart';
+import '../../allergens/domain/allergen_models.dart';
 import '../../auth/domain/auth_error_mapper.dart';
 import '../../auth/domain/auth_models.dart';
 import '../../kitchen/domain/kitchen_models.dart';
@@ -200,26 +201,62 @@ class SupabaseSchoolRepository implements SchoolRepository {
       await refreshSampleVaultsFromServer(school.id);
       activeSamples = await _database.watchActiveSampleVaults(school.id).first;
       activeSamples.sort((a, b) => a.expiresAt.compareTo(b.expiresAt));
+      final historySamples = await _database
+          .watchHistorySampleVaults(school.id)
+          .first;
+      final sampleLabelByInspectionId = <String, String>{
+        for (final s in activeSamples) s.inspectionId: s.labelCode,
+        for (final s in historySamples) s.inspectionId: s.labelCode,
+      };
 
-      final inspectionRows = List<Map<String, dynamic>>.from(
-        await client
-                .from('school_inspections')
-                .select(
-                  'id, batch_id, school_id, scanned_at, elapsed_minutes, '
-                  'bmkg_temp_c, bmkg_source, danger_status, gps_within_radius, '
-                  'sample_photo_url, tflite_label, tflite_confidence, '
-                  'gemini_summary_json, manual_smell_ok, manual_visual_ok, '
-                  'manual_pack_ok, final_decision, '
-                  'food_batches(batch_code, menu_name, sealed_at)',
-                )
-                .eq('school_id', school.id)
-                .order('scanned_at', ascending: false)
-                .limit(30)
-            as List,
-      );
+      List<Map<String, dynamic>> inspectionRows;
+      try {
+        inspectionRows = List<Map<String, dynamic>>.from(
+          await client
+                  .from('school_inspections')
+                  .select(
+                    'id, batch_id, school_id, scanned_at, elapsed_minutes, '
+                    'bmkg_temp_c, bmkg_source, danger_status, gps_within_radius, '
+                    'sample_photo_url, tflite_label, tflite_confidence, '
+                    'gemini_summary_json, actual_temp_celsius, temp_source, '
+                    'manual_smell_ok, manual_visual_ok, manual_pack_ok, final_decision, '
+                    'food_batches(batch_code, menu_name, sealed_at, allergen_tags)',
+                  )
+                  .eq('school_id', school.id)
+                  .order('scanned_at', ascending: false)
+                  .limit(30)
+              as List,
+        );
+      } on PostgrestException catch (pgError) {
+        if (pgError.code == 'PGRST204' || pgError.code == '42703') {
+          inspectionRows = List<Map<String, dynamic>>.from(
+            await client
+                    .from('school_inspections')
+                    .select(
+                      'id, batch_id, school_id, scanned_at, elapsed_minutes, '
+                      'bmkg_temp_c, bmkg_source, danger_status, gps_within_radius, '
+                      'sample_photo_url, tflite_label, tflite_confidence, '
+                      'gemini_summary_json, manual_smell_ok, manual_visual_ok, '
+                      'manual_pack_ok, final_decision, '
+                      'food_batches(batch_code, menu_name, sealed_at)',
+                    )
+                    .eq('school_id', school.id)
+                    .order('scanned_at', ascending: false)
+                    .limit(30)
+                as List,
+          );
+        } else {
+          rethrow;
+        }
+      }
 
       final remoteToday = inspectionRows
-          .map(_mapRemoteInspectionRow)
+          .map(
+            (row) => _mapRemoteInspectionRow(
+              row,
+              sampleLabelByInspectionId: sampleLabelByInspectionId,
+            ),
+          )
           .where((item) => isSameWibCalendarDay(item.scannedAtUtc, nowUtc))
           .toList(growable: false);
 
@@ -282,6 +319,14 @@ class SupabaseSchoolRepository implements SchoolRepository {
 
     var sppgName = school.partnerKitchenName ?? 'Dapur SPPG Mitra';
     var publicKeyB64 = '';
+    final sealedAtUtc = DateTime.fromMillisecondsSinceEpoch(
+      payload.sealedAtEpochSec * 1000,
+      isUtc: true,
+    );
+
+    if (!isOffline && _client != null) {
+      await _refreshSigningKeysForSppgSafe(payload.sppgId);
+    }
 
     final cachedKey = await _database.getSppgKey(payload.sppgId);
     if (!isOffline &&
@@ -327,6 +372,30 @@ class SupabaseSchoolRepository implements SchoolRepository {
         }
       } catch (_) {
         // Stay offline-safe below.
+      }
+    }
+
+    if (payload.keyId != null && payload.keyId!.isNotEmpty) {
+      final keyRecord = await _database.getSigningKeyById(payload.keyId!);
+      if (keyRecord != null && keyRecord.sppgId == payload.sppgId) {
+        if (Ed25519Service.isRevokedForSealTime(
+          status: keyRecord.status,
+          revokedAtUtc: keyRecord.revokedAt,
+          sealedAtUtc: sealedAtUtc,
+        )) {
+          return const QrVerificationResult(
+            outcome: QrVerificationOutcome.revokedKey,
+            errorTitle: 'Kunci Segel Sudah Dicabut',
+            errorMessage:
+                'Perangkat pencetak QR ini telah dicabut aksesnya sebelum waktu segel batch. Hentikan pembagian dan hubungi Dapur SPPG.',
+          );
+        }
+        publicKeyB64 = keyRecord.publicKeyB64;
+      } else if (publicKeyB64.isEmpty) {
+        final sppgKeys = await _database.getSigningKeysForSppg(payload.sppgId);
+        if (sppgKeys.isNotEmpty) {
+          publicKeyB64 = sppgKeys.first.publicKeyB64;
+        }
       }
     }
 
@@ -385,10 +454,6 @@ class SupabaseSchoolRepository implements SchoolRepository {
     }
 
     final scanAtUtc = _clockUtc();
-    final sealedAtUtc = DateTime.fromMillisecondsSinceEpoch(
-      payload.sealedAtEpochSec * 1000,
-      isUtc: true,
-    );
     final riskCategory = FoodRiskCategory.fromDb(payload.riskCategory);
     final timestampSource = BatchTimestampSource.fromDb(payload.timestampSource);
 
@@ -417,6 +482,22 @@ class SupabaseSchoolRepository implements SchoolRepository {
       temperatureC: weather.temperatureC,
     );
 
+    var matchedAllergens = const <SchoolAllergenEntry>[];
+    if (payload.allergenTags.isNotEmpty) {
+      try {
+        final localAllergens = await _database.getSchoolAllergens(school.id);
+        final schoolEntries = localAllergens
+            .map(SchoolAllergenEntry.fromLocalRow)
+            .toList(growable: false);
+        matchedAllergens = AllergenMatchWarning.intersect(
+          batchAllergenTags: payload.allergenTags,
+          schoolEntries: schoolEntries,
+        ).matchedEntries;
+      } catch (_) {
+        matchedAllergens = const [];
+      }
+    }
+
     return QrVerificationResult(
       outcome: QrVerificationOutcome.valid,
       context: VerifiedBatchScanContext(
@@ -431,6 +512,7 @@ class SupabaseSchoolRepository implements SchoolRepository {
         dangerEvaluation: dangerEvaluation,
         gpsWithinRadius: gpsWithinRadius,
         distanceMeters: distanceMeters,
+        matchedAllergens: matchedAllergens,
       ),
     );
   }
@@ -463,6 +545,11 @@ class SupabaseSchoolRepository implements SchoolRepository {
         scanContext.weather.temperatureC.toStringAsFixed(1),
       ),
       'bmkg_source': scanContext.weather.source.dbValue,
+      if (scanContext.actualTempC != null)
+        'actual_temp_celsius': double.parse(
+          scanContext.actualTempC!.toStringAsFixed(1),
+        ),
+      'temp_source': scanContext.tempSource.dbValue,
       'danger_status': scanContext.dangerEvaluation.status.dbValue,
       'gps_within_radius': scanContext.gpsWithinRadius,
       'sample_photo_url': storagePath,
@@ -494,6 +581,9 @@ class SupabaseSchoolRepository implements SchoolRepository {
       tfliteLabel: onDeviceResult?.label.dbValue,
       tfliteConfidence: onDeviceResult?.confidence,
       geminiSummaryJson: cloudResult?.toJsonMap(),
+      actualTempC: scanContext.actualTempC,
+      tempSource: scanContext.tempSource,
+      allergenTags: scanContext.payload.allergenTags,
       manualSmellOk: manualSmellOk,
       manualVisualOk: manualVisualOk,
       manualPackOk: manualPackOk,
@@ -542,6 +632,9 @@ class SupabaseSchoolRepository implements SchoolRepository {
         tfliteLabel: item.tfliteLabel,
         tfliteConfidence: item.tfliteConfidence,
         geminiSummaryJson: item.geminiSummaryJson,
+        actualTempC: item.actualTempC,
+        tempSource: item.tempSource,
+        allergenTags: item.allergenTags,
         manualSmellOk: item.manualSmellOk,
         manualVisualOk: item.manualVisualOk,
         manualPackOk: item.manualPackOk,
@@ -587,6 +680,12 @@ class SupabaseSchoolRepository implements SchoolRepository {
           .maybeSingle();
       return (inserted?['id'] as String?) ?? fallbackId;
     } on PostgrestException catch (pgError) {
+      if (pgError.code == 'PGRST204') {
+        final legacyInsert = Map<String, dynamic>.from(dbMap)
+          ..remove('actual_temp_celsius')
+          ..remove('temp_source');
+        return _saveInspectionRemote(client, legacyInsert);
+      }
       if (pgError.code != '23505') {
         rethrow;
       }
@@ -1086,6 +1185,8 @@ class SupabaseSchoolRepository implements SchoolRepository {
           ...dbMap,
           'batch_code': scanContext.payload.batchCode,
           'menu_name': scanContext.payload.menuName,
+          if (scanContext.payload.allergenTags.isNotEmpty)
+            'allergen_tags': scanContext.payload.allergenTags,
         }),
         localPhotoPathsJson: Value(
           jsonEncode(localPhotoPath == null ? const [] : [localPhotoPath]),
@@ -1183,6 +1284,15 @@ class SupabaseSchoolRepository implements SchoolRepository {
                     map['gemini_summary_json'] as Map,
                   )
                 : null,
+            actualTempC: (map['actual_temp_celsius'] as num?)?.toDouble(),
+            tempSource: FoodTemperatureSource.fromDb(
+              map['temp_source'] as String?,
+            ),
+            allergenTags: (map['allergen_tags'] is List)
+                ? BatchQrPayload.normalizeAllergenTags(
+                    (map['allergen_tags'] as List).whereType<String>(),
+                  )
+                : const [],
             manualSmellOk: (map['manual_smell_ok'] as bool?) ?? true,
             manualVisualOk: (map['manual_visual_ok'] as bool?) ?? true,
             manualPackOk: (map['manual_pack_ok'] as bool?) ?? true,
@@ -1213,11 +1323,15 @@ class SupabaseSchoolRepository implements SchoolRepository {
     return list;
   }
 
-  SchoolInspectionItem _mapRemoteInspectionRow(Map<String, dynamic> row) {
+  SchoolInspectionItem _mapRemoteInspectionRow(
+    Map<String, dynamic> row, {
+    Map<String, String> sampleLabelByInspectionId = const {},
+  }) {
+    final inspectionId = row['id'] as String;
     final batchMeta = row['food_batches'] as Map<String, dynamic>?;
     final rawSealed = batchMeta?['sealed_at'] as String?;
     return SchoolInspectionItem(
-      id: row['id'] as String,
+      id: inspectionId,
       batchId: row['batch_id'] as String,
       batchCode: (batchMeta?['batch_code'] as String?) ?? '-',
       menuName: (batchMeta?['menu_name'] as String?) ?? 'Menu SPPG',
@@ -1230,12 +1344,20 @@ class SupabaseSchoolRepository implements SchoolRepository {
       bmkgSource: _bmkgSourceFromDb(row['bmkg_source'] as String?),
       dangerStatus: DangerZoneStatus.fromDb(row['danger_status'] as String?),
       gpsWithinRadius: (row['gps_within_radius'] as bool?) ?? true,
+      sampleLabelCode: sampleLabelByInspectionId[inspectionId],
       samplePhotoUrl: row['sample_photo_url'] as String?,
       tfliteLabel: row['tflite_label'] as String?,
       tfliteConfidence: (row['tflite_confidence'] as num?)?.toDouble(),
       geminiSummaryJson: row['gemini_summary_json'] is Map
           ? Map<String, dynamic>.from(row['gemini_summary_json'] as Map)
           : null,
+      actualTempC: (row['actual_temp_celsius'] as num?)?.toDouble(),
+      tempSource: FoodTemperatureSource.fromDb(row['temp_source'] as String?),
+      allergenTags: (batchMeta?['allergen_tags'] is List)
+          ? BatchQrPayload.normalizeAllergenTags(
+              (batchMeta!['allergen_tags'] as List).whereType<String>(),
+            )
+          : const [],
       manualSmellOk: (row['manual_smell_ok'] as bool?) ?? true,
       manualVisualOk: (row['manual_visual_ok'] as bool?) ?? true,
       manualPackOk: (row['manual_pack_ok'] as bool?) ?? true,
@@ -1284,6 +1406,50 @@ class SupabaseSchoolRepository implements SchoolRepository {
       );
     } catch (_) {
       // Non-fatal.
+    }
+  }
+
+  Future<void> _refreshSigningKeysForSppgSafe(String sppgId) async {
+    final client = _client;
+    if (client == null || sppgId.isEmpty) {
+      return;
+    }
+    try {
+      final rows = List<Map<String, dynamic>>.from(
+        await client
+                .from('signing_keys')
+                .select(
+                  'key_id, sppg_id, public_key, status, device_label, created_at, retired_at, revoked_at',
+                )
+                .eq('sppg_id', sppgId)
+            as List,
+      );
+      final now = _clockUtc();
+      final companions = rows
+          .where((r) => (r['key_id'] as String?)?.isNotEmpty == true)
+          .map(
+            (r) => LocalSigningKeysCompanion(
+              keyId: Value(r['key_id'] as String),
+              sppgId: Value((r['sppg_id'] as String?) ?? sppgId),
+              publicKeyB64: Value((r['public_key'] as String?) ?? ''),
+              status: Value((r['status'] as String?) ?? 'active'),
+              deviceLabel: Value(r['device_label'] as String?),
+              createdAt: Value(
+                DateTime.tryParse('${r['created_at'] ?? ''}')?.toUtc() ?? now,
+              ),
+              retiredAt: Value(
+                DateTime.tryParse('${r['retired_at'] ?? ''}')?.toUtc(),
+              ),
+              revokedAt: Value(
+                DateTime.tryParse('${r['revoked_at'] ?? ''}')?.toUtc(),
+              ),
+              updatedAt: Value(now),
+            ),
+          )
+          .toList(growable: false);
+      await _database.upsertSigningKeys(companions);
+    } catch (_) {
+      // Non-fatal: remote table may not be migrated yet or connection unstable.
     }
   }
 }

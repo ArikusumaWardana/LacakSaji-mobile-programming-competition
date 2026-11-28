@@ -10,6 +10,8 @@ import '../../../core/widgets/editorial_widgets.dart';
 import '../../../core/widgets/lacak_buttons.dart';
 import '../../../core/widgets/lacak_feedback_states.dart';
 import '../../../core/widgets/lacak_status_badge.dart';
+import '../../alerts/domain/cluster_alert_models.dart';
+import '../../alerts/presentation/widgets/alert_resolution_sheet.dart';
 import '../../auth/domain/auth_models.dart';
 import '../../auth/presentation/auth_controller.dart';
 import '../domain/kitchen_models.dart';
@@ -45,8 +47,61 @@ class _KitchenDashboardScreenState
     super.dispose();
   }
 
-  void _showNotificationsSheet(KitchenDashboardData? data) {
+  Future<void> _openAlertResolution({
+    required KitchenProfile kitchen,
+    required ActiveClusterAlertItem item,
+    required String verifierName,
+  }) async {
+    final event = ClusterAlertEvent(
+      id: item.id,
+      sppgId: kitchen.id,
+      sppgName: kitchen.name,
+      batchId: item.batchId,
+      batchCode: item.batchCode,
+      menuName: item.menuName,
+      reporterSchoolId: item.reporterSchoolId,
+      reporterSchoolName: item.reporterSchoolName,
+      stage: ClusterAlertStage.fromDb(item.stage),
+      symptomCount: item.symptomCount,
+      broadcastEnabled: true,
+      createdAtUtc: item.createdAtUtc,
+      resolutionStatus: item.resolutionStatus,
+      resolutionNote: item.resolutionNote,
+      resolvedByName: item.resolvedByName,
+      resolvedAtUtc: item.resolvedAtUtc,
+    );
+    final updated = await showModalBottomSheet<ClusterAlertEvent>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppColors.bgCanvas,
+      constraints: const BoxConstraints(
+        maxWidth: AppSpacing.tabletFormMaxWidth,
+      ),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(
+          top: Radius.circular(AppSpacing.radiusHero),
+        ),
+      ),
+      builder: (_) =>
+          AlertResolutionSheet(alert: event, verifierName: verifierName),
+    );
+    if (updated != null && mounted) {
+      ref.invalidate(kitchenDashboardProvider);
+    }
+  }
+
+  void _showNotificationsSheet(
+    KitchenDashboardData? data, {
+    required bool isInstitutionAdmin,
+    required String verifierName,
+  }) {
     final alerts = data?.activeAlertsToday ?? const <ActiveClusterAlertItem>[];
+    final unresolvedAlerts = alerts
+        .where((a) => a.resolutionStatus != AlertResolutionStatus.clarifiedSafe)
+        .toList();
+    final clarifiedAlerts = alerts
+        .where((a) => a.resolutionStatus == AlertResolutionStatus.clarifiedSafe)
+        .toList();
     final pendingCount = data?.pendingSchoolsCount ?? 0;
 
     showModalBottomSheet<void>(
@@ -102,12 +157,39 @@ class _KitchenDashboardScreenState
                     ),
                   )
                 else ...[
-                  if (alerts.isNotEmpty) ...[
+                  if (unresolvedAlerts.isNotEmpty) ...[
                     LacakStatusBanner(
                       level: LacakStatusLevel.danger,
-                      title: '${alerts.length} Laporan Anomali Aktif',
+                      title: '${unresolvedAlerts.length} Laporan Anomali Aktif',
                       description:
-                          '${alerts.first.reporterSchoolName} melaporkan anomali pada ${alerts.first.menuName} (${alerts.first.batchCode}).',
+                          '${unresolvedAlerts.first.reporterSchoolName} melaporkan anomali pada ${unresolvedAlerts.first.menuName} (${unresolvedAlerts.first.batchCode}).',
+                      action:
+                          isInstitutionAdmin &&
+                              data != null &&
+                              unresolvedAlerts.first.resolutionStatus ==
+                                  AlertResolutionStatus.active
+                          ? LacakSecondaryButton(
+                              label: 'Klarifikasi / Perbarui Status',
+                              icon: Icons.verified_user_outlined,
+                              onPressed: () {
+                                Navigator.of(sheetContext).pop();
+                                _openAlertResolution(
+                                  kitchen: data.kitchen,
+                                  item: unresolvedAlerts.first,
+                                  verifierName: verifierName,
+                                );
+                              },
+                            )
+                          : null,
+                    ),
+                    const SizedBox(height: AppSpacing.md),
+                  ] else if (clarifiedAlerts.isNotEmpty) ...[
+                    LacakStatusBanner(
+                      level: LacakStatusLevel.safe,
+                      title: 'Status Darurat Diklarifikasi: Aman',
+                      description:
+                          clarifiedAlerts.first.resolutionNote ??
+                          'Laporan ${clarifiedAlerts.first.menuName} (${clarifiedAlerts.first.batchCode}) dinyatakan aman dilanjutkan.',
                     ),
                     const SizedBox(height: AppSpacing.md),
                   ],
@@ -210,8 +292,15 @@ class _KitchenDashboardScreenState
     }
 
     final dashData = dashboardAsync.value;
-    final hasUnread = (dashData?.activeAlertsToday.isNotEmpty ?? false) ||
+    final hasUnread =
+        (dashData?.activeAlertsToday.any(
+              (a) => a.resolutionStatus != AlertResolutionStatus.clarifiedSafe,
+            ) ??
+            false) ||
         (dashData?.pendingSchoolsCount ?? 0) > 0;
+    final verifierName = authState.profile?.fullName.isNotEmpty == true
+        ? authState.profile!.fullName
+        : kitchen.name;
 
     return Scaffold(
       backgroundColor: AppColors.bgCanvas,
@@ -221,7 +310,11 @@ class _KitchenDashboardScreenState
             contextLabel: 'Dapur SPPG · ${kitchen.inviteCode}',
             title: kitchen.name,
             hasUnreadAlert: hasUnread,
-            onNotificationTap: () => _showNotificationsSheet(dashData),
+            onNotificationTap: () => _showNotificationsSheet(
+              dashData,
+              isInstitutionAdmin: authState.isInstitutionAdmin,
+              verifierName: verifierName,
+            ),
           ),
           Expanded(
             child: RefreshIndicator(
@@ -323,6 +416,12 @@ class _KitchenDashboardScreenState
                             hasActiveFilter: _filter !=
                                     _KitchenDashboardFilter.all ||
                                 _searchQuery.isNotEmpty,
+                            isInstitutionAdmin: authState.isInstitutionAdmin,
+                            onResolveAlert: (item) => _openAlertResolution(
+                              kitchen: data.kitchen,
+                              item: item,
+                              verifierName: verifierName,
+                            ),
                             onResetFilter: () {
                               _searchController.clear();
                               setState(() {
@@ -353,6 +452,8 @@ class _DashboardContent extends StatelessWidget {
     required this.filterSchools,
     required this.horizontalPad,
     required this.hasActiveFilter,
+    required this.isInstitutionAdmin,
+    required this.onResolveAlert,
     required this.onResetFilter,
   });
 
@@ -362,24 +463,57 @@ class _DashboardContent extends StatelessWidget {
   final List<PartnerSchoolItem> Function(List<PartnerSchoolItem>) filterSchools;
   final double horizontalPad;
   final bool hasActiveFilter;
+  final bool isInstitutionAdmin;
+  final ValueChanged<ActiveClusterAlertItem> onResolveAlert;
   final VoidCallback onResetFilter;
 
   @override
   Widget build(BuildContext context) {
     final summary = data.weeklyWasteSummary;
 
+    final unresolvedAlerts = data.activeAlertsToday
+        .where((a) => a.resolutionStatus != AlertResolutionStatus.clarifiedSafe)
+        .toList();
+    final clarifiedAlerts = data.activeAlertsToday
+        .where((a) => a.resolutionStatus == AlertResolutionStatus.clarifiedSafe)
+        .toList();
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        if (data.activeAlertsToday.isNotEmpty) ...[
+        if (unresolvedAlerts.isNotEmpty) ...[
           Padding(
             padding: EdgeInsets.symmetric(horizontal: horizontalPad),
             child: LacakStatusBanner(
               level: LacakStatusLevel.danger,
-              title:
-                  'PERINGATAN DARURAT: ${data.activeAlertsToday.length} Laporan Anomali',
+              title: unresolvedAlerts.first.resolutionStatus ==
+                      AlertResolutionStatus.confirmedKlb
+                  ? 'TERKONFIRMASI KLB: ${unresolvedAlerts.length} Laporan Anomali'
+                  : 'PERINGATAN DARURAT: ${unresolvedAlerts.length} Laporan Anomali',
               description:
-                  '${data.activeAlertsToday.first.reporterSchoolName} melaporkan anomali pada batch ${data.activeAlertsToday.first.batchCode} (${data.activeAlertsToday.first.menuName}). Segera koordinasikan penahanan distribusi.',
+                  '${unresolvedAlerts.first.reporterSchoolName} melaporkan anomali pada batch ${unresolvedAlerts.first.batchCode} (${unresolvedAlerts.first.menuName}). Segera koordinasikan penahanan distribusi.',
+              action:
+                  isInstitutionAdmin &&
+                      unresolvedAlerts.first.resolutionStatus ==
+                          AlertResolutionStatus.active
+                  ? LacakSecondaryButton(
+                      label: 'Klarifikasi / Perbarui Status',
+                      icon: Icons.verified_user_outlined,
+                      onPressed: () => onResolveAlert(unresolvedAlerts.first),
+                    )
+                  : null,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.md),
+        ] else if (clarifiedAlerts.isNotEmpty) ...[
+          Padding(
+            padding: EdgeInsets.symmetric(horizontal: horizontalPad),
+            child: LacakStatusBanner(
+              level: LacakStatusLevel.safe,
+              title: 'Pembaruan Status Darurat: Distribusi Aman Dilanjutkan',
+              description:
+                  clarifiedAlerts.first.resolutionNote ??
+                  'Anomali pada batch ${clarifiedAlerts.first.batchCode} (${clarifiedAlerts.first.menuName}) dinyatakan aman dilanjutkan.',
             ),
           ),
           const SizedBox(height: AppSpacing.md),
@@ -622,10 +756,86 @@ class _DashboardContent extends StatelessWidget {
                 ),
               ),
               const Divider(height: 1),
+              _QuickModuleRow(
+                icon: Icons.inventory_2_rounded,
+                title: 'Riwayat Hulu Bahan Baku',
+                subtitle:
+                    'Catat pemasok, nomor lot, dan tanggal kedaluwarsa bahan utama.',
+                onTap: () => context.go(AppRoutes.kitchenIngredients),
+              ),
+              const Divider(height: 1),
+              _QuickModuleRow(
+                icon: Icons.cleaning_services_rounded,
+                title: 'Logistik & Sanitasi Wadah',
+                subtitle:
+                    'Verifikasi ompreng kembali dari sekolah dan standar pencucian.',
+                onTap: () => context.go(AppRoutes.kitchenTrays),
+              ),
+              const Divider(height: 1),
             ],
           ),
         ),
       ],
+    );
+  }
+}
+
+class _QuickModuleRow extends StatelessWidget {
+  const _QuickModuleRow({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(AppSpacing.radiusThumb),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
+        child: Row(
+          children: [
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: AppColors.surfaceSoft,
+                borderRadius: BorderRadius.circular(AppSpacing.radiusThumb),
+              ),
+              alignment: Alignment.center,
+              child: Icon(icon, size: 20, color: AppColors.primary),
+            ),
+            const SizedBox(width: AppSpacing.md),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title, style: AppTypography.titleItem),
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    style: AppTypography.bodyMedium.copyWith(
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Icon(
+              Icons.chevron_right_rounded,
+              size: 22,
+              color: AppColors.textSecondary,
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

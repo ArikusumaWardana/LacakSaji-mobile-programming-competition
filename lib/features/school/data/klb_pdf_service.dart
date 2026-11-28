@@ -82,7 +82,32 @@ class DeviceKlbReportPdfService implements KlbReportPdfService {
       )
       ..writeln(
         '- Suhu Wilayah: ${args.bmkgTempC.toStringAsFixed(1)} C (${args.bmkgSource.label}, ${AppConstants.bmkgShortAttribution})',
-      )
+      );
+
+    final handover = args.transitHandover;
+    if (handover != null) {
+      final transitMin = handover.transitDurationMinutes;
+      buffer.writeln(
+        '- Jam Muat Kurir (${handover.courierName}): ${formatWibDateTime(handover.effectiveDepartedAtUtc)}',
+      );
+      if (handover.arrivedAtUtc != null) {
+        buffer.writeln(
+          '- Jam Tiba Kurir: ${formatWibDateTime(handover.arrivedAtUtc!)} (Durasi Jalan: ${transitMin != null ? formatDurationMinutes(transitMin) : '-'})',
+        );
+      }
+    }
+
+    if (args.ingredientLogs.isNotEmpty) {
+      buffer.writeln();
+      buffer.writeln('*Riwayat Hulu Bahan Baku*');
+      for (final log in args.ingredientLogs.take(4)) {
+        buffer.writeln(
+          '- ${log.ingredientName} | ${log.supplierName} | Lot ${log.supplierBatchNo} | Exp ${log.formattedExpiryDate}',
+        );
+      }
+    }
+
+    buffer
       ..writeln()
       ..writeln('*Bank Sampel & Temuan*')
       ..writeln('- Kode Bank Sampel 2x24 Jam: *$sampleLine*')
@@ -127,16 +152,32 @@ class DeviceKlbReportPdfService implements KlbReportPdfService {
         ? 'Tahap 2: Pasca-Konsumsi (${args.symptomCount} siswa bergejala)'
         : 'Tahap 1: Pra-Konsumsi (Makanan ditahan sebelum makan)';
 
+    final handover = args.transitHandover;
+    final kitchenHoldMinutes = handover?.effectiveDepartedAtUtc
+        .toUtc()
+        .difference(args.sealedAtUtc.toUtc())
+        .inMinutes
+        .clamp(0, 1440);
+    final courierTransitMinutes = handover == null
+        ? null
+        : (handover.transitDurationMinutes ??
+              args.scannedAtUtc
+                  .toUtc()
+                  .difference(handover.effectiveDepartedAtUtc.toUtc())
+                  .inMinutes
+                  .clamp(0, 1440));
+    final hasIngredients = args.ingredientLogs.isNotEmpty;
+
     doc.addPage(
       pw.Page(
         pageFormat: PdfPageFormat.a4,
-        margin: const pw.EdgeInsets.all(24),
+        margin: const pw.EdgeInsets.all(20),
         build: (context) {
           return pw.Column(
             crossAxisAlignment: pw.CrossAxisAlignment.stretch,
             children: [
               pw.Container(
-                padding: const pw.EdgeInsets.all(12),
+                padding: const pw.EdgeInsets.all(10),
                 decoration: pw.BoxDecoration(
                   color: PdfColor.fromInt(0xFFFBECEC),
                   border: pw.Border.all(
@@ -153,16 +194,16 @@ class DeviceKlbReportPdfService implements KlbReportPdfService {
                     pw.Text(
                       'LACAKSAJI : KEAMANAN PANGAN MAKAN BERGIZI GRATIS',
                       style: pw.TextStyle(
-                        fontSize: 9,
+                        fontSize: 8.5,
                         fontWeight: pw.FontWeight.bold,
                         color: PdfColor.fromInt(0xFF8E2424),
                       ),
                     ),
-                    pw.SizedBox(height: 3),
+                    pw.SizedBox(height: 2),
                     pw.Text(
                       'BERITA ACARA & LAPORAN DINI KLB',
                       style: pw.TextStyle(
-                        fontSize: 16,
+                        fontSize: 15,
                         fontWeight: pw.FontWeight.bold,
                         color: PdfColor.fromInt(0xFF181E1B),
                       ),
@@ -173,16 +214,16 @@ class DeviceKlbReportPdfService implements KlbReportPdfService {
                         'Tanggal Laporan: ${formatWibDateTime(args.reportedAtUtc)}',
                       ),
                       style: const pw.TextStyle(
-                        fontSize: 9.5,
+                        fontSize: 9,
                         color: PdfColors.grey800,
                       ),
                     ),
                   ],
                 ),
               ),
-              pw.SizedBox(height: 10),
+              pw.SizedBox(height: 8),
               pw.Container(
-                padding: const pw.EdgeInsets.all(10),
+                padding: const pw.EdgeInsets.all(9),
                 decoration: pw.BoxDecoration(
                   border: pw.Border.all(color: PdfColors.grey400, width: 1),
                   borderRadius: const pw.BorderRadius.all(
@@ -202,9 +243,9 @@ class DeviceKlbReportPdfService implements KlbReportPdfService {
                   ],
                 ),
               ),
-              pw.SizedBox(height: 10),
+              pw.SizedBox(height: 8),
               pw.Container(
-                padding: const pw.EdgeInsets.all(10),
+                padding: const pw.EdgeInsets.all(9),
                 decoration: pw.BoxDecoration(
                   border: pw.Border.all(color: PdfColors.grey400, width: 1),
                   borderRadius: const pw.BorderRadius.all(
@@ -214,10 +255,35 @@ class DeviceKlbReportPdfService implements KlbReportPdfService {
                 child: pw.Column(
                   crossAxisAlignment: pw.CrossAxisAlignment.stretch,
                   children: [
-                    _sectionTitle('2. KRONOLOGI WAKTU-SUHU & CUACA'),
+                    _sectionTitle('2. KRONOLOGI WAKTU-SUHU & TRANSIT KURIR'),
                     _kvRow('Jam Segel Dapur SPPG', formatWibDateTime(args.sealedAtUtc)),
+                    if (handover != null) ...[
+                      _kvRow(
+                        'Jam Muat Kurir (${handover.courierName})',
+                        formatWibDateTime(handover.effectiveDepartedAtUtc),
+                      ),
+                      if (handover.arrivedAtUtc != null)
+                        _kvRow(
+                          'Jam Tiba Gerbang Sekolah',
+                          formatWibDateTime(handover.arrivedAtUtc!),
+                        ),
+                      if (kitchenHoldMinutes != null)
+                        _kvRow(
+                          'Jeda Tunggu di Dapur',
+                          formatDurationMinutes(kitchenHoldMinutes),
+                        ),
+                      if (courierTransitMinutes != null)
+                        _kvRow(
+                          'Durasi Transit Jalan Kurir',
+                          formatDurationMinutes(courierTransitMinutes),
+                        ),
+                    ] else
+                      _kvRow(
+                        'Log Transit Kurir',
+                        'Belum ada pindai kurir (langsung dipindai sekolah)',
+                      ),
                     _kvRow('Jam Scan & Terima Sekolah', formatWibDateTime(args.scannedAtUtc)),
-                    _kvRow('Durasi Perjalanan', formatDurationMinutes(args.elapsedMinutes)),
+                    _kvRow('Total Durasi Sejak Segel', formatDurationMinutes(args.elapsedMinutes)),
                     _kvRow(
                       'Suhu Lokal Wilayah',
                       '${args.bmkgTempC.toStringAsFixed(1)} C (${args.bmkgSource.label})',
@@ -230,9 +296,39 @@ class DeviceKlbReportPdfService implements KlbReportPdfService {
                   ],
                 ),
               ),
-              pw.SizedBox(height: 10),
+              pw.SizedBox(height: 8),
               pw.Container(
-                padding: const pw.EdgeInsets.all(10),
+                padding: const pw.EdgeInsets.all(9),
+                decoration: pw.BoxDecoration(
+                  border: pw.Border.all(color: PdfColors.grey400, width: 1),
+                  borderRadius: const pw.BorderRadius.all(
+                    pw.Radius.circular(6),
+                  ),
+                ),
+                child: pw.Column(
+                  crossAxisAlignment: pw.CrossAxisAlignment.stretch,
+                  children: [
+                    _sectionTitle('3. RIWAYAT HULU BAHAN BAKU & PEMASOK'),
+                    if (!hasIngredients)
+                      pw.Text(
+                        'Tidak ada log bahan baku tertaut pada batch ini saat laporan dibuat.',
+                        style: const pw.TextStyle(
+                          fontSize: 9,
+                          color: PdfColors.grey700,
+                        ),
+                      )
+                    else
+                      for (final log in args.ingredientLogs.take(4))
+                        _kvRow(
+                          log.ingredientName,
+                          '${log.supplierName} | Lot ${log.supplierBatchNo} | Exp ${log.formattedExpiryDate}',
+                        ),
+                  ],
+                ),
+              ),
+              pw.SizedBox(height: 8),
+              pw.Container(
+                padding: const pw.EdgeInsets.all(9),
                 decoration: pw.BoxDecoration(
                   color: PdfColor.fromInt(0xFFEBF4EF),
                   border: pw.Border.all(
@@ -246,12 +342,12 @@ class DeviceKlbReportPdfService implements KlbReportPdfService {
                 child: pw.Column(
                   crossAxisAlignment: pw.CrossAxisAlignment.start,
                   children: [
-                    _sectionTitle('3. KODE LABEL BANK SAMPEL 2x24 JAM (UJI LAB)'),
+                    _sectionTitle('4. KODE LABEL BANK SAMPEL 2x24 JAM (UJI LAB)'),
                     pw.SizedBox(height: 2),
                     pw.Text(
                       sampleCode,
                       style: pw.TextStyle(
-                        fontSize: 15,
+                        fontSize: 13.5,
                         fontWeight: pw.FontWeight.bold,
                         color: PdfColor.fromInt(0xFF19533B),
                       ),
@@ -260,16 +356,16 @@ class DeviceKlbReportPdfService implements KlbReportPdfService {
                     pw.Text(
                       'Simpan sampel arsip pada suhu < 5 C untuk diserahkan kepada petugas Puskesmas / laboratorium sesuai Perbagi No. 4 Tahun 2026.',
                       style: const pw.TextStyle(
-                        fontSize: 9,
+                        fontSize: 8.5,
                         color: PdfColors.grey800,
                       ),
                     ),
                   ],
                 ),
               ),
-              pw.SizedBox(height: 10),
+              pw.SizedBox(height: 8),
               pw.Container(
-                padding: const pw.EdgeInsets.all(10),
+                padding: const pw.EdgeInsets.all(9),
                 decoration: pw.BoxDecoration(
                   border: pw.Border.all(color: PdfColors.grey400, width: 1),
                   borderRadius: const pw.BorderRadius.all(
@@ -279,13 +375,13 @@ class DeviceKlbReportPdfService implements KlbReportPdfService {
                 child: pw.Column(
                   crossAxisAlignment: pw.CrossAxisAlignment.start,
                   children: [
-                    _sectionTitle('4. BUKTI FOTO SAMPEL LAPANGAN'),
-                    pw.SizedBox(height: 6),
+                    _sectionTitle('5. BUKTI FOTO SAMPEL LAPANGAN'),
+                    pw.SizedBox(height: 4),
                     if (embeddedPhotoJpg != null)
                       pw.Center(
                         child: pw.Image(
                           pw.MemoryImage(embeddedPhotoJpg),
-                          height: 130,
+                          height: hasIngredients ? 88 : 112,
                           fit: pw.BoxFit.contain,
                         ),
                       )
@@ -293,7 +389,7 @@ class DeviceKlbReportPdfService implements KlbReportPdfService {
                       pw.Text(
                         'Tidak ada foto sampel terlampir pada laporan ini (dihentikan langsung pada tahap waktu-suhu atau belum difoto).',
                         style: const pw.TextStyle(
-                          fontSize: 9.5,
+                          fontSize: 9,
                           color: PdfColors.grey700,
                         ),
                       ),

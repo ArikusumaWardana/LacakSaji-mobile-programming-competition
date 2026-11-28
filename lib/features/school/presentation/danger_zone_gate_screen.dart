@@ -5,13 +5,22 @@ import 'package:material_ui/material_ui.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/constants/app_routes.dart';
 import '../../../core/network/connectivity_provider.dart';
+import '../../../core/sensors/ble_thermometer_service.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/widgets/editorial_widgets.dart';
+import '../../../core/widgets/lacak_buttons.dart';
 import '../../../core/widgets/lacak_feedback_states.dart';
+import '../../../core/widgets/lacak_status_badge.dart';
+import '../../../core/widgets/lacak_text_field.dart';
+import '../../allergens/domain/allergen_models.dart';
+import '../../allergens/presentation/allergen_providers.dart';
 import '../../auth/presentation/auth_controller.dart';
 import '../../kitchen/domain/kitchen_models.dart';
+import '../../traceability/domain/traceability_models.dart';
+import '../../traceability/presentation/traceability_providers.dart';
+import '../../traceability/presentation/widgets/supply_chain_timeline.dart';
 import '../domain/danger_zone_calculator.dart';
 import '../domain/school_models.dart';
 import 'school_providers.dart';
@@ -29,7 +38,151 @@ class DangerZoneGateScreen extends ConsumerStatefulWidget {
 }
 
 class _DangerZoneGateScreenState extends ConsumerState<DangerZoneGateScreen> {
+  final TextEditingController _manualTempController = TextEditingController();
+  VerifiedBatchScanContext? _overrideContext;
+  int _tempMode = 0; // 0 = manual, 1 = BLE ready
+  BleThermometerAvailability? _bleAvailability;
+  bool _readingBle = false;
+  String? _tempError;
   bool _savingStop = false;
+
+  @override
+  void initState() {
+    super.initState();
+    Future.microtask(_loadBleAvailability);
+  }
+
+  @override
+  void didUpdateWidget(covariant DangerZoneGateScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.scanContext != widget.scanContext) {
+      _overrideContext = null;
+      _tempError = null;
+    }
+  }
+
+  @override
+  void dispose() {
+    _manualTempController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadBleAvailability() async {
+    try {
+      final status = await ref
+          .read(bleThermometerServiceProvider)
+          .checkAvailability();
+      if (mounted) {
+        setState(() => _bleAvailability = status);
+      }
+    } catch (_) {
+      // Safe no-crash fallback if device lacks BLE hardware.
+    }
+  }
+
+  void _applyActualTemperature(
+    VerifiedBatchScanContext baseCtx, {
+    required double tempC,
+    required FoodTemperatureSource source,
+  }) {
+    final reEvaluated = DangerZoneCalculator.evaluate(
+      riskCategory: baseCtx.riskCategory,
+      sealedAtUtc: baseCtx.sealedAtUtc,
+      scanAtUtc: baseCtx.scannedAtUtc,
+      temperatureC: baseCtx.weather.temperatureC,
+      actualTempC: tempC,
+      tempSource: source,
+    );
+    setState(() {
+      _tempError = null;
+      _overrideContext = baseCtx.copyWithActualTemp(
+        actualTempC: tempC,
+        tempSource: source,
+        dangerEvaluation: reEvaluated,
+      );
+    });
+  }
+
+  void _applyManualTemperature(VerifiedBatchScanContext baseCtx) {
+    final raw = _manualTempController.text.trim().replaceAll(',', '.');
+    final parsed = double.tryParse(raw);
+    if (parsed == null || parsed < -5.0 || parsed > 110.0) {
+      setState(() {
+        _tempError = 'Masukkan angka suhu makanan yang valid (-5 s.d. 110 C).';
+      });
+      return;
+    }
+    _applyActualTemperature(
+      baseCtx,
+      tempC: parsed,
+      source: FoodTemperatureSource.manualThermometer,
+    );
+  }
+
+  Future<void> _scanBleThermometer(VerifiedBatchScanContext baseCtx) async {
+    if (_readingBle) {
+      return;
+    }
+    setState(() {
+      _readingBle = true;
+      _tempError = null;
+    });
+    try {
+      final service = ref.read(bleThermometerServiceProvider);
+      final avail = await service.checkAvailability();
+      final reading = await service.readContainerTemperature();
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _bleAvailability = avail;
+        _readingBle = false;
+      });
+      if (reading != null) {
+        _manualTempController.text = reading.temperatureC.toStringAsFixed(1);
+        _applyActualTemperature(
+          baseCtx,
+          tempC: reading.temperatureC,
+          source: FoodTemperatureSource.bleSensor,
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Belum ada sensor BLE kontainer yang terpasang. Gunakan Termometer Manual atau lanjutkan dengan estimasi BMKG.',
+            ),
+          ),
+        );
+      }
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _readingBle = false;
+        _tempError =
+            'Sensor BLE belum terhubung. Gunakan Termometer Manual atau estimasi BMKG.';
+      });
+    }
+  }
+
+  void _resetToBmkg(VerifiedBatchScanContext baseCtx) {
+    final reEvaluated = DangerZoneCalculator.evaluate(
+      riskCategory: baseCtx.riskCategory,
+      sealedAtUtc: baseCtx.sealedAtUtc,
+      scanAtUtc: baseCtx.scannedAtUtc,
+      temperatureC: baseCtx.weather.temperatureC,
+    );
+    setState(() {
+      _tempError = null;
+      _manualTempController.clear();
+      _overrideContext = baseCtx.copyWithActualTemp(
+        actualTempC: null,
+        tempSource: FoodTemperatureSource.bmkgEstimate,
+        dangerEvaluation: reEvaluated,
+      );
+    });
+  }
 
   Future<void> _stopAndReport(
     VerifiedBatchScanContext ctx, {
@@ -93,8 +246,11 @@ class _DangerZoneGateScreenState extends ConsumerState<DangerZoneGateScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final ctx = widget.scanContext;
+    final baseCtx = widget.scanContext;
+    final ctx = _overrideContext ?? baseCtx;
     final school = ref.watch(authControllerProvider).school;
+    final schoolAllergens =
+        ref.watch(schoolAllergensProvider).value ?? const <SchoolAllergenEntry>[];
     final width = MediaQuery.sizeOf(context).width;
     final horizontalPad = AppSpacing.horizontalPadding(width);
     final maxWidth = AppSpacing.maxContentWidth(width);
@@ -120,6 +276,13 @@ class _DangerZoneGateScreenState extends ConsumerState<DangerZoneGateScreen> {
     final status = ctx.dangerEvaluation.status;
     final isRed = status == DangerZoneStatus.red;
     final isYellow = status == DangerZoneStatus.yellow;
+    final effectiveAllergenEntries = schoolAllergens.isNotEmpty
+        ? schoolAllergens
+        : ctx.matchedAllergens;
+    final allergenWarning = AllergenMatchWarning.intersect(
+      batchAllergenTags: ctx.payload.allergenTags,
+      schoolEntries: effectiveAllergenEntries,
+    );
 
     final Color heroBg = isRed
         ? AppColors.dangerBg
@@ -187,12 +350,28 @@ class _DangerZoneGateScreenState extends ConsumerState<DangerZoneGateScreen> {
                               ),
                               HeroMetricItem(
                                 icon: Icons.thermostat_rounded,
-                                label: ctx.weather.formattedTemperature,
+                                label: ctx.formattedEffectiveTemp,
                               ),
                             ],
                           ),
                         ),
                       ),
+                      if (allergenWarning.hasMatches)
+                        Padding(
+                          padding: EdgeInsets.fromLTRB(
+                            horizontalPad,
+                            AppSpacing.md,
+                            horizontalPad,
+                            0,
+                          ),
+                          child: LacakStatusBanner(
+                            level: LacakStatusLevel.danger,
+                            icon: Icons.health_and_safety_rounded,
+                            title:
+                                'PERINGATAN ALERGEN SISWA (${allergenWarning.totalReportedCases} SISWA TERDAMPAK)',
+                            description: allergenWarning.buildSummaryMessage(),
+                          ),
+                        ),
                       Padding(
                         padding: EdgeInsets.fromLTRB(
                           horizontalPad,
@@ -254,6 +433,23 @@ class _DangerZoneGateScreenState extends ConsumerState<DangerZoneGateScreen> {
                               ],
                             ),
                             const SizedBox(height: AppSpacing.xl),
+                            _ActualTemperatureSection(
+                              ctx: ctx,
+                              tempMode: _tempMode,
+                              onModeChanged: (next) =>
+                                  setState(() => _tempMode = next),
+                              manualController: _manualTempController,
+                              tempError: _tempError,
+                              onApplyManual: () =>
+                                  _applyManualTemperature(ctx),
+                              bleAvailability: _bleAvailability,
+                              readingBle: _readingBle,
+                              onScanBle: () => _scanBleThermometer(ctx),
+                              onResetBmkg: () => _resetToBmkg(ctx),
+                            ),
+                            const SizedBox(height: AppSpacing.xl),
+                            _GateSupplyChainTimelineSection(ctx: ctx),
+                            const SizedBox(height: AppSpacing.xl),
                             Text(
                               'Rincian Verifikasi Pengiriman',
                               style: AppTypography.titleSection,
@@ -265,6 +461,15 @@ class _DangerZoneGateScreenState extends ConsumerState<DangerZoneGateScreen> {
                               value: ctx.payload.batchCode,
                               tabular: true,
                             ),
+                            if (ctx.payload.allergenTags.isNotEmpty) ...[
+                              const Divider(height: 1),
+                              _FlatGateRow(
+                                label: 'Tag Alergen Menu',
+                                value: ctx.payload.allergenTags
+                                    .map(AllergenTag.displayLabelFor)
+                                    .join(', '),
+                              ),
+                            ],
                             const Divider(height: 1),
                             _FlatGateRow(
                               label: 'Jam Segel Dapur',
@@ -279,10 +484,15 @@ class _DangerZoneGateScreenState extends ConsumerState<DangerZoneGateScreen> {
                             ),
                             const Divider(height: 1),
                             _FlatGateRow(
-                              label: 'Suhu Wilayah',
-                              value:
-                                  '${ctx.weather.formattedTemperature} · ${ctx.weather.source.label}',
-                              subtitle: AppConstants.bmkgShortAttribution,
+                              label: ctx.actualTempC != null
+                                  ? 'Suhu Acuan Aktif'
+                                  : 'Suhu Wilayah',
+                              value: ctx.actualTempC != null
+                                  ? '${ctx.formattedEffectiveTemp} · ${ctx.tempSource.label}'
+                                  : '${ctx.weather.formattedTemperature} · ${ctx.weather.source.label}',
+                              subtitle: ctx.actualTempC != null
+                                  ? 'Default BMKG: ${ctx.weather.formattedTemperature} (${AppConstants.bmkgShortAttribution})'
+                                  : AppConstants.bmkgShortAttribution,
                               tabular: true,
                             ),
                             const Divider(height: 1),
@@ -343,7 +553,7 @@ class _DangerZoneGateScreenState extends ConsumerState<DangerZoneGateScreen> {
                 ? () => _stopAndReport(
                     ctx,
                     reasonSummary:
-                        'Durasi perjalanan (${formatDurationMinutes(ctx.dangerEvaluation.elapsedMinutes)}) melewati batas aman pada suhu ${ctx.weather.formattedTemperature}.',
+                        'Durasi perjalanan (${formatDurationMinutes(ctx.dangerEvaluation.elapsedMinutes)}) melewati batas aman pada suhu ${ctx.formattedEffectiveTemp}.',
                   )
                 : () => context.push(AppRoutes.schoolVisualAudit, extra: ctx),
           ),
@@ -420,6 +630,182 @@ class _FlatGateRow extends StatelessWidget {
           );
         },
       ),
+    );
+  }
+}
+
+class _GateSupplyChainTimelineSection extends ConsumerWidget {
+  const _GateSupplyChainTimelineSection({required this.ctx});
+
+  final VerifiedBatchScanContext ctx;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final timelineAsync = ref.watch(
+      batchSupplyChainTimelineProvider((
+        sppgId: ctx.payload.sppgId,
+        batchId: ctx.payload.batchId,
+        sealedAtUtc: ctx.sealedAtUtc,
+        schoolScannedAtUtc: ctx.scannedAtUtc,
+      )),
+    );
+
+    final fallback = SupplyChainTimelineData(
+      batchId: ctx.payload.batchId,
+      sealedAtUtc: ctx.sealedAtUtc,
+      schoolScannedAtUtc: ctx.scannedAtUtc,
+    );
+
+    return SupplyChainTimeline(
+      timeline: timelineAsync.value ?? fallback,
+    );
+  }
+}
+
+class _ActualTemperatureSection extends StatelessWidget {
+  const _ActualTemperatureSection({
+    required this.ctx,
+    required this.tempMode,
+    required this.onModeChanged,
+    required this.manualController,
+    required this.tempError,
+    required this.onApplyManual,
+    required this.bleAvailability,
+    required this.readingBle,
+    required this.onScanBle,
+    required this.onResetBmkg,
+  });
+
+  final VerifiedBatchScanContext ctx;
+  final int tempMode;
+  final ValueChanged<int> onModeChanged;
+  final TextEditingController manualController;
+  final String? tempError;
+  final VoidCallback onApplyManual;
+  final BleThermometerAvailability? bleAvailability;
+  final bool readingBle;
+  final VoidCallback onScanBle;
+  final VoidCallback onResetBmkg;
+
+  @override
+  Widget build(BuildContext context) {
+    final hasActual = ctx.actualTempC != null;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Wrap(
+          spacing: AppSpacing.sm,
+          runSpacing: AppSpacing.xs,
+          alignment: WrapAlignment.spaceBetween,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            Text(
+              'Ukur Suhu Aktual Makanan (Opsional)',
+              style: AppTypography.titleSection,
+            ),
+            if (hasActual)
+              LacakStatusTag(
+                level: LacakStatusLevel.safe,
+                label: ctx.tempSource.label,
+              ),
+          ],
+        ),
+        const SizedBox(height: 2),
+        Text(
+          'Default otomatis memakai suhu BMKG Rp0. Jika tersedia termometer tusuk atau sensor kontainer, ukur suhu inti untuk pembaruan langsung.',
+          style: AppTypography.captionMuted,
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        FilterChipStrip<int>(
+          padding: EdgeInsets.zero,
+          selectedValue: tempMode,
+          onSelected: onModeChanged,
+          items: const [
+            FilterChipItem(
+              value: 0,
+              label: 'Termometer Manual',
+              icon: Icons.thermostat_rounded,
+            ),
+            FilterChipItem(
+              value: 1,
+              label: 'Sensor BLE',
+              icon: Icons.bluetooth_searching_rounded,
+            ),
+          ],
+        ),
+        const SizedBox(height: AppSpacing.md),
+        Container(
+          padding: const EdgeInsets.all(AppSpacing.lg),
+          decoration: BoxDecoration(
+            color: AppColors.surfaceSoft,
+            borderRadius: BorderRadius.circular(AppSpacing.radiusSurface),
+          ),
+          child: tempMode == 0
+              ? Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    LacakTextField(
+                      label: 'Suhu Inti Makanan (Celsius)',
+                      controller: manualController,
+                      hintText: 'Contoh: 64.5',
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true,
+                      ),
+                    ),
+                    if (tempError != null) ...[
+                      const SizedBox(height: AppSpacing.xs),
+                      Text(
+                        tempError!,
+                        style: AppTypography.captionMuted.copyWith(
+                          color: AppColors.dangerFg,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: AppSpacing.md),
+                    LacakSecondaryButton(
+                      label: 'Terapkan Suhu Aktual',
+                      icon: Icons.check_rounded,
+                      onPressed: onApplyManual,
+                    ),
+                  ],
+                )
+              : Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text(
+                      bleAvailability?.status.label ?? 'Siap Dihubungkan',
+                      style: AppTypography.titleItem,
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      bleAvailability?.detail ??
+                          'Arsitektur siap menghubungkan sensor suhu Bluetooth Low Energy (BLE) kontainer tanpa mengganggu alur offline.',
+                      style: AppTypography.bodyMedium,
+                    ),
+                    const SizedBox(height: AppSpacing.md),
+                    LacakSecondaryButton(
+                      label: 'Pindai Sensor BLE Kontainer',
+                      icon: Icons.bluetooth_connected_rounded,
+                      isLoading: readingBle,
+                      onPressed: onScanBle,
+                    ),
+                  ],
+                ),
+        ),
+        if (hasActual) ...[
+          const SizedBox(height: AppSpacing.xs),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton.icon(
+              onPressed: onResetBmkg,
+              icon: const Icon(Icons.restart_alt_rounded, size: 18),
+              label: const Text('Kembali ke Estimasi BMKG'),
+            ),
+          ),
+        ],
+      ],
     );
   }
 }

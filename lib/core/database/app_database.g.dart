@@ -376,6 +376,2226 @@ class LocalSppgKeysCompanion extends UpdateCompanion<LocalSppgKey> {
   }
 }
 
+class $LocalSigningKeysTable extends LocalSigningKeys
+    with TableInfo<$LocalSigningKeysTable, LocalSigningKey> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $LocalSigningKeysTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _keyIdMeta = const VerificationMeta('keyId');
+  @override
+  late final GeneratedColumn<String> keyId = GeneratedColumn<String>(
+    'key_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _sppgIdMeta = const VerificationMeta('sppgId');
+  @override
+  late final GeneratedColumn<String> sppgId = GeneratedColumn<String>(
+    'sppg_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _publicKeyB64Meta = const VerificationMeta(
+    'publicKeyB64',
+  );
+  @override
+  late final GeneratedColumn<String> publicKeyB64 = GeneratedColumn<String>(
+    'public_key_b64',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _statusMeta = const VerificationMeta('status');
+  @override
+  late final GeneratedColumn<String> status = GeneratedColumn<String>(
+    'status',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('active'),
+  );
+  static const VerificationMeta _deviceLabelMeta = const VerificationMeta(
+    'deviceLabel',
+  );
+  @override
+  late final GeneratedColumn<String> deviceLabel = GeneratedColumn<String>(
+    'device_label',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _retiredAtMeta = const VerificationMeta(
+    'retiredAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> retiredAt = GeneratedColumn<DateTime>(
+    'retired_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _revokedAtMeta = const VerificationMeta(
+    'revokedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> revokedAt = GeneratedColumn<DateTime>(
+    'revoked_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    keyId,
+    sppgId,
+    publicKeyB64,
+    status,
+    deviceLabel,
+    createdAt,
+    retiredAt,
+    revokedAt,
+    updatedAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'local_signing_keys';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<LocalSigningKey> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('key_id')) {
+      context.handle(
+        _keyIdMeta,
+        keyId.isAcceptableOrUnknown(data['key_id']!, _keyIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_keyIdMeta);
+    }
+    if (data.containsKey('sppg_id')) {
+      context.handle(
+        _sppgIdMeta,
+        sppgId.isAcceptableOrUnknown(data['sppg_id']!, _sppgIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_sppgIdMeta);
+    }
+    if (data.containsKey('public_key_b64')) {
+      context.handle(
+        _publicKeyB64Meta,
+        publicKeyB64.isAcceptableOrUnknown(
+          data['public_key_b64']!,
+          _publicKeyB64Meta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_publicKeyB64Meta);
+    }
+    if (data.containsKey('status')) {
+      context.handle(
+        _statusMeta,
+        status.isAcceptableOrUnknown(data['status']!, _statusMeta),
+      );
+    }
+    if (data.containsKey('device_label')) {
+      context.handle(
+        _deviceLabelMeta,
+        deviceLabel.isAcceptableOrUnknown(
+          data['device_label']!,
+          _deviceLabelMeta,
+        ),
+      );
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_createdAtMeta);
+    }
+    if (data.containsKey('retired_at')) {
+      context.handle(
+        _retiredAtMeta,
+        retiredAt.isAcceptableOrUnknown(data['retired_at']!, _retiredAtMeta),
+      );
+    }
+    if (data.containsKey('revoked_at')) {
+      context.handle(
+        _revokedAtMeta,
+        revokedAt.isAcceptableOrUnknown(data['revoked_at']!, _revokedAtMeta),
+      );
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_updatedAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {keyId};
+  @override
+  LocalSigningKey map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return LocalSigningKey(
+      keyId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}key_id'],
+      )!,
+      sppgId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}sppg_id'],
+      )!,
+      publicKeyB64: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}public_key_b64'],
+      )!,
+      status: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}status'],
+      )!,
+      deviceLabel: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}device_label'],
+      ),
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}created_at'],
+      )!,
+      retiredAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}retired_at'],
+      ),
+      revokedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}revoked_at'],
+      ),
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      )!,
+    );
+  }
+
+  @override
+  $LocalSigningKeysTable createAlias(String alias) {
+    return $LocalSigningKeysTable(attachedDatabase, alias);
+  }
+}
+
+class LocalSigningKey extends DataClass implements Insertable<LocalSigningKey> {
+  final String keyId;
+  final String sppgId;
+  final String publicKeyB64;
+
+  /// One of: active, retired, revoked.
+  final String status;
+  final String? deviceLabel;
+  final DateTime createdAt;
+  final DateTime? retiredAt;
+  final DateTime? revokedAt;
+  final DateTime updatedAt;
+  const LocalSigningKey({
+    required this.keyId,
+    required this.sppgId,
+    required this.publicKeyB64,
+    required this.status,
+    this.deviceLabel,
+    required this.createdAt,
+    this.retiredAt,
+    this.revokedAt,
+    required this.updatedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['key_id'] = Variable<String>(keyId);
+    map['sppg_id'] = Variable<String>(sppgId);
+    map['public_key_b64'] = Variable<String>(publicKeyB64);
+    map['status'] = Variable<String>(status);
+    if (!nullToAbsent || deviceLabel != null) {
+      map['device_label'] = Variable<String>(deviceLabel);
+    }
+    map['created_at'] = Variable<DateTime>(createdAt);
+    if (!nullToAbsent || retiredAt != null) {
+      map['retired_at'] = Variable<DateTime>(retiredAt);
+    }
+    if (!nullToAbsent || revokedAt != null) {
+      map['revoked_at'] = Variable<DateTime>(revokedAt);
+    }
+    map['updated_at'] = Variable<DateTime>(updatedAt);
+    return map;
+  }
+
+  LocalSigningKeysCompanion toCompanion(bool nullToAbsent) {
+    return LocalSigningKeysCompanion(
+      keyId: Value(keyId),
+      sppgId: Value(sppgId),
+      publicKeyB64: Value(publicKeyB64),
+      status: Value(status),
+      deviceLabel: deviceLabel == null && nullToAbsent
+          ? const Value.absent()
+          : Value(deviceLabel),
+      createdAt: Value(createdAt),
+      retiredAt: retiredAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(retiredAt),
+      revokedAt: revokedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(revokedAt),
+      updatedAt: Value(updatedAt),
+    );
+  }
+
+  factory LocalSigningKey.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return LocalSigningKey(
+      keyId: serializer.fromJson<String>(json['keyId']),
+      sppgId: serializer.fromJson<String>(json['sppgId']),
+      publicKeyB64: serializer.fromJson<String>(json['publicKeyB64']),
+      status: serializer.fromJson<String>(json['status']),
+      deviceLabel: serializer.fromJson<String?>(json['deviceLabel']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      retiredAt: serializer.fromJson<DateTime?>(json['retiredAt']),
+      revokedAt: serializer.fromJson<DateTime?>(json['revokedAt']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'keyId': serializer.toJson<String>(keyId),
+      'sppgId': serializer.toJson<String>(sppgId),
+      'publicKeyB64': serializer.toJson<String>(publicKeyB64),
+      'status': serializer.toJson<String>(status),
+      'deviceLabel': serializer.toJson<String?>(deviceLabel),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+      'retiredAt': serializer.toJson<DateTime?>(retiredAt),
+      'revokedAt': serializer.toJson<DateTime?>(revokedAt),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+    };
+  }
+
+  LocalSigningKey copyWith({
+    String? keyId,
+    String? sppgId,
+    String? publicKeyB64,
+    String? status,
+    Value<String?> deviceLabel = const Value.absent(),
+    DateTime? createdAt,
+    Value<DateTime?> retiredAt = const Value.absent(),
+    Value<DateTime?> revokedAt = const Value.absent(),
+    DateTime? updatedAt,
+  }) => LocalSigningKey(
+    keyId: keyId ?? this.keyId,
+    sppgId: sppgId ?? this.sppgId,
+    publicKeyB64: publicKeyB64 ?? this.publicKeyB64,
+    status: status ?? this.status,
+    deviceLabel: deviceLabel.present ? deviceLabel.value : this.deviceLabel,
+    createdAt: createdAt ?? this.createdAt,
+    retiredAt: retiredAt.present ? retiredAt.value : this.retiredAt,
+    revokedAt: revokedAt.present ? revokedAt.value : this.revokedAt,
+    updatedAt: updatedAt ?? this.updatedAt,
+  );
+  LocalSigningKey copyWithCompanion(LocalSigningKeysCompanion data) {
+    return LocalSigningKey(
+      keyId: data.keyId.present ? data.keyId.value : this.keyId,
+      sppgId: data.sppgId.present ? data.sppgId.value : this.sppgId,
+      publicKeyB64: data.publicKeyB64.present
+          ? data.publicKeyB64.value
+          : this.publicKeyB64,
+      status: data.status.present ? data.status.value : this.status,
+      deviceLabel: data.deviceLabel.present
+          ? data.deviceLabel.value
+          : this.deviceLabel,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      retiredAt: data.retiredAt.present ? data.retiredAt.value : this.retiredAt,
+      revokedAt: data.revokedAt.present ? data.revokedAt.value : this.revokedAt,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('LocalSigningKey(')
+          ..write('keyId: $keyId, ')
+          ..write('sppgId: $sppgId, ')
+          ..write('publicKeyB64: $publicKeyB64, ')
+          ..write('status: $status, ')
+          ..write('deviceLabel: $deviceLabel, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('retiredAt: $retiredAt, ')
+          ..write('revokedAt: $revokedAt, ')
+          ..write('updatedAt: $updatedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    keyId,
+    sppgId,
+    publicKeyB64,
+    status,
+    deviceLabel,
+    createdAt,
+    retiredAt,
+    revokedAt,
+    updatedAt,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is LocalSigningKey &&
+          other.keyId == this.keyId &&
+          other.sppgId == this.sppgId &&
+          other.publicKeyB64 == this.publicKeyB64 &&
+          other.status == this.status &&
+          other.deviceLabel == this.deviceLabel &&
+          other.createdAt == this.createdAt &&
+          other.retiredAt == this.retiredAt &&
+          other.revokedAt == this.revokedAt &&
+          other.updatedAt == this.updatedAt);
+}
+
+class LocalSigningKeysCompanion extends UpdateCompanion<LocalSigningKey> {
+  final Value<String> keyId;
+  final Value<String> sppgId;
+  final Value<String> publicKeyB64;
+  final Value<String> status;
+  final Value<String?> deviceLabel;
+  final Value<DateTime> createdAt;
+  final Value<DateTime?> retiredAt;
+  final Value<DateTime?> revokedAt;
+  final Value<DateTime> updatedAt;
+  final Value<int> rowid;
+  const LocalSigningKeysCompanion({
+    this.keyId = const Value.absent(),
+    this.sppgId = const Value.absent(),
+    this.publicKeyB64 = const Value.absent(),
+    this.status = const Value.absent(),
+    this.deviceLabel = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.retiredAt = const Value.absent(),
+    this.revokedAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  LocalSigningKeysCompanion.insert({
+    required String keyId,
+    required String sppgId,
+    required String publicKeyB64,
+    this.status = const Value.absent(),
+    this.deviceLabel = const Value.absent(),
+    required DateTime createdAt,
+    this.retiredAt = const Value.absent(),
+    this.revokedAt = const Value.absent(),
+    required DateTime updatedAt,
+    this.rowid = const Value.absent(),
+  }) : keyId = Value(keyId),
+       sppgId = Value(sppgId),
+       publicKeyB64 = Value(publicKeyB64),
+       createdAt = Value(createdAt),
+       updatedAt = Value(updatedAt);
+  static Insertable<LocalSigningKey> custom({
+    Expression<String>? keyId,
+    Expression<String>? sppgId,
+    Expression<String>? publicKeyB64,
+    Expression<String>? status,
+    Expression<String>? deviceLabel,
+    Expression<DateTime>? createdAt,
+    Expression<DateTime>? retiredAt,
+    Expression<DateTime>? revokedAt,
+    Expression<DateTime>? updatedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (keyId != null) 'key_id': keyId,
+      if (sppgId != null) 'sppg_id': sppgId,
+      if (publicKeyB64 != null) 'public_key_b64': publicKeyB64,
+      if (status != null) 'status': status,
+      if (deviceLabel != null) 'device_label': deviceLabel,
+      if (createdAt != null) 'created_at': createdAt,
+      if (retiredAt != null) 'retired_at': retiredAt,
+      if (revokedAt != null) 'revoked_at': revokedAt,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  LocalSigningKeysCompanion copyWith({
+    Value<String>? keyId,
+    Value<String>? sppgId,
+    Value<String>? publicKeyB64,
+    Value<String>? status,
+    Value<String?>? deviceLabel,
+    Value<DateTime>? createdAt,
+    Value<DateTime?>? retiredAt,
+    Value<DateTime?>? revokedAt,
+    Value<DateTime>? updatedAt,
+    Value<int>? rowid,
+  }) {
+    return LocalSigningKeysCompanion(
+      keyId: keyId ?? this.keyId,
+      sppgId: sppgId ?? this.sppgId,
+      publicKeyB64: publicKeyB64 ?? this.publicKeyB64,
+      status: status ?? this.status,
+      deviceLabel: deviceLabel ?? this.deviceLabel,
+      createdAt: createdAt ?? this.createdAt,
+      retiredAt: retiredAt ?? this.retiredAt,
+      revokedAt: revokedAt ?? this.revokedAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (keyId.present) {
+      map['key_id'] = Variable<String>(keyId.value);
+    }
+    if (sppgId.present) {
+      map['sppg_id'] = Variable<String>(sppgId.value);
+    }
+    if (publicKeyB64.present) {
+      map['public_key_b64'] = Variable<String>(publicKeyB64.value);
+    }
+    if (status.present) {
+      map['status'] = Variable<String>(status.value);
+    }
+    if (deviceLabel.present) {
+      map['device_label'] = Variable<String>(deviceLabel.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (retiredAt.present) {
+      map['retired_at'] = Variable<DateTime>(retiredAt.value);
+    }
+    if (revokedAt.present) {
+      map['revoked_at'] = Variable<DateTime>(revokedAt.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('LocalSigningKeysCompanion(')
+          ..write('keyId: $keyId, ')
+          ..write('sppgId: $sppgId, ')
+          ..write('publicKeyB64: $publicKeyB64, ')
+          ..write('status: $status, ')
+          ..write('deviceLabel: $deviceLabel, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('retiredAt: $retiredAt, ')
+          ..write('revokedAt: $revokedAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $LocalInstitutionMembersTable extends LocalInstitutionMembers
+    with TableInfo<$LocalInstitutionMembersTable, LocalInstitutionMember> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $LocalInstitutionMembersTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _institutionTypeMeta = const VerificationMeta(
+    'institutionType',
+  );
+  @override
+  late final GeneratedColumn<String> institutionType = GeneratedColumn<String>(
+    'institution_type',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _institutionIdMeta = const VerificationMeta(
+    'institutionId',
+  );
+  @override
+  late final GeneratedColumn<String> institutionId = GeneratedColumn<String>(
+    'institution_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _userIdMeta = const VerificationMeta('userId');
+  @override
+  late final GeneratedColumn<String> userId = GeneratedColumn<String>(
+    'user_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _memberNameMeta = const VerificationMeta(
+    'memberName',
+  );
+  @override
+  late final GeneratedColumn<String> memberName = GeneratedColumn<String>(
+    'member_name',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _memberEmailMeta = const VerificationMeta(
+    'memberEmail',
+  );
+  @override
+  late final GeneratedColumn<String> memberEmail = GeneratedColumn<String>(
+    'member_email',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _roleMeta = const VerificationMeta('role');
+  @override
+  late final GeneratedColumn<String> role = GeneratedColumn<String>(
+    'role',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _isActiveMeta = const VerificationMeta(
+    'isActive',
+  );
+  @override
+  late final GeneratedColumn<bool> isActive = GeneratedColumn<bool>(
+    'is_active',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("is_active" IN (0, 1))',
+    ),
+    defaultValue: const Constant(true),
+  );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    institutionType,
+    institutionId,
+    userId,
+    memberName,
+    memberEmail,
+    role,
+    isActive,
+    createdAt,
+    updatedAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'local_institution_members';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<LocalInstitutionMember> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('institution_type')) {
+      context.handle(
+        _institutionTypeMeta,
+        institutionType.isAcceptableOrUnknown(
+          data['institution_type']!,
+          _institutionTypeMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_institutionTypeMeta);
+    }
+    if (data.containsKey('institution_id')) {
+      context.handle(
+        _institutionIdMeta,
+        institutionId.isAcceptableOrUnknown(
+          data['institution_id']!,
+          _institutionIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_institutionIdMeta);
+    }
+    if (data.containsKey('user_id')) {
+      context.handle(
+        _userIdMeta,
+        userId.isAcceptableOrUnknown(data['user_id']!, _userIdMeta),
+      );
+    }
+    if (data.containsKey('member_name')) {
+      context.handle(
+        _memberNameMeta,
+        memberName.isAcceptableOrUnknown(data['member_name']!, _memberNameMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_memberNameMeta);
+    }
+    if (data.containsKey('member_email')) {
+      context.handle(
+        _memberEmailMeta,
+        memberEmail.isAcceptableOrUnknown(
+          data['member_email']!,
+          _memberEmailMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_memberEmailMeta);
+    }
+    if (data.containsKey('role')) {
+      context.handle(
+        _roleMeta,
+        role.isAcceptableOrUnknown(data['role']!, _roleMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_roleMeta);
+    }
+    if (data.containsKey('is_active')) {
+      context.handle(
+        _isActiveMeta,
+        isActive.isAcceptableOrUnknown(data['is_active']!, _isActiveMeta),
+      );
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_createdAtMeta);
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_updatedAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  LocalInstitutionMember map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return LocalInstitutionMember(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      institutionType: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}institution_type'],
+      )!,
+      institutionId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}institution_id'],
+      )!,
+      userId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}user_id'],
+      ),
+      memberName: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}member_name'],
+      )!,
+      memberEmail: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}member_email'],
+      )!,
+      role: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}role'],
+      )!,
+      isActive: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}is_active'],
+      )!,
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}created_at'],
+      )!,
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      )!,
+    );
+  }
+
+  @override
+  $LocalInstitutionMembersTable createAlias(String alias) {
+    return $LocalInstitutionMembersTable(attachedDatabase, alias);
+  }
+}
+
+class LocalInstitutionMember extends DataClass
+    implements Insertable<LocalInstitutionMember> {
+  final String id;
+
+  /// One of: sppg, school.
+  final String institutionType;
+  final String institutionId;
+  final String? userId;
+  final String memberName;
+  final String memberEmail;
+
+  /// One of: admin, staff, courier.
+  final String role;
+  final bool isActive;
+  final DateTime createdAt;
+  final DateTime updatedAt;
+  const LocalInstitutionMember({
+    required this.id,
+    required this.institutionType,
+    required this.institutionId,
+    this.userId,
+    required this.memberName,
+    required this.memberEmail,
+    required this.role,
+    required this.isActive,
+    required this.createdAt,
+    required this.updatedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['institution_type'] = Variable<String>(institutionType);
+    map['institution_id'] = Variable<String>(institutionId);
+    if (!nullToAbsent || userId != null) {
+      map['user_id'] = Variable<String>(userId);
+    }
+    map['member_name'] = Variable<String>(memberName);
+    map['member_email'] = Variable<String>(memberEmail);
+    map['role'] = Variable<String>(role);
+    map['is_active'] = Variable<bool>(isActive);
+    map['created_at'] = Variable<DateTime>(createdAt);
+    map['updated_at'] = Variable<DateTime>(updatedAt);
+    return map;
+  }
+
+  LocalInstitutionMembersCompanion toCompanion(bool nullToAbsent) {
+    return LocalInstitutionMembersCompanion(
+      id: Value(id),
+      institutionType: Value(institutionType),
+      institutionId: Value(institutionId),
+      userId: userId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(userId),
+      memberName: Value(memberName),
+      memberEmail: Value(memberEmail),
+      role: Value(role),
+      isActive: Value(isActive),
+      createdAt: Value(createdAt),
+      updatedAt: Value(updatedAt),
+    );
+  }
+
+  factory LocalInstitutionMember.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return LocalInstitutionMember(
+      id: serializer.fromJson<String>(json['id']),
+      institutionType: serializer.fromJson<String>(json['institutionType']),
+      institutionId: serializer.fromJson<String>(json['institutionId']),
+      userId: serializer.fromJson<String?>(json['userId']),
+      memberName: serializer.fromJson<String>(json['memberName']),
+      memberEmail: serializer.fromJson<String>(json['memberEmail']),
+      role: serializer.fromJson<String>(json['role']),
+      isActive: serializer.fromJson<bool>(json['isActive']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'institutionType': serializer.toJson<String>(institutionType),
+      'institutionId': serializer.toJson<String>(institutionId),
+      'userId': serializer.toJson<String?>(userId),
+      'memberName': serializer.toJson<String>(memberName),
+      'memberEmail': serializer.toJson<String>(memberEmail),
+      'role': serializer.toJson<String>(role),
+      'isActive': serializer.toJson<bool>(isActive),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+    };
+  }
+
+  LocalInstitutionMember copyWith({
+    String? id,
+    String? institutionType,
+    String? institutionId,
+    Value<String?> userId = const Value.absent(),
+    String? memberName,
+    String? memberEmail,
+    String? role,
+    bool? isActive,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+  }) => LocalInstitutionMember(
+    id: id ?? this.id,
+    institutionType: institutionType ?? this.institutionType,
+    institutionId: institutionId ?? this.institutionId,
+    userId: userId.present ? userId.value : this.userId,
+    memberName: memberName ?? this.memberName,
+    memberEmail: memberEmail ?? this.memberEmail,
+    role: role ?? this.role,
+    isActive: isActive ?? this.isActive,
+    createdAt: createdAt ?? this.createdAt,
+    updatedAt: updatedAt ?? this.updatedAt,
+  );
+  LocalInstitutionMember copyWithCompanion(
+    LocalInstitutionMembersCompanion data,
+  ) {
+    return LocalInstitutionMember(
+      id: data.id.present ? data.id.value : this.id,
+      institutionType: data.institutionType.present
+          ? data.institutionType.value
+          : this.institutionType,
+      institutionId: data.institutionId.present
+          ? data.institutionId.value
+          : this.institutionId,
+      userId: data.userId.present ? data.userId.value : this.userId,
+      memberName: data.memberName.present
+          ? data.memberName.value
+          : this.memberName,
+      memberEmail: data.memberEmail.present
+          ? data.memberEmail.value
+          : this.memberEmail,
+      role: data.role.present ? data.role.value : this.role,
+      isActive: data.isActive.present ? data.isActive.value : this.isActive,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('LocalInstitutionMember(')
+          ..write('id: $id, ')
+          ..write('institutionType: $institutionType, ')
+          ..write('institutionId: $institutionId, ')
+          ..write('userId: $userId, ')
+          ..write('memberName: $memberName, ')
+          ..write('memberEmail: $memberEmail, ')
+          ..write('role: $role, ')
+          ..write('isActive: $isActive, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    institutionType,
+    institutionId,
+    userId,
+    memberName,
+    memberEmail,
+    role,
+    isActive,
+    createdAt,
+    updatedAt,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is LocalInstitutionMember &&
+          other.id == this.id &&
+          other.institutionType == this.institutionType &&
+          other.institutionId == this.institutionId &&
+          other.userId == this.userId &&
+          other.memberName == this.memberName &&
+          other.memberEmail == this.memberEmail &&
+          other.role == this.role &&
+          other.isActive == this.isActive &&
+          other.createdAt == this.createdAt &&
+          other.updatedAt == this.updatedAt);
+}
+
+class LocalInstitutionMembersCompanion
+    extends UpdateCompanion<LocalInstitutionMember> {
+  final Value<String> id;
+  final Value<String> institutionType;
+  final Value<String> institutionId;
+  final Value<String?> userId;
+  final Value<String> memberName;
+  final Value<String> memberEmail;
+  final Value<String> role;
+  final Value<bool> isActive;
+  final Value<DateTime> createdAt;
+  final Value<DateTime> updatedAt;
+  final Value<int> rowid;
+  const LocalInstitutionMembersCompanion({
+    this.id = const Value.absent(),
+    this.institutionType = const Value.absent(),
+    this.institutionId = const Value.absent(),
+    this.userId = const Value.absent(),
+    this.memberName = const Value.absent(),
+    this.memberEmail = const Value.absent(),
+    this.role = const Value.absent(),
+    this.isActive = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  LocalInstitutionMembersCompanion.insert({
+    required String id,
+    required String institutionType,
+    required String institutionId,
+    this.userId = const Value.absent(),
+    required String memberName,
+    required String memberEmail,
+    required String role,
+    this.isActive = const Value.absent(),
+    required DateTime createdAt,
+    required DateTime updatedAt,
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       institutionType = Value(institutionType),
+       institutionId = Value(institutionId),
+       memberName = Value(memberName),
+       memberEmail = Value(memberEmail),
+       role = Value(role),
+       createdAt = Value(createdAt),
+       updatedAt = Value(updatedAt);
+  static Insertable<LocalInstitutionMember> custom({
+    Expression<String>? id,
+    Expression<String>? institutionType,
+    Expression<String>? institutionId,
+    Expression<String>? userId,
+    Expression<String>? memberName,
+    Expression<String>? memberEmail,
+    Expression<String>? role,
+    Expression<bool>? isActive,
+    Expression<DateTime>? createdAt,
+    Expression<DateTime>? updatedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (institutionType != null) 'institution_type': institutionType,
+      if (institutionId != null) 'institution_id': institutionId,
+      if (userId != null) 'user_id': userId,
+      if (memberName != null) 'member_name': memberName,
+      if (memberEmail != null) 'member_email': memberEmail,
+      if (role != null) 'role': role,
+      if (isActive != null) 'is_active': isActive,
+      if (createdAt != null) 'created_at': createdAt,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  LocalInstitutionMembersCompanion copyWith({
+    Value<String>? id,
+    Value<String>? institutionType,
+    Value<String>? institutionId,
+    Value<String?>? userId,
+    Value<String>? memberName,
+    Value<String>? memberEmail,
+    Value<String>? role,
+    Value<bool>? isActive,
+    Value<DateTime>? createdAt,
+    Value<DateTime>? updatedAt,
+    Value<int>? rowid,
+  }) {
+    return LocalInstitutionMembersCompanion(
+      id: id ?? this.id,
+      institutionType: institutionType ?? this.institutionType,
+      institutionId: institutionId ?? this.institutionId,
+      userId: userId ?? this.userId,
+      memberName: memberName ?? this.memberName,
+      memberEmail: memberEmail ?? this.memberEmail,
+      role: role ?? this.role,
+      isActive: isActive ?? this.isActive,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (institutionType.present) {
+      map['institution_type'] = Variable<String>(institutionType.value);
+    }
+    if (institutionId.present) {
+      map['institution_id'] = Variable<String>(institutionId.value);
+    }
+    if (userId.present) {
+      map['user_id'] = Variable<String>(userId.value);
+    }
+    if (memberName.present) {
+      map['member_name'] = Variable<String>(memberName.value);
+    }
+    if (memberEmail.present) {
+      map['member_email'] = Variable<String>(memberEmail.value);
+    }
+    if (role.present) {
+      map['role'] = Variable<String>(role.value);
+    }
+    if (isActive.present) {
+      map['is_active'] = Variable<bool>(isActive.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('LocalInstitutionMembersCompanion(')
+          ..write('id: $id, ')
+          ..write('institutionType: $institutionType, ')
+          ..write('institutionId: $institutionId, ')
+          ..write('userId: $userId, ')
+          ..write('memberName: $memberName, ')
+          ..write('memberEmail: $memberEmail, ')
+          ..write('role: $role, ')
+          ..write('isActive: $isActive, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $LocalSchoolAllergensTable extends LocalSchoolAllergens
+    with TableInfo<$LocalSchoolAllergensTable, LocalSchoolAllergen> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $LocalSchoolAllergensTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _schoolIdMeta = const VerificationMeta(
+    'schoolId',
+  );
+  @override
+  late final GeneratedColumn<String> schoolId = GeneratedColumn<String>(
+    'school_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _allergenTagMeta = const VerificationMeta(
+    'allergenTag',
+  );
+  @override
+  late final GeneratedColumn<String> allergenTag = GeneratedColumn<String>(
+    'allergen_tag',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _studentCountMeta = const VerificationMeta(
+    'studentCount',
+  );
+  @override
+  late final GeneratedColumn<int> studentCount = GeneratedColumn<int>(
+    'student_count',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(1),
+  );
+  static const VerificationMeta _severityLevelMeta = const VerificationMeta(
+    'severityLevel',
+  );
+  @override
+  late final GeneratedColumn<String> severityLevel = GeneratedColumn<String>(
+    'severity_level',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('moderate'),
+  );
+  static const VerificationMeta _handlingNoteMeta = const VerificationMeta(
+    'handlingNote',
+  );
+  @override
+  late final GeneratedColumn<String> handlingNote = GeneratedColumn<String>(
+    'handling_note',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    schoolId,
+    allergenTag,
+    studentCount,
+    severityLevel,
+    handlingNote,
+    updatedAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'local_school_allergens';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<LocalSchoolAllergen> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('school_id')) {
+      context.handle(
+        _schoolIdMeta,
+        schoolId.isAcceptableOrUnknown(data['school_id']!, _schoolIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_schoolIdMeta);
+    }
+    if (data.containsKey('allergen_tag')) {
+      context.handle(
+        _allergenTagMeta,
+        allergenTag.isAcceptableOrUnknown(
+          data['allergen_tag']!,
+          _allergenTagMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_allergenTagMeta);
+    }
+    if (data.containsKey('student_count')) {
+      context.handle(
+        _studentCountMeta,
+        studentCount.isAcceptableOrUnknown(
+          data['student_count']!,
+          _studentCountMeta,
+        ),
+      );
+    }
+    if (data.containsKey('severity_level')) {
+      context.handle(
+        _severityLevelMeta,
+        severityLevel.isAcceptableOrUnknown(
+          data['severity_level']!,
+          _severityLevelMeta,
+        ),
+      );
+    }
+    if (data.containsKey('handling_note')) {
+      context.handle(
+        _handlingNoteMeta,
+        handlingNote.isAcceptableOrUnknown(
+          data['handling_note']!,
+          _handlingNoteMeta,
+        ),
+      );
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_updatedAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  LocalSchoolAllergen map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return LocalSchoolAllergen(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      schoolId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}school_id'],
+      )!,
+      allergenTag: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}allergen_tag'],
+      )!,
+      studentCount: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}student_count'],
+      )!,
+      severityLevel: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}severity_level'],
+      )!,
+      handlingNote: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}handling_note'],
+      ),
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      )!,
+    );
+  }
+
+  @override
+  $LocalSchoolAllergensTable createAlias(String alias) {
+    return $LocalSchoolAllergensTable(attachedDatabase, alias);
+  }
+}
+
+class LocalSchoolAllergen extends DataClass
+    implements Insertable<LocalSchoolAllergen> {
+  final String id;
+  final String schoolId;
+  final String allergenTag;
+  final int studentCount;
+
+  /// One of: mild, moderate, severe.
+  final String severityLevel;
+  final String? handlingNote;
+  final DateTime updatedAt;
+  const LocalSchoolAllergen({
+    required this.id,
+    required this.schoolId,
+    required this.allergenTag,
+    required this.studentCount,
+    required this.severityLevel,
+    this.handlingNote,
+    required this.updatedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['school_id'] = Variable<String>(schoolId);
+    map['allergen_tag'] = Variable<String>(allergenTag);
+    map['student_count'] = Variable<int>(studentCount);
+    map['severity_level'] = Variable<String>(severityLevel);
+    if (!nullToAbsent || handlingNote != null) {
+      map['handling_note'] = Variable<String>(handlingNote);
+    }
+    map['updated_at'] = Variable<DateTime>(updatedAt);
+    return map;
+  }
+
+  LocalSchoolAllergensCompanion toCompanion(bool nullToAbsent) {
+    return LocalSchoolAllergensCompanion(
+      id: Value(id),
+      schoolId: Value(schoolId),
+      allergenTag: Value(allergenTag),
+      studentCount: Value(studentCount),
+      severityLevel: Value(severityLevel),
+      handlingNote: handlingNote == null && nullToAbsent
+          ? const Value.absent()
+          : Value(handlingNote),
+      updatedAt: Value(updatedAt),
+    );
+  }
+
+  factory LocalSchoolAllergen.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return LocalSchoolAllergen(
+      id: serializer.fromJson<String>(json['id']),
+      schoolId: serializer.fromJson<String>(json['schoolId']),
+      allergenTag: serializer.fromJson<String>(json['allergenTag']),
+      studentCount: serializer.fromJson<int>(json['studentCount']),
+      severityLevel: serializer.fromJson<String>(json['severityLevel']),
+      handlingNote: serializer.fromJson<String?>(json['handlingNote']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'schoolId': serializer.toJson<String>(schoolId),
+      'allergenTag': serializer.toJson<String>(allergenTag),
+      'studentCount': serializer.toJson<int>(studentCount),
+      'severityLevel': serializer.toJson<String>(severityLevel),
+      'handlingNote': serializer.toJson<String?>(handlingNote),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+    };
+  }
+
+  LocalSchoolAllergen copyWith({
+    String? id,
+    String? schoolId,
+    String? allergenTag,
+    int? studentCount,
+    String? severityLevel,
+    Value<String?> handlingNote = const Value.absent(),
+    DateTime? updatedAt,
+  }) => LocalSchoolAllergen(
+    id: id ?? this.id,
+    schoolId: schoolId ?? this.schoolId,
+    allergenTag: allergenTag ?? this.allergenTag,
+    studentCount: studentCount ?? this.studentCount,
+    severityLevel: severityLevel ?? this.severityLevel,
+    handlingNote: handlingNote.present ? handlingNote.value : this.handlingNote,
+    updatedAt: updatedAt ?? this.updatedAt,
+  );
+  LocalSchoolAllergen copyWithCompanion(LocalSchoolAllergensCompanion data) {
+    return LocalSchoolAllergen(
+      id: data.id.present ? data.id.value : this.id,
+      schoolId: data.schoolId.present ? data.schoolId.value : this.schoolId,
+      allergenTag: data.allergenTag.present
+          ? data.allergenTag.value
+          : this.allergenTag,
+      studentCount: data.studentCount.present
+          ? data.studentCount.value
+          : this.studentCount,
+      severityLevel: data.severityLevel.present
+          ? data.severityLevel.value
+          : this.severityLevel,
+      handlingNote: data.handlingNote.present
+          ? data.handlingNote.value
+          : this.handlingNote,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('LocalSchoolAllergen(')
+          ..write('id: $id, ')
+          ..write('schoolId: $schoolId, ')
+          ..write('allergenTag: $allergenTag, ')
+          ..write('studentCount: $studentCount, ')
+          ..write('severityLevel: $severityLevel, ')
+          ..write('handlingNote: $handlingNote, ')
+          ..write('updatedAt: $updatedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    schoolId,
+    allergenTag,
+    studentCount,
+    severityLevel,
+    handlingNote,
+    updatedAt,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is LocalSchoolAllergen &&
+          other.id == this.id &&
+          other.schoolId == this.schoolId &&
+          other.allergenTag == this.allergenTag &&
+          other.studentCount == this.studentCount &&
+          other.severityLevel == this.severityLevel &&
+          other.handlingNote == this.handlingNote &&
+          other.updatedAt == this.updatedAt);
+}
+
+class LocalSchoolAllergensCompanion
+    extends UpdateCompanion<LocalSchoolAllergen> {
+  final Value<String> id;
+  final Value<String> schoolId;
+  final Value<String> allergenTag;
+  final Value<int> studentCount;
+  final Value<String> severityLevel;
+  final Value<String?> handlingNote;
+  final Value<DateTime> updatedAt;
+  final Value<int> rowid;
+  const LocalSchoolAllergensCompanion({
+    this.id = const Value.absent(),
+    this.schoolId = const Value.absent(),
+    this.allergenTag = const Value.absent(),
+    this.studentCount = const Value.absent(),
+    this.severityLevel = const Value.absent(),
+    this.handlingNote = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  LocalSchoolAllergensCompanion.insert({
+    required String id,
+    required String schoolId,
+    required String allergenTag,
+    this.studentCount = const Value.absent(),
+    this.severityLevel = const Value.absent(),
+    this.handlingNote = const Value.absent(),
+    required DateTime updatedAt,
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       schoolId = Value(schoolId),
+       allergenTag = Value(allergenTag),
+       updatedAt = Value(updatedAt);
+  static Insertable<LocalSchoolAllergen> custom({
+    Expression<String>? id,
+    Expression<String>? schoolId,
+    Expression<String>? allergenTag,
+    Expression<int>? studentCount,
+    Expression<String>? severityLevel,
+    Expression<String>? handlingNote,
+    Expression<DateTime>? updatedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (schoolId != null) 'school_id': schoolId,
+      if (allergenTag != null) 'allergen_tag': allergenTag,
+      if (studentCount != null) 'student_count': studentCount,
+      if (severityLevel != null) 'severity_level': severityLevel,
+      if (handlingNote != null) 'handling_note': handlingNote,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  LocalSchoolAllergensCompanion copyWith({
+    Value<String>? id,
+    Value<String>? schoolId,
+    Value<String>? allergenTag,
+    Value<int>? studentCount,
+    Value<String>? severityLevel,
+    Value<String?>? handlingNote,
+    Value<DateTime>? updatedAt,
+    Value<int>? rowid,
+  }) {
+    return LocalSchoolAllergensCompanion(
+      id: id ?? this.id,
+      schoolId: schoolId ?? this.schoolId,
+      allergenTag: allergenTag ?? this.allergenTag,
+      studentCount: studentCount ?? this.studentCount,
+      severityLevel: severityLevel ?? this.severityLevel,
+      handlingNote: handlingNote ?? this.handlingNote,
+      updatedAt: updatedAt ?? this.updatedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (schoolId.present) {
+      map['school_id'] = Variable<String>(schoolId.value);
+    }
+    if (allergenTag.present) {
+      map['allergen_tag'] = Variable<String>(allergenTag.value);
+    }
+    if (studentCount.present) {
+      map['student_count'] = Variable<int>(studentCount.value);
+    }
+    if (severityLevel.present) {
+      map['severity_level'] = Variable<String>(severityLevel.value);
+    }
+    if (handlingNote.present) {
+      map['handling_note'] = Variable<String>(handlingNote.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('LocalSchoolAllergensCompanion(')
+          ..write('id: $id, ')
+          ..write('schoolId: $schoolId, ')
+          ..write('allergenTag: $allergenTag, ')
+          ..write('studentCount: $studentCount, ')
+          ..write('severityLevel: $severityLevel, ')
+          ..write('handlingNote: $handlingNote, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $LocalTraceabilityDraftsTable extends LocalTraceabilityDrafts
+    with TableInfo<$LocalTraceabilityDraftsTable, LocalTraceabilityDraft> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $LocalTraceabilityDraftsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _recordTypeMeta = const VerificationMeta(
+    'recordType',
+  );
+  @override
+  late final GeneratedColumn<String> recordType = GeneratedColumn<String>(
+    'record_type',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _institutionIdMeta = const VerificationMeta(
+    'institutionId',
+  );
+  @override
+  late final GeneratedColumn<String> institutionId = GeneratedColumn<String>(
+    'institution_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _batchIdMeta = const VerificationMeta(
+    'batchId',
+  );
+  @override
+  late final GeneratedColumn<String> batchId = GeneratedColumn<String>(
+    'batch_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _payloadJsonMeta = const VerificationMeta(
+    'payloadJson',
+  );
+  @override
+  late final GeneratedColumn<String> payloadJson = GeneratedColumn<String>(
+    'payload_json',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _isSyncedMeta = const VerificationMeta(
+    'isSynced',
+  );
+  @override
+  late final GeneratedColumn<bool> isSynced = GeneratedColumn<bool>(
+    'is_synced',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("is_synced" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    recordType,
+    institutionId,
+    batchId,
+    payloadJson,
+    isSynced,
+    createdAt,
+    updatedAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'local_traceability_drafts';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<LocalTraceabilityDraft> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('record_type')) {
+      context.handle(
+        _recordTypeMeta,
+        recordType.isAcceptableOrUnknown(data['record_type']!, _recordTypeMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_recordTypeMeta);
+    }
+    if (data.containsKey('institution_id')) {
+      context.handle(
+        _institutionIdMeta,
+        institutionId.isAcceptableOrUnknown(
+          data['institution_id']!,
+          _institutionIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_institutionIdMeta);
+    }
+    if (data.containsKey('batch_id')) {
+      context.handle(
+        _batchIdMeta,
+        batchId.isAcceptableOrUnknown(data['batch_id']!, _batchIdMeta),
+      );
+    }
+    if (data.containsKey('payload_json')) {
+      context.handle(
+        _payloadJsonMeta,
+        payloadJson.isAcceptableOrUnknown(
+          data['payload_json']!,
+          _payloadJsonMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_payloadJsonMeta);
+    }
+    if (data.containsKey('is_synced')) {
+      context.handle(
+        _isSyncedMeta,
+        isSynced.isAcceptableOrUnknown(data['is_synced']!, _isSyncedMeta),
+      );
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_createdAtMeta);
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_updatedAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  LocalTraceabilityDraft map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return LocalTraceabilityDraft(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      recordType: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}record_type'],
+      )!,
+      institutionId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}institution_id'],
+      )!,
+      batchId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}batch_id'],
+      ),
+      payloadJson: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}payload_json'],
+      )!,
+      isSynced: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}is_synced'],
+      )!,
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}created_at'],
+      )!,
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      )!,
+    );
+  }
+
+  @override
+  $LocalTraceabilityDraftsTable createAlias(String alias) {
+    return $LocalTraceabilityDraftsTable(attachedDatabase, alias);
+  }
+}
+
+class LocalTraceabilityDraft extends DataClass
+    implements Insertable<LocalTraceabilityDraft> {
+  final String id;
+
+  /// One of: ingredient_log, transit_handover, tray_return, alert_resolution.
+  final String recordType;
+  final String institutionId;
+  final String? batchId;
+  final String payloadJson;
+  final bool isSynced;
+  final DateTime createdAt;
+  final DateTime updatedAt;
+  const LocalTraceabilityDraft({
+    required this.id,
+    required this.recordType,
+    required this.institutionId,
+    this.batchId,
+    required this.payloadJson,
+    required this.isSynced,
+    required this.createdAt,
+    required this.updatedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['record_type'] = Variable<String>(recordType);
+    map['institution_id'] = Variable<String>(institutionId);
+    if (!nullToAbsent || batchId != null) {
+      map['batch_id'] = Variable<String>(batchId);
+    }
+    map['payload_json'] = Variable<String>(payloadJson);
+    map['is_synced'] = Variable<bool>(isSynced);
+    map['created_at'] = Variable<DateTime>(createdAt);
+    map['updated_at'] = Variable<DateTime>(updatedAt);
+    return map;
+  }
+
+  LocalTraceabilityDraftsCompanion toCompanion(bool nullToAbsent) {
+    return LocalTraceabilityDraftsCompanion(
+      id: Value(id),
+      recordType: Value(recordType),
+      institutionId: Value(institutionId),
+      batchId: batchId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(batchId),
+      payloadJson: Value(payloadJson),
+      isSynced: Value(isSynced),
+      createdAt: Value(createdAt),
+      updatedAt: Value(updatedAt),
+    );
+  }
+
+  factory LocalTraceabilityDraft.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return LocalTraceabilityDraft(
+      id: serializer.fromJson<String>(json['id']),
+      recordType: serializer.fromJson<String>(json['recordType']),
+      institutionId: serializer.fromJson<String>(json['institutionId']),
+      batchId: serializer.fromJson<String?>(json['batchId']),
+      payloadJson: serializer.fromJson<String>(json['payloadJson']),
+      isSynced: serializer.fromJson<bool>(json['isSynced']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'recordType': serializer.toJson<String>(recordType),
+      'institutionId': serializer.toJson<String>(institutionId),
+      'batchId': serializer.toJson<String?>(batchId),
+      'payloadJson': serializer.toJson<String>(payloadJson),
+      'isSynced': serializer.toJson<bool>(isSynced),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+    };
+  }
+
+  LocalTraceabilityDraft copyWith({
+    String? id,
+    String? recordType,
+    String? institutionId,
+    Value<String?> batchId = const Value.absent(),
+    String? payloadJson,
+    bool? isSynced,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+  }) => LocalTraceabilityDraft(
+    id: id ?? this.id,
+    recordType: recordType ?? this.recordType,
+    institutionId: institutionId ?? this.institutionId,
+    batchId: batchId.present ? batchId.value : this.batchId,
+    payloadJson: payloadJson ?? this.payloadJson,
+    isSynced: isSynced ?? this.isSynced,
+    createdAt: createdAt ?? this.createdAt,
+    updatedAt: updatedAt ?? this.updatedAt,
+  );
+  LocalTraceabilityDraft copyWithCompanion(
+    LocalTraceabilityDraftsCompanion data,
+  ) {
+    return LocalTraceabilityDraft(
+      id: data.id.present ? data.id.value : this.id,
+      recordType: data.recordType.present
+          ? data.recordType.value
+          : this.recordType,
+      institutionId: data.institutionId.present
+          ? data.institutionId.value
+          : this.institutionId,
+      batchId: data.batchId.present ? data.batchId.value : this.batchId,
+      payloadJson: data.payloadJson.present
+          ? data.payloadJson.value
+          : this.payloadJson,
+      isSynced: data.isSynced.present ? data.isSynced.value : this.isSynced,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('LocalTraceabilityDraft(')
+          ..write('id: $id, ')
+          ..write('recordType: $recordType, ')
+          ..write('institutionId: $institutionId, ')
+          ..write('batchId: $batchId, ')
+          ..write('payloadJson: $payloadJson, ')
+          ..write('isSynced: $isSynced, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    recordType,
+    institutionId,
+    batchId,
+    payloadJson,
+    isSynced,
+    createdAt,
+    updatedAt,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is LocalTraceabilityDraft &&
+          other.id == this.id &&
+          other.recordType == this.recordType &&
+          other.institutionId == this.institutionId &&
+          other.batchId == this.batchId &&
+          other.payloadJson == this.payloadJson &&
+          other.isSynced == this.isSynced &&
+          other.createdAt == this.createdAt &&
+          other.updatedAt == this.updatedAt);
+}
+
+class LocalTraceabilityDraftsCompanion
+    extends UpdateCompanion<LocalTraceabilityDraft> {
+  final Value<String> id;
+  final Value<String> recordType;
+  final Value<String> institutionId;
+  final Value<String?> batchId;
+  final Value<String> payloadJson;
+  final Value<bool> isSynced;
+  final Value<DateTime> createdAt;
+  final Value<DateTime> updatedAt;
+  final Value<int> rowid;
+  const LocalTraceabilityDraftsCompanion({
+    this.id = const Value.absent(),
+    this.recordType = const Value.absent(),
+    this.institutionId = const Value.absent(),
+    this.batchId = const Value.absent(),
+    this.payloadJson = const Value.absent(),
+    this.isSynced = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  LocalTraceabilityDraftsCompanion.insert({
+    required String id,
+    required String recordType,
+    required String institutionId,
+    this.batchId = const Value.absent(),
+    required String payloadJson,
+    this.isSynced = const Value.absent(),
+    required DateTime createdAt,
+    required DateTime updatedAt,
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       recordType = Value(recordType),
+       institutionId = Value(institutionId),
+       payloadJson = Value(payloadJson),
+       createdAt = Value(createdAt),
+       updatedAt = Value(updatedAt);
+  static Insertable<LocalTraceabilityDraft> custom({
+    Expression<String>? id,
+    Expression<String>? recordType,
+    Expression<String>? institutionId,
+    Expression<String>? batchId,
+    Expression<String>? payloadJson,
+    Expression<bool>? isSynced,
+    Expression<DateTime>? createdAt,
+    Expression<DateTime>? updatedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (recordType != null) 'record_type': recordType,
+      if (institutionId != null) 'institution_id': institutionId,
+      if (batchId != null) 'batch_id': batchId,
+      if (payloadJson != null) 'payload_json': payloadJson,
+      if (isSynced != null) 'is_synced': isSynced,
+      if (createdAt != null) 'created_at': createdAt,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  LocalTraceabilityDraftsCompanion copyWith({
+    Value<String>? id,
+    Value<String>? recordType,
+    Value<String>? institutionId,
+    Value<String?>? batchId,
+    Value<String>? payloadJson,
+    Value<bool>? isSynced,
+    Value<DateTime>? createdAt,
+    Value<DateTime>? updatedAt,
+    Value<int>? rowid,
+  }) {
+    return LocalTraceabilityDraftsCompanion(
+      id: id ?? this.id,
+      recordType: recordType ?? this.recordType,
+      institutionId: institutionId ?? this.institutionId,
+      batchId: batchId ?? this.batchId,
+      payloadJson: payloadJson ?? this.payloadJson,
+      isSynced: isSynced ?? this.isSynced,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (recordType.present) {
+      map['record_type'] = Variable<String>(recordType.value);
+    }
+    if (institutionId.present) {
+      map['institution_id'] = Variable<String>(institutionId.value);
+    }
+    if (batchId.present) {
+      map['batch_id'] = Variable<String>(batchId.value);
+    }
+    if (payloadJson.present) {
+      map['payload_json'] = Variable<String>(payloadJson.value);
+    }
+    if (isSynced.present) {
+      map['is_synced'] = Variable<bool>(isSynced.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('LocalTraceabilityDraftsCompanion(')
+          ..write('id: $id, ')
+          ..write('recordType: $recordType, ')
+          ..write('institutionId: $institutionId, ')
+          ..write('batchId: $batchId, ')
+          ..write('payloadJson: $payloadJson, ')
+          ..write('isSynced: $isSynced, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 class $LocalBmkgCacheTable extends LocalBmkgCache
     with TableInfo<$LocalBmkgCacheTable, LocalBmkgCacheData> {
   @override
@@ -2138,6 +4358,15 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
   late final $LocalSppgKeysTable localSppgKeys = $LocalSppgKeysTable(this);
+  late final $LocalSigningKeysTable localSigningKeys = $LocalSigningKeysTable(
+    this,
+  );
+  late final $LocalInstitutionMembersTable localInstitutionMembers =
+      $LocalInstitutionMembersTable(this);
+  late final $LocalSchoolAllergensTable localSchoolAllergens =
+      $LocalSchoolAllergensTable(this);
+  late final $LocalTraceabilityDraftsTable localTraceabilityDrafts =
+      $LocalTraceabilityDraftsTable(this);
   late final $LocalBmkgCacheTable localBmkgCache = $LocalBmkgCacheTable(this);
   late final $LocalSyncQueueTable localSyncQueue = $LocalSyncQueueTable(this);
   late final $LocalSampleVaultsTable localSampleVaults =
@@ -2152,6 +4381,10 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   @override
   List<DatabaseSchemaEntity> get allSchemaEntities => [
     localSppgKeys,
+    localSigningKeys,
+    localInstitutionMembers,
+    localSchoolAllergens,
+    localTraceabilityDrafts,
     localBmkgCache,
     localSyncQueue,
     localSampleVaults,
@@ -2370,6 +4603,1202 @@ typedef $$LocalSppgKeysTableProcessedTableManager =
         BaseReferences<_$AppDatabase, $LocalSppgKeysTable, LocalSppgKey>,
       ),
       LocalSppgKey,
+      PrefetchHooks Function()
+    >;
+typedef $$LocalSigningKeysTableCreateCompanionBuilder =
+    LocalSigningKeysCompanion Function({
+      required String keyId,
+      required String sppgId,
+      required String publicKeyB64,
+      Value<String> status,
+      Value<String?> deviceLabel,
+      required DateTime createdAt,
+      Value<DateTime?> retiredAt,
+      Value<DateTime?> revokedAt,
+      required DateTime updatedAt,
+      Value<int> rowid,
+    });
+typedef $$LocalSigningKeysTableUpdateCompanionBuilder =
+    LocalSigningKeysCompanion Function({
+      Value<String> keyId,
+      Value<String> sppgId,
+      Value<String> publicKeyB64,
+      Value<String> status,
+      Value<String?> deviceLabel,
+      Value<DateTime> createdAt,
+      Value<DateTime?> retiredAt,
+      Value<DateTime?> revokedAt,
+      Value<DateTime> updatedAt,
+      Value<int> rowid,
+    });
+
+class $$LocalSigningKeysTableFilterComposer
+    extends Composer<_$AppDatabase, $LocalSigningKeysTable> {
+  $$LocalSigningKeysTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get keyId => $composableBuilder(
+    column: $table.keyId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get sppgId => $composableBuilder(
+    column: $table.sppgId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get publicKeyB64 => $composableBuilder(
+    column: $table.publicKeyB64,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get status => $composableBuilder(
+    column: $table.status,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get deviceLabel => $composableBuilder(
+    column: $table.deviceLabel,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get retiredAt => $composableBuilder(
+    column: $table.retiredAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get revokedAt => $composableBuilder(
+    column: $table.revokedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$LocalSigningKeysTableOrderingComposer
+    extends Composer<_$AppDatabase, $LocalSigningKeysTable> {
+  $$LocalSigningKeysTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get keyId => $composableBuilder(
+    column: $table.keyId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get sppgId => $composableBuilder(
+    column: $table.sppgId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get publicKeyB64 => $composableBuilder(
+    column: $table.publicKeyB64,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get status => $composableBuilder(
+    column: $table.status,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get deviceLabel => $composableBuilder(
+    column: $table.deviceLabel,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get retiredAt => $composableBuilder(
+    column: $table.retiredAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get revokedAt => $composableBuilder(
+    column: $table.revokedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$LocalSigningKeysTableAnnotationComposer
+    extends Composer<_$AppDatabase, $LocalSigningKeysTable> {
+  $$LocalSigningKeysTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get keyId =>
+      $composableBuilder(column: $table.keyId, builder: (column) => column);
+
+  GeneratedColumn<String> get sppgId =>
+      $composableBuilder(column: $table.sppgId, builder: (column) => column);
+
+  GeneratedColumn<String> get publicKeyB64 => $composableBuilder(
+    column: $table.publicKeyB64,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get status =>
+      $composableBuilder(column: $table.status, builder: (column) => column);
+
+  GeneratedColumn<String> get deviceLabel => $composableBuilder(
+    column: $table.deviceLabel,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get retiredAt =>
+      $composableBuilder(column: $table.retiredAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get revokedAt =>
+      $composableBuilder(column: $table.revokedAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+}
+
+class $$LocalSigningKeysTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $LocalSigningKeysTable,
+          LocalSigningKey,
+          $$LocalSigningKeysTableFilterComposer,
+          $$LocalSigningKeysTableOrderingComposer,
+          $$LocalSigningKeysTableAnnotationComposer,
+          $$LocalSigningKeysTableCreateCompanionBuilder,
+          $$LocalSigningKeysTableUpdateCompanionBuilder,
+          (
+            LocalSigningKey,
+            BaseReferences<
+              _$AppDatabase,
+              $LocalSigningKeysTable,
+              LocalSigningKey
+            >,
+          ),
+          LocalSigningKey,
+          PrefetchHooks Function()
+        > {
+  $$LocalSigningKeysTableTableManager(
+    _$AppDatabase db,
+    $LocalSigningKeysTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$LocalSigningKeysTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$LocalSigningKeysTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$LocalSigningKeysTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> keyId = const Value.absent(),
+                Value<String> sppgId = const Value.absent(),
+                Value<String> publicKeyB64 = const Value.absent(),
+                Value<String> status = const Value.absent(),
+                Value<String?> deviceLabel = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<DateTime?> retiredAt = const Value.absent(),
+                Value<DateTime?> revokedAt = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => LocalSigningKeysCompanion(
+                keyId: keyId,
+                sppgId: sppgId,
+                publicKeyB64: publicKeyB64,
+                status: status,
+                deviceLabel: deviceLabel,
+                createdAt: createdAt,
+                retiredAt: retiredAt,
+                revokedAt: revokedAt,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String keyId,
+                required String sppgId,
+                required String publicKeyB64,
+                Value<String> status = const Value.absent(),
+                Value<String?> deviceLabel = const Value.absent(),
+                required DateTime createdAt,
+                Value<DateTime?> retiredAt = const Value.absent(),
+                Value<DateTime?> revokedAt = const Value.absent(),
+                required DateTime updatedAt,
+                Value<int> rowid = const Value.absent(),
+              }) => LocalSigningKeysCompanion.insert(
+                keyId: keyId,
+                sppgId: sppgId,
+                publicKeyB64: publicKeyB64,
+                status: status,
+                deviceLabel: deviceLabel,
+                createdAt: createdAt,
+                retiredAt: retiredAt,
+                revokedAt: revokedAt,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<$LocalSigningKeysTable, LocalSigningKey>(table),
+                  BaseReferences<
+                    _$AppDatabase,
+                    $LocalSigningKeysTable,
+                    LocalSigningKey
+                  >(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$LocalSigningKeysTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $LocalSigningKeysTable,
+      LocalSigningKey,
+      $$LocalSigningKeysTableFilterComposer,
+      $$LocalSigningKeysTableOrderingComposer,
+      $$LocalSigningKeysTableAnnotationComposer,
+      $$LocalSigningKeysTableCreateCompanionBuilder,
+      $$LocalSigningKeysTableUpdateCompanionBuilder,
+      (
+        LocalSigningKey,
+        BaseReferences<_$AppDatabase, $LocalSigningKeysTable, LocalSigningKey>,
+      ),
+      LocalSigningKey,
+      PrefetchHooks Function()
+    >;
+typedef $$LocalInstitutionMembersTableCreateCompanionBuilder =
+    LocalInstitutionMembersCompanion Function({
+      required String id,
+      required String institutionType,
+      required String institutionId,
+      Value<String?> userId,
+      required String memberName,
+      required String memberEmail,
+      required String role,
+      Value<bool> isActive,
+      required DateTime createdAt,
+      required DateTime updatedAt,
+      Value<int> rowid,
+    });
+typedef $$LocalInstitutionMembersTableUpdateCompanionBuilder =
+    LocalInstitutionMembersCompanion Function({
+      Value<String> id,
+      Value<String> institutionType,
+      Value<String> institutionId,
+      Value<String?> userId,
+      Value<String> memberName,
+      Value<String> memberEmail,
+      Value<String> role,
+      Value<bool> isActive,
+      Value<DateTime> createdAt,
+      Value<DateTime> updatedAt,
+      Value<int> rowid,
+    });
+
+class $$LocalInstitutionMembersTableFilterComposer
+    extends Composer<_$AppDatabase, $LocalInstitutionMembersTable> {
+  $$LocalInstitutionMembersTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get institutionType => $composableBuilder(
+    column: $table.institutionType,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get institutionId => $composableBuilder(
+    column: $table.institutionId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get userId => $composableBuilder(
+    column: $table.userId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get memberName => $composableBuilder(
+    column: $table.memberName,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get memberEmail => $composableBuilder(
+    column: $table.memberEmail,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get role => $composableBuilder(
+    column: $table.role,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get isActive => $composableBuilder(
+    column: $table.isActive,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$LocalInstitutionMembersTableOrderingComposer
+    extends Composer<_$AppDatabase, $LocalInstitutionMembersTable> {
+  $$LocalInstitutionMembersTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get institutionType => $composableBuilder(
+    column: $table.institutionType,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get institutionId => $composableBuilder(
+    column: $table.institutionId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get userId => $composableBuilder(
+    column: $table.userId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get memberName => $composableBuilder(
+    column: $table.memberName,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get memberEmail => $composableBuilder(
+    column: $table.memberEmail,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get role => $composableBuilder(
+    column: $table.role,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get isActive => $composableBuilder(
+    column: $table.isActive,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$LocalInstitutionMembersTableAnnotationComposer
+    extends Composer<_$AppDatabase, $LocalInstitutionMembersTable> {
+  $$LocalInstitutionMembersTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get institutionType => $composableBuilder(
+    column: $table.institutionType,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get institutionId => $composableBuilder(
+    column: $table.institutionId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get userId =>
+      $composableBuilder(column: $table.userId, builder: (column) => column);
+
+  GeneratedColumn<String> get memberName => $composableBuilder(
+    column: $table.memberName,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get memberEmail => $composableBuilder(
+    column: $table.memberEmail,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get role =>
+      $composableBuilder(column: $table.role, builder: (column) => column);
+
+  GeneratedColumn<bool> get isActive =>
+      $composableBuilder(column: $table.isActive, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+}
+
+class $$LocalInstitutionMembersTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $LocalInstitutionMembersTable,
+          LocalInstitutionMember,
+          $$LocalInstitutionMembersTableFilterComposer,
+          $$LocalInstitutionMembersTableOrderingComposer,
+          $$LocalInstitutionMembersTableAnnotationComposer,
+          $$LocalInstitutionMembersTableCreateCompanionBuilder,
+          $$LocalInstitutionMembersTableUpdateCompanionBuilder,
+          (
+            LocalInstitutionMember,
+            BaseReferences<
+              _$AppDatabase,
+              $LocalInstitutionMembersTable,
+              LocalInstitutionMember
+            >,
+          ),
+          LocalInstitutionMember,
+          PrefetchHooks Function()
+        > {
+  $$LocalInstitutionMembersTableTableManager(
+    _$AppDatabase db,
+    $LocalInstitutionMembersTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$LocalInstitutionMembersTableFilterComposer(
+                $db: db,
+                $table: table,
+              ),
+          createOrderingComposer: () =>
+              $$LocalInstitutionMembersTableOrderingComposer(
+                $db: db,
+                $table: table,
+              ),
+          createComputedFieldComposer: () =>
+              $$LocalInstitutionMembersTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> institutionType = const Value.absent(),
+                Value<String> institutionId = const Value.absent(),
+                Value<String?> userId = const Value.absent(),
+                Value<String> memberName = const Value.absent(),
+                Value<String> memberEmail = const Value.absent(),
+                Value<String> role = const Value.absent(),
+                Value<bool> isActive = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => LocalInstitutionMembersCompanion(
+                id: id,
+                institutionType: institutionType,
+                institutionId: institutionId,
+                userId: userId,
+                memberName: memberName,
+                memberEmail: memberEmail,
+                role: role,
+                isActive: isActive,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String institutionType,
+                required String institutionId,
+                Value<String?> userId = const Value.absent(),
+                required String memberName,
+                required String memberEmail,
+                required String role,
+                Value<bool> isActive = const Value.absent(),
+                required DateTime createdAt,
+                required DateTime updatedAt,
+                Value<int> rowid = const Value.absent(),
+              }) => LocalInstitutionMembersCompanion.insert(
+                id: id,
+                institutionType: institutionType,
+                institutionId: institutionId,
+                userId: userId,
+                memberName: memberName,
+                memberEmail: memberEmail,
+                role: role,
+                isActive: isActive,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<
+                    $LocalInstitutionMembersTable,
+                    LocalInstitutionMember
+                  >(table),
+                  BaseReferences<
+                    _$AppDatabase,
+                    $LocalInstitutionMembersTable,
+                    LocalInstitutionMember
+                  >(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$LocalInstitutionMembersTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $LocalInstitutionMembersTable,
+      LocalInstitutionMember,
+      $$LocalInstitutionMembersTableFilterComposer,
+      $$LocalInstitutionMembersTableOrderingComposer,
+      $$LocalInstitutionMembersTableAnnotationComposer,
+      $$LocalInstitutionMembersTableCreateCompanionBuilder,
+      $$LocalInstitutionMembersTableUpdateCompanionBuilder,
+      (
+        LocalInstitutionMember,
+        BaseReferences<
+          _$AppDatabase,
+          $LocalInstitutionMembersTable,
+          LocalInstitutionMember
+        >,
+      ),
+      LocalInstitutionMember,
+      PrefetchHooks Function()
+    >;
+typedef $$LocalSchoolAllergensTableCreateCompanionBuilder =
+    LocalSchoolAllergensCompanion Function({
+      required String id,
+      required String schoolId,
+      required String allergenTag,
+      Value<int> studentCount,
+      Value<String> severityLevel,
+      Value<String?> handlingNote,
+      required DateTime updatedAt,
+      Value<int> rowid,
+    });
+typedef $$LocalSchoolAllergensTableUpdateCompanionBuilder =
+    LocalSchoolAllergensCompanion Function({
+      Value<String> id,
+      Value<String> schoolId,
+      Value<String> allergenTag,
+      Value<int> studentCount,
+      Value<String> severityLevel,
+      Value<String?> handlingNote,
+      Value<DateTime> updatedAt,
+      Value<int> rowid,
+    });
+
+class $$LocalSchoolAllergensTableFilterComposer
+    extends Composer<_$AppDatabase, $LocalSchoolAllergensTable> {
+  $$LocalSchoolAllergensTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get schoolId => $composableBuilder(
+    column: $table.schoolId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get allergenTag => $composableBuilder(
+    column: $table.allergenTag,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get studentCount => $composableBuilder(
+    column: $table.studentCount,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get severityLevel => $composableBuilder(
+    column: $table.severityLevel,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get handlingNote => $composableBuilder(
+    column: $table.handlingNote,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$LocalSchoolAllergensTableOrderingComposer
+    extends Composer<_$AppDatabase, $LocalSchoolAllergensTable> {
+  $$LocalSchoolAllergensTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get schoolId => $composableBuilder(
+    column: $table.schoolId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get allergenTag => $composableBuilder(
+    column: $table.allergenTag,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get studentCount => $composableBuilder(
+    column: $table.studentCount,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get severityLevel => $composableBuilder(
+    column: $table.severityLevel,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get handlingNote => $composableBuilder(
+    column: $table.handlingNote,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$LocalSchoolAllergensTableAnnotationComposer
+    extends Composer<_$AppDatabase, $LocalSchoolAllergensTable> {
+  $$LocalSchoolAllergensTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get schoolId =>
+      $composableBuilder(column: $table.schoolId, builder: (column) => column);
+
+  GeneratedColumn<String> get allergenTag => $composableBuilder(
+    column: $table.allergenTag,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get studentCount => $composableBuilder(
+    column: $table.studentCount,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get severityLevel => $composableBuilder(
+    column: $table.severityLevel,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get handlingNote => $composableBuilder(
+    column: $table.handlingNote,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+}
+
+class $$LocalSchoolAllergensTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $LocalSchoolAllergensTable,
+          LocalSchoolAllergen,
+          $$LocalSchoolAllergensTableFilterComposer,
+          $$LocalSchoolAllergensTableOrderingComposer,
+          $$LocalSchoolAllergensTableAnnotationComposer,
+          $$LocalSchoolAllergensTableCreateCompanionBuilder,
+          $$LocalSchoolAllergensTableUpdateCompanionBuilder,
+          (
+            LocalSchoolAllergen,
+            BaseReferences<
+              _$AppDatabase,
+              $LocalSchoolAllergensTable,
+              LocalSchoolAllergen
+            >,
+          ),
+          LocalSchoolAllergen,
+          PrefetchHooks Function()
+        > {
+  $$LocalSchoolAllergensTableTableManager(
+    _$AppDatabase db,
+    $LocalSchoolAllergensTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$LocalSchoolAllergensTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$LocalSchoolAllergensTableOrderingComposer(
+                $db: db,
+                $table: table,
+              ),
+          createComputedFieldComposer: () =>
+              $$LocalSchoolAllergensTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> schoolId = const Value.absent(),
+                Value<String> allergenTag = const Value.absent(),
+                Value<int> studentCount = const Value.absent(),
+                Value<String> severityLevel = const Value.absent(),
+                Value<String?> handlingNote = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => LocalSchoolAllergensCompanion(
+                id: id,
+                schoolId: schoolId,
+                allergenTag: allergenTag,
+                studentCount: studentCount,
+                severityLevel: severityLevel,
+                handlingNote: handlingNote,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String schoolId,
+                required String allergenTag,
+                Value<int> studentCount = const Value.absent(),
+                Value<String> severityLevel = const Value.absent(),
+                Value<String?> handlingNote = const Value.absent(),
+                required DateTime updatedAt,
+                Value<int> rowid = const Value.absent(),
+              }) => LocalSchoolAllergensCompanion.insert(
+                id: id,
+                schoolId: schoolId,
+                allergenTag: allergenTag,
+                studentCount: studentCount,
+                severityLevel: severityLevel,
+                handlingNote: handlingNote,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<$LocalSchoolAllergensTable, LocalSchoolAllergen>(
+                    table,
+                  ),
+                  BaseReferences<
+                    _$AppDatabase,
+                    $LocalSchoolAllergensTable,
+                    LocalSchoolAllergen
+                  >(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$LocalSchoolAllergensTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $LocalSchoolAllergensTable,
+      LocalSchoolAllergen,
+      $$LocalSchoolAllergensTableFilterComposer,
+      $$LocalSchoolAllergensTableOrderingComposer,
+      $$LocalSchoolAllergensTableAnnotationComposer,
+      $$LocalSchoolAllergensTableCreateCompanionBuilder,
+      $$LocalSchoolAllergensTableUpdateCompanionBuilder,
+      (
+        LocalSchoolAllergen,
+        BaseReferences<
+          _$AppDatabase,
+          $LocalSchoolAllergensTable,
+          LocalSchoolAllergen
+        >,
+      ),
+      LocalSchoolAllergen,
+      PrefetchHooks Function()
+    >;
+typedef $$LocalTraceabilityDraftsTableCreateCompanionBuilder =
+    LocalTraceabilityDraftsCompanion Function({
+      required String id,
+      required String recordType,
+      required String institutionId,
+      Value<String?> batchId,
+      required String payloadJson,
+      Value<bool> isSynced,
+      required DateTime createdAt,
+      required DateTime updatedAt,
+      Value<int> rowid,
+    });
+typedef $$LocalTraceabilityDraftsTableUpdateCompanionBuilder =
+    LocalTraceabilityDraftsCompanion Function({
+      Value<String> id,
+      Value<String> recordType,
+      Value<String> institutionId,
+      Value<String?> batchId,
+      Value<String> payloadJson,
+      Value<bool> isSynced,
+      Value<DateTime> createdAt,
+      Value<DateTime> updatedAt,
+      Value<int> rowid,
+    });
+
+class $$LocalTraceabilityDraftsTableFilterComposer
+    extends Composer<_$AppDatabase, $LocalTraceabilityDraftsTable> {
+  $$LocalTraceabilityDraftsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get recordType => $composableBuilder(
+    column: $table.recordType,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get institutionId => $composableBuilder(
+    column: $table.institutionId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get batchId => $composableBuilder(
+    column: $table.batchId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get payloadJson => $composableBuilder(
+    column: $table.payloadJson,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get isSynced => $composableBuilder(
+    column: $table.isSynced,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$LocalTraceabilityDraftsTableOrderingComposer
+    extends Composer<_$AppDatabase, $LocalTraceabilityDraftsTable> {
+  $$LocalTraceabilityDraftsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get recordType => $composableBuilder(
+    column: $table.recordType,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get institutionId => $composableBuilder(
+    column: $table.institutionId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get batchId => $composableBuilder(
+    column: $table.batchId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get payloadJson => $composableBuilder(
+    column: $table.payloadJson,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get isSynced => $composableBuilder(
+    column: $table.isSynced,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$LocalTraceabilityDraftsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $LocalTraceabilityDraftsTable> {
+  $$LocalTraceabilityDraftsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get recordType => $composableBuilder(
+    column: $table.recordType,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get institutionId => $composableBuilder(
+    column: $table.institutionId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get batchId =>
+      $composableBuilder(column: $table.batchId, builder: (column) => column);
+
+  GeneratedColumn<String> get payloadJson => $composableBuilder(
+    column: $table.payloadJson,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get isSynced =>
+      $composableBuilder(column: $table.isSynced, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+}
+
+class $$LocalTraceabilityDraftsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $LocalTraceabilityDraftsTable,
+          LocalTraceabilityDraft,
+          $$LocalTraceabilityDraftsTableFilterComposer,
+          $$LocalTraceabilityDraftsTableOrderingComposer,
+          $$LocalTraceabilityDraftsTableAnnotationComposer,
+          $$LocalTraceabilityDraftsTableCreateCompanionBuilder,
+          $$LocalTraceabilityDraftsTableUpdateCompanionBuilder,
+          (
+            LocalTraceabilityDraft,
+            BaseReferences<
+              _$AppDatabase,
+              $LocalTraceabilityDraftsTable,
+              LocalTraceabilityDraft
+            >,
+          ),
+          LocalTraceabilityDraft,
+          PrefetchHooks Function()
+        > {
+  $$LocalTraceabilityDraftsTableTableManager(
+    _$AppDatabase db,
+    $LocalTraceabilityDraftsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$LocalTraceabilityDraftsTableFilterComposer(
+                $db: db,
+                $table: table,
+              ),
+          createOrderingComposer: () =>
+              $$LocalTraceabilityDraftsTableOrderingComposer(
+                $db: db,
+                $table: table,
+              ),
+          createComputedFieldComposer: () =>
+              $$LocalTraceabilityDraftsTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> recordType = const Value.absent(),
+                Value<String> institutionId = const Value.absent(),
+                Value<String?> batchId = const Value.absent(),
+                Value<String> payloadJson = const Value.absent(),
+                Value<bool> isSynced = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => LocalTraceabilityDraftsCompanion(
+                id: id,
+                recordType: recordType,
+                institutionId: institutionId,
+                batchId: batchId,
+                payloadJson: payloadJson,
+                isSynced: isSynced,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String recordType,
+                required String institutionId,
+                Value<String?> batchId = const Value.absent(),
+                required String payloadJson,
+                Value<bool> isSynced = const Value.absent(),
+                required DateTime createdAt,
+                required DateTime updatedAt,
+                Value<int> rowid = const Value.absent(),
+              }) => LocalTraceabilityDraftsCompanion.insert(
+                id: id,
+                recordType: recordType,
+                institutionId: institutionId,
+                batchId: batchId,
+                payloadJson: payloadJson,
+                isSynced: isSynced,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<
+                    $LocalTraceabilityDraftsTable,
+                    LocalTraceabilityDraft
+                  >(table),
+                  BaseReferences<
+                    _$AppDatabase,
+                    $LocalTraceabilityDraftsTable,
+                    LocalTraceabilityDraft
+                  >(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$LocalTraceabilityDraftsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $LocalTraceabilityDraftsTable,
+      LocalTraceabilityDraft,
+      $$LocalTraceabilityDraftsTableFilterComposer,
+      $$LocalTraceabilityDraftsTableOrderingComposer,
+      $$LocalTraceabilityDraftsTableAnnotationComposer,
+      $$LocalTraceabilityDraftsTableCreateCompanionBuilder,
+      $$LocalTraceabilityDraftsTableUpdateCompanionBuilder,
+      (
+        LocalTraceabilityDraft,
+        BaseReferences<
+          _$AppDatabase,
+          $LocalTraceabilityDraftsTable,
+          LocalTraceabilityDraft
+        >,
+      ),
+      LocalTraceabilityDraft,
       PrefetchHooks Function()
     >;
 typedef $$LocalBmkgCacheTableCreateCompanionBuilder =
@@ -3283,6 +6712,20 @@ class $AppDatabaseManager {
   $AppDatabaseManager(this._db);
   $$LocalSppgKeysTableTableManager get localSppgKeys =>
       $$LocalSppgKeysTableTableManager(_db, _db.localSppgKeys);
+  $$LocalSigningKeysTableTableManager get localSigningKeys =>
+      $$LocalSigningKeysTableTableManager(_db, _db.localSigningKeys);
+  $$LocalInstitutionMembersTableTableManager get localInstitutionMembers =>
+      $$LocalInstitutionMembersTableTableManager(
+        _db,
+        _db.localInstitutionMembers,
+      );
+  $$LocalSchoolAllergensTableTableManager get localSchoolAllergens =>
+      $$LocalSchoolAllergensTableTableManager(_db, _db.localSchoolAllergens);
+  $$LocalTraceabilityDraftsTableTableManager get localTraceabilityDrafts =>
+      $$LocalTraceabilityDraftsTableTableManager(
+        _db,
+        _db.localTraceabilityDrafts,
+      );
   $$LocalBmkgCacheTableTableManager get localBmkgCache =>
       $$LocalBmkgCacheTableTableManager(_db, _db.localBmkgCache);
   $$LocalSyncQueueTableTableManager get localSyncQueue =>

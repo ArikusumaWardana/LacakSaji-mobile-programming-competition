@@ -1,7 +1,9 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../../../core/constants/app_constants.dart';
+import '../../../core/constants/app_routes.dart';
 import '../../../core/database/database_provider.dart';
 import '../../../core/network/connectivity_provider.dart';
 import '../../../core/sync/offline_sync_controller.dart';
@@ -15,6 +17,9 @@ import '../../../core/widgets/lacak_confirm_dialog.dart';
 import '../../../core/widgets/lacak_status_badge.dart';
 import '../../../core/widgets/lacak_sync_queue_sheet.dart';
 import '../../../core/widgets/lacak_text_field.dart';
+import '../../allergens/domain/allergen_models.dart';
+import '../../allergens/presentation/allergen_providers.dart';
+import '../../allergens/presentation/widgets/school_allergen_profile_sheet.dart';
 import '../../auth/domain/auth_models.dart';
 import '../../auth/presentation/auth_controller.dart';
 import '../../auth/presentation/widgets/adm4_picker_sheet.dart';
@@ -147,9 +152,19 @@ class SettingsScreen extends ConsumerWidget {
     return '$cleanName · ${profile.role.label}';
   }
 
+  String _formatAllergenSummary(List<SchoolAllergenEntry> entries) {
+    if (entries.isEmpty) {
+      return 'Belum ada data alergen siswa yang dicatat. Ketuk tombol di bawah untuk mengatur daftar alergen sekolah.';
+    }
+    return entries
+        .map((e) => '${e.allergen.label} (${e.studentCount} siswa)')
+        .join(', ');
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final authState = ref.watch(authControllerProvider);
+    final schoolAllergensAsync = ref.watch(schoolAllergensProvider);
     final textScale = ref.watch(textScaleProvider);
     final isOffline = ref.watch(isOfflineProvider).value ?? false;
     final pendingCount = ref.watch(pendingSyncCountProvider).value ?? 0;
@@ -467,6 +482,64 @@ class SettingsScreen extends ConsumerWidget {
                                   school,
                                 ),
                         ),
+                        const SizedBox(height: AppSpacing.lg),
+                        const Divider(height: 1),
+                        const SizedBox(height: AppSpacing.md),
+                        Text(
+                          'Profil Alergen Siswa (Tanpa Nama)',
+                          style: AppTypography.titleSection,
+                        ),
+                        const SizedBox(height: AppSpacing.xs),
+                        Text(
+                          _formatAllergenSummary(
+                            schoolAllergensAsync.value ?? const [],
+                          ),
+                          style: AppTypography.bodyMedium.copyWith(
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                        const SizedBox(height: AppSpacing.md),
+                        LacakSecondaryButton(
+                          label: 'Atur Profil Alergen Siswa',
+                          icon: Icons.health_and_safety_rounded,
+                          onPressed: anyBusy
+                              ? null
+                              : () async {
+                                  final saved =
+                                      await showModalBottomSheet<bool>(
+                                        context: context,
+                                        isScrollControlled: true,
+                                        backgroundColor: AppColors.bgCanvas,
+                                        constraints: const BoxConstraints(
+                                          maxWidth:
+                                              AppSpacing.tabletFormMaxWidth,
+                                        ),
+                                        shape: const RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.vertical(
+                                            top: Radius.circular(
+                                              AppSpacing.radiusHero,
+                                            ),
+                                          ),
+                                        ),
+                                        builder: (_) =>
+                                            SchoolAllergenProfileSheet(
+                                              schoolId: school.id,
+                                              initialEntries:
+                                                  schoolAllergensAsync.value ??
+                                                  const [],
+                                            ),
+                                      );
+                                  if (saved == true && context.mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text(
+                                          'Profil alergen sekolah berhasil disimpan.',
+                                        ),
+                                      ),
+                                    );
+                                  }
+                                },
+                        ),
                       ],
                       if (kitchen != null) ...[
                         const SizedBox(height: AppSpacing.md),
@@ -484,19 +557,47 @@ class SettingsScreen extends ConsumerWidget {
                           tabular: true,
                         ),
                         const Divider(height: 1),
+                        if (profile?.role == UserRole.kitchen) ...[
+                          const SizedBox(height: AppSpacing.md),
+                          LacakSecondaryButton(
+                            label: 'Perbarui Lokasi GPS Dapur',
+                            icon: Icons.location_on_rounded,
+                            isLoading: authState.busyAction ==
+                                AuthBusyAction.updateKitchenLocation,
+                            onPressed: anyBusy
+                                ? null
+                                : () => _updateKitchenGps(
+                                    context,
+                                    ref,
+                                    kitchen,
+                                  ),
+                          ),
+                        ],
+                      ],
+                      if (authState.isInstitutionAdmin) ...[
+                        const SizedBox(height: AppSpacing.md),
+                        const Divider(height: 1),
+                        const SizedBox(height: AppSpacing.md),
+                        Text(
+                          'Tim & Keamanan Kunci',
+                          style: AppTypography.titleSection,
+                        ),
+                        const SizedBox(height: AppSpacing.xs),
+                        Text(
+                          'Atur staf pelaksana pengganti (Multi-PIC) serta rotasi kunci segel digital QR.',
+                          style: AppTypography.bodyMedium.copyWith(
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
                         const SizedBox(height: AppSpacing.md),
                         LacakSecondaryButton(
-                          label: 'Perbarui Lokasi GPS Dapur',
-                          icon: Icons.location_on_rounded,
-                          isLoading: authState.busyAction ==
-                              AuthBusyAction.updateKitchenLocation,
+                          label: 'Kelola Tim & Keamanan Kunci',
+                          icon: Icons.group_rounded,
                           onPressed: anyBusy
                               ? null
-                              : () => _updateKitchenGps(
-                                  context,
-                                  ref,
-                                  kitchen,
-                                ),
+                              : () => context.push(
+                                    AppRoutes.settingsTeamSecurity,
+                                  ),
                         ),
                       ],
                       const SizedBox(height: AppSpacing.xxl),

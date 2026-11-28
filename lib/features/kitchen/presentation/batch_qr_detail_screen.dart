@@ -1,7 +1,9 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
+import '../../../core/constants/app_routes.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
@@ -10,6 +12,9 @@ import '../../../core/widgets/lacak_buttons.dart';
 import '../../../core/widgets/lacak_feedback_states.dart';
 import '../../../core/widgets/lacak_logo.dart';
 import '../../../core/widgets/lacak_status_badge.dart';
+import '../../traceability/domain/traceability_models.dart';
+import '../../traceability/presentation/traceability_providers.dart';
+import '../../traceability/presentation/widgets/supply_chain_timeline.dart';
 import '../data/batch_export_service.dart';
 import '../domain/kitchen_models.dart';
 import 'kitchen_providers.dart';
@@ -426,6 +431,8 @@ class _BatchQrDetailScreenState extends ConsumerState<BatchQrDetailScreen> {
                                   isLoading: _exportingPdf,
                                   onPressed: () => _exportPrintablePdf(batch),
                                 ),
+                                const SizedBox(height: AppSpacing.xxl),
+                                _BatchTraceabilitySections(batch: batch),
                               ],
                             ),
                           ),
@@ -485,6 +492,106 @@ class _WaybillDetailRow extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _BatchTraceabilitySections extends ConsumerWidget {
+  const _BatchTraceabilitySections({required this.batch});
+
+  final FoodBatchItem batch;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final timelineAsync = ref.watch(
+      batchSupplyChainTimelineProvider((
+        sppgId: batch.sppgId,
+        batchId: batch.id,
+        sealedAtUtc: batch.sealedAtUtc,
+        schoolScannedAtUtc: null,
+      )),
+    );
+    final ingredientsAsync = ref.watch(
+      batchIngredientLogsProvider((sppgId: batch.sppgId, batchId: batch.id)),
+    );
+
+    final fallbackTimeline = SupplyChainTimelineData(
+      batchId: batch.id,
+      sealedAtUtc: batch.sealedAtUtc,
+    );
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        SupplyChainTimeline(
+          timeline: timelineAsync.value ?? fallbackTimeline,
+        ),
+        const SizedBox(height: AppSpacing.xxl),
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                'Hulu Bahan Baku Tertaut',
+                style: AppTypography.titleSection,
+              ),
+            ),
+            TextButton(
+              onPressed: () => context.go(AppRoutes.kitchenIngredients),
+              child: const Text('Kelola'),
+            ),
+          ],
+        ),
+        const SizedBox(height: AppSpacing.xs),
+        ingredientsAsync.when(
+          loading: () => Text(
+            'Memuat catatan pemasok bahan...',
+            style: AppTypography.bodyMedium,
+          ),
+          error: (_, _) => Text(
+            'Catatan bahan baku belum dapat dimuat.',
+            style: AppTypography.bodyMedium,
+          ),
+          data: (logs) {
+            if (logs.isEmpty) {
+              return Container(
+                padding: const EdgeInsets.all(AppSpacing.lg),
+                decoration: BoxDecoration(
+                  color: AppColors.surfaceSoft,
+                  borderRadius: BorderRadius.circular(AppSpacing.radiusSurface),
+                ),
+                child: Text(
+                  'Belum ada catatan pemasok bahan baku untuk batch ini. Buka menu Bahan Baku untuk menautkan lot pemasok.',
+                  style: AppTypography.bodyMedium,
+                ),
+              );
+            }
+            return Column(
+              children: [
+                for (var i = 0; i < logs.length; i++)
+                  BorderlessThumbTile(
+                    title:
+                        '${logs[i].ingredientName} · ${logs[i].supplierName}',
+                    statusText: 'Exp ${logs[i].formattedExpiryDate}',
+                    statusColor: AppColors.primary,
+                    fallbackIcon: Icons.inventory_2_rounded,
+                    showBottomDivider: i < logs.length - 1,
+                    metadata: [
+                      BorderlessMetaItem(
+                        icon: Icons.qr_code_rounded,
+                        label: 'Lot ${logs[i].supplierBatchNo}',
+                      ),
+                      if (logs[i].isPendingSync)
+                        const BorderlessMetaItem(
+                          icon: Icons.cloud_off_rounded,
+                          label: 'Belum Terkirim',
+                        ),
+                    ],
+                  ),
+              ],
+            );
+          },
+        ),
+      ],
     );
   }
 }

@@ -25,10 +25,14 @@ class SupervisorHomeScreen extends ConsumerWidget {
     final dateFilter = ref.watch(supervisorDateFilterProvider);
     final selectedRegion = ref.watch(supervisorRegionFilterProvider);
     final overviewAsync = ref.watch(supervisorOverviewProvider);
+    final hasAppShell = AppShellScope.maybeOf(context) != null;
 
     final width = MediaQuery.sizeOf(context).width;
     final horizontalPad = AppSpacing.horizontalPadding(width);
     final maxWidth = width >= 900 ? 920.0 : AppSpacing.maxContentWidth(width);
+    final displayTitle = profile?.fullName.isNotEmpty == true
+        ? profile!.fullName
+        : 'Pengawas BGN Wilayah';
 
     return Scaffold(
       backgroundColor: AppColors.bgCanvas,
@@ -37,39 +41,17 @@ class SupervisorHomeScreen extends ConsumerWidget {
           SafeArea(
             bottom: false,
             child: Padding(
-              padding: EdgeInsets.fromLTRB(
-                horizontalPad,
-                AppSpacing.md,
-                AppSpacing.sm,
-                AppSpacing.sm,
-              ),
+              padding: const EdgeInsets.only(right: AppSpacing.sm),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
                   Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          'Pemantauan Wilayah · Hanya Baca',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: AppTypography.captionMuted,
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          profile?.fullName.isNotEmpty == true
-                              ? profile!.fullName
-                              : 'Pengawas BGN Wilayah',
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: AppTypography.headlinePage,
-                        ),
-                      ],
+                    child: MinimalTopHeader(
+                      includeTopSafeArea: false,
+                      contextLabel: 'Pemantauan Wilayah · Hanya Baca',
+                      title: displayTitle,
                     ),
                   ),
-                  const SizedBox(width: AppSpacing.xs),
                   IconButton(
                     onPressed: () => ref.invalidate(supervisorOverviewProvider),
                     tooltip: 'Muat Ulang Ringkasan',
@@ -82,22 +64,25 @@ class SupervisorHomeScreen extends ConsumerWidget {
                       color: AppColors.textPrimary,
                     ),
                   ),
-                  Material(
-                    color: AppColors.surfaceSoft,
-                    borderRadius: BorderRadius.circular(AppSpacing.radiusChip),
-                    child: IconButton(
-                      onPressed: () => context.push(AppRoutes.settings),
-                      tooltip: 'Pengaturan & Keluar',
-                      constraints: const BoxConstraints(
-                        minWidth: AppSpacing.minTouchTarget,
-                        minHeight: AppSpacing.minTouchTarget,
+                  if (!hasAppShell)
+                    Material(
+                      color: AppColors.surfaceSoft,
+                      borderRadius: BorderRadius.circular(
+                        AppSpacing.radiusChip,
                       ),
-                      icon: const Icon(
-                        Icons.person_rounded,
-                        color: AppColors.primary,
+                      child: IconButton(
+                        onPressed: () => context.push(AppRoutes.settings),
+                        tooltip: 'Pengaturan & Keluar',
+                        constraints: const BoxConstraints(
+                          minWidth: AppSpacing.minTouchTarget,
+                          minHeight: AppSpacing.minTouchTarget,
+                        ),
+                        icon: const Icon(
+                          Icons.person_rounded,
+                          color: AppColors.primary,
+                        ),
                       ),
                     ),
-                  ),
                 ],
               ),
             ),
@@ -316,6 +301,14 @@ class _SupervisorOverviewBody extends StatelessWidget {
                 ),
                 const SizedBox(height: AppSpacing.xl),
               ],
+              if (overview.alertResolutionHistory.isNotEmpty) ...[
+                const Divider(height: 1),
+                const SizedBox(height: AppSpacing.lg),
+                _AlertResolutionHistorySection(
+                  history: overview.alertResolutionHistory,
+                ),
+                const SizedBox(height: AppSpacing.xl),
+              ],
               const Divider(height: 1),
               const SizedBox(height: AppSpacing.lg),
               Text(
@@ -431,6 +424,24 @@ class _NationalMetricsTonalBlock extends StatelessWidget {
             : AppColors.textPrimary,
         caption: 'Rata-rata gabungan',
       ),
+      _MetricCell(
+        label: 'Rata Transit Kurir',
+        value: overview.avgTransitMinutes != null
+            ? '${overview.avgTransitMinutes} mnt'
+            : '-',
+        valueColor: AppColors.textPrimary,
+        caption: 'Muat hingga tiba sekolah',
+      ),
+      _MetricCell(
+        label: 'Retur Ompreng',
+        value: overview.trayReturnRatePct != null
+            ? '${overview.trayReturnRatePct}%'
+            : '-',
+        valueColor: (overview.trayReturnRatePct ?? 100) < 90
+            ? AppColors.warnFg
+            : AppColors.safeFg,
+        caption: 'Ompreng kembali & sanitasi',
+      ),
     ];
 
     return Container(
@@ -481,6 +492,21 @@ class _NationalMetricsTonalBlock extends StatelessWidget {
                       color: AppColors.borderHairline,
                     ),
                     Expanded(child: cells[3]),
+                  ],
+                ),
+              ),
+              const Divider(height: 1),
+              IntrinsicHeight(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Expanded(child: cells[4]),
+                    const VerticalDivider(
+                      width: 1,
+                      thickness: 1,
+                      color: AppColors.borderHairline,
+                    ),
+                    Expanded(child: cells[5]),
                   ],
                 ),
               ),
@@ -690,6 +716,14 @@ class _SppgSummaryRow extends StatelessWidget {
               ),
             ),
           ),
+          if (summary.avgTransitMinutes != null ||
+              summary.trayReturnRatePct != null) ...[
+            const SizedBox(height: 2),
+            Text(
+              'Rata Transit Kurir: ${summary.avgTransitMinutes != null ? '${summary.avgTransitMinutes} mnt' : '-'} · Retur Ompreng: ${summary.trayReturnRatePct != null ? '${summary.trayReturnRatePct}%' : '-'}',
+              style: AppTypography.tabular(AppTypography.captionMuted),
+            ),
+          ],
           const SizedBox(height: AppSpacing.md),
           if (summary.wasteLogCount == 0)
             Text(
@@ -719,6 +753,81 @@ class _SppgSummaryRow extends StatelessWidget {
           ],
         ],
       ),
+    );
+  }
+}
+
+class _AlertResolutionHistorySection extends StatelessWidget {
+  const _AlertResolutionHistorySection({required this.history});
+
+  final List<SupervisorAlertResolutionBrief> history;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          'Riwayat Klarifikasi & Resolusi Alarm (${history.length})',
+          style: AppTypography.tabular(AppTypography.titleSection),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          'Jejak audit pencabutan status darurat atau konfirmasi KLB oleh pejabat berwenang.',
+          style: AppTypography.bodyMedium,
+        ),
+        const SizedBox(height: AppSpacing.xs),
+        for (var i = 0; i < history.length; i++) ...[
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Wrap(
+                  spacing: AppSpacing.sm,
+                  runSpacing: AppSpacing.xs,
+                  alignment: WrapAlignment.spaceBetween,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    Text(history[i].sppgName, style: AppTypography.titleItem),
+                    LacakStatusTag(
+                      level:
+                          history[i].newStatus ==
+                              AlertResolutionStatus.clarifiedSafe
+                          ? LacakStatusLevel.safe
+                          : LacakStatusLevel.danger,
+                      label: history[i].newStatus.label,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  '${history[i].menuName} (${history[i].batchCode})',
+                  style: AppTypography.tabular(
+                    AppTypography.bodyMedium.copyWith(
+                      color: AppColors.textPrimary,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+                if (history[i].resolutionNote.isNotEmpty) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    history[i].resolutionNote,
+                    style: AppTypography.bodyMedium,
+                  ),
+                ],
+                const SizedBox(height: 2),
+                Text(
+                  'Oleh ${history[i].actorName} · ${formatWibDateTime(history[i].createdAtUtc)}',
+                  style: AppTypography.tabular(AppTypography.captionMuted),
+                ),
+              ],
+            ),
+          ),
+          if (i < history.length - 1) const Divider(height: 1),
+        ],
+      ],
     );
   }
 }

@@ -23,6 +23,8 @@ import '../../alerts/data/cluster_alert_repository.dart';
 import '../../alerts/domain/cluster_alert_models.dart';
 import '../../auth/presentation/auth_controller.dart';
 import '../../kitchen/domain/kitchen_models.dart';
+import '../../traceability/domain/traceability_models.dart';
+import '../../traceability/presentation/traceability_providers.dart';
 import '../domain/danger_zone_calculator.dart';
 import '../domain/school_models.dart';
 import 'school_providers.dart';
@@ -162,6 +164,27 @@ class _AnomalyReportScreenState extends ConsumerState<AnomalyReportScreen> {
               .difference(args.sealedAtUtc.toUtc())
               .inMinutes
               .clamp(0, 1440);
+      List<IngredientLogItem> ingredientLogs = const [];
+      TransitHandoverItem? transitHandover;
+      try {
+        final traceRepo = ref.read(traceabilityRepositoryProvider);
+        ingredientLogs = await traceRepo.fetchIngredientLogsByBatch(
+          sppgId: sppgId,
+          batchId: args.batchId,
+        );
+        final timeline = await traceRepo.fetchSupplyChainTimeline(
+          sppgId: sppgId,
+          batchId: args.batchId,
+          sealedAtUtc: args.sealedAtUtc,
+          schoolScannedAtUtc: scannedAt,
+        );
+        transitHandover = timeline.handover;
+      } catch (_) {
+        // Non-blocking lookup: never delay emergency alert PDF creation.
+      }
+      if (!mounted) {
+        return;
+      }
       final draftArgs = PuskesmasDraftArgs(
         alertId: event.id,
         batchId: args.batchId,
@@ -185,6 +208,8 @@ class _AnomalyReportScreenState extends ConsumerState<AnomalyReportScreen> {
         broadcastEnabled: _broadcastEnabled,
         isPendingSync: event.isPendingSync,
         reportedAtUtc: event.createdAtUtc,
+        ingredientLogs: ingredientLogs,
+        transitHandover: transitHandover,
       );
 
       context.pushReplacement(

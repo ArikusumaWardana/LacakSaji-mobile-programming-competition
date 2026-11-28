@@ -19,6 +19,7 @@ import '../../kitchen/domain/kitchen_models.dart';
 import '../domain/danger_zone_calculator.dart';
 import '../domain/school_models.dart';
 import 'school_providers.dart';
+import 'widgets/parent_summary_share_sheet.dart';
 
 enum _SchoolDashFilter {
   today,
@@ -194,6 +195,7 @@ class _SchoolDashboardScreenState extends ConsumerState<SchoolDashboardScreen> {
     final school = ref.watch(authControllerProvider).school;
     final dashboardAsync = ref.watch(schoolDashboardProvider);
     final activeSamplesAsync = ref.watch(activeSampleVaultsProvider);
+    final historySamplesAsync = ref.watch(historySampleVaultsProvider);
     final width = MediaQuery.sizeOf(context).width;
     final horizontalPad = AppSpacing.horizontalPadding(width);
     final maxWidth = width >= 900 ? 960.0 : AppSpacing.maxContentWidth(width);
@@ -215,6 +217,10 @@ class _SchoolDashboardScreenState extends ConsumerState<SchoolDashboardScreen> {
 
     final dashData = dashboardAsync.value;
     final activeSamples = activeSamplesAsync.value ?? const <SampleVaultItem>[];
+    final allSamples = <SampleVaultItem>[
+      ...activeSamples,
+      ...(historySamplesAsync.value ?? const <SampleVaultItem>[]),
+    ];
     final nowUtc = DateTime.now().toUtc();
     final hasAlert = (dashData != null && !dashData.partnerKeyCached) ||
         activeSamples.any((s) => s.isReadyToDispose(nowUtc)) ||
@@ -337,6 +343,7 @@ class _SchoolDashboardScreenState extends ConsumerState<SchoolDashboardScreen> {
                               context,
                               school: data.school,
                               item: item,
+                              allSamples: allSamples,
                             ),
                           ),
                         ),
@@ -356,10 +363,24 @@ class _SchoolDashboardScreenState extends ConsumerState<SchoolDashboardScreen> {
     BuildContext context, {
     required SchoolProfile school,
     required SchoolInspectionItem item,
+    required List<SampleVaultItem> allSamples,
   }) {
     final sppgName = school.partnerKitchenName ?? 'Dapur SPPG Mitra';
     final sealedAtUtc = item.effectiveSealedAtUtc;
     final parentRouter = GoRouter.of(context);
+    final matchedSample = allSamples
+        .where((s) => s.inspectionId == item.id)
+        .cast<SampleVaultItem?>()
+        .firstWhere((s) => s != null, orElse: () => null);
+    final effectiveSampleLabel =
+        (item.sampleLabelCode != null && item.sampleLabelCode!.isNotEmpty)
+            ? item.sampleLabelCode
+            : matchedSample?.labelCode;
+    final canShareParentSummary =
+        item.finalDecision == 'APPROVED' &&
+        item.dangerStatus != DangerZoneStatus.red &&
+        effectiveSampleLabel != null &&
+        effectiveSampleLabel.isNotEmpty;
 
     showModalBottomSheet<void>(
       context: context,
@@ -412,7 +433,49 @@ class _SchoolDashboardScreenState extends ConsumerState<SchoolDashboardScreen> {
                       : 'Lolos Diterima',
                 ),
                 const Divider(height: 1),
+                if (effectiveSampleLabel != null &&
+                    effectiveSampleLabel.isNotEmpty) ...[
+                  _DetailSheetRow(
+                    label: 'Label Bank Sampel',
+                    value: effectiveSampleLabel,
+                  ),
+                  const Divider(height: 1),
+                ],
                 const SizedBox(height: AppSpacing.xl),
+                if (canShareParentSummary) ...[
+                  LacakPrimaryButton(
+                    label: 'Bagikan Ringkasan ke Wali Murid',
+                    icon: Icons.share_rounded,
+                    onPressed: () {
+                      Navigator.of(sheetContext).pop();
+                      showModalBottomSheet<void>(
+                        context: context,
+                        isScrollControlled: true,
+                        constraints: const BoxConstraints(
+                          maxWidth: AppSpacing.tabletFormMaxWidth,
+                        ),
+                        backgroundColor: AppColors.bgCanvas,
+                        shape: const RoundedRectangleBorder(
+                          borderRadius: BorderRadius.vertical(
+                            top: Radius.circular(AppSpacing.radiusHero),
+                          ),
+                        ),
+                        builder: (_) => ParentSummaryShareSheet(
+                          schoolName: school.name,
+                          dateUtc: item.scannedAtUtc,
+                          menuName: item.menuName,
+                          batchCode: item.batchCode,
+                          cookedAtUtc: sealedAtUtc,
+                          arrivedAtUtc: item.scannedAtUtc,
+                          sampleLabelCode: effectiveSampleLabel,
+                          allergenTags: item.allergenTags,
+                          localPhotoPath: item.localPhotoPath,
+                        ),
+                      );
+                    },
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                ],
                 LacakDangerButton(
                   label: 'Laporkan Anomali / Siswa Bergejala',
                   icon: Icons.notification_important_rounded,

@@ -198,8 +198,18 @@ String _operationTitle(String operationType) {
     'update_sample_status' => 'Pembaruan Status Sampel',
     'create_waste_log' => 'Laporan Sisa Makanan Siswa',
     'create_alert' => 'Laporan Darurat Makanan',
+    'resolve_cluster_alert' => 'Klarifikasi Status Darurat',
     'update_alert_pdf_dispatched' => 'Status Kirim PDF Puskesmas',
     'ack_alert' => 'Konfirmasi Peringatan Darurat',
+    'sync_school_allergens' => 'Profil Alergen Siswa',
+    'rotate_signing_key' => 'Rotasi Kunci Keamanan QR',
+    'revoke_signing_key' => 'Pencabutan Kunci QR',
+    'upsert_institution_member' => 'Penambahan Anggota Tim',
+    'toggle_institution_member' => 'Pembaruan Status Anggota Tim',
+    'create_ingredient_log' => 'Catatan Hulu Bahan Baku',
+    'upsert_transit_handover' => 'Pindai Transit Kurir',
+    'create_tray_return' => 'Serah Terima Ompreng Kosong',
+    'update_tray_return_sanitation' => 'Verifikasi & Sanitasi Ompreng',
     _ => 'Data Pemeriksaan Tersimpan',
   };
 }
@@ -214,9 +224,15 @@ String _buildDetailLine({
   final menuName = _cleanStr(payload['menu_name']);
   final batchCode = _cleanStr(payload['batch_code']);
   final labelCode = _cleanStr(payload['label_code']);
+  final ingredientName = _cleanStr(payload['ingredient_name']);
+  final supplierName = _cleanStr(payload['supplier_name']);
 
   final subjectParts = <String>[];
-  if (menuName != null) {
+  if (ingredientName != null) {
+    subjectParts.add(
+      supplierName != null ? '$ingredientName ($supplierName)' : ingredientName,
+    );
+  } else if (menuName != null) {
     subjectParts.add(menuName);
   }
   if (batchCode != null) {
@@ -258,21 +274,67 @@ String? _cleanStr(Object? value) {
     return (belongsToCurrent: true, hint: null);
   }
 
-  if (operationType == 'create_batch') {
+  if (operationType == 'create_batch' ||
+      operationType == 'rotate_signing_key' ||
+      operationType == 'revoke_signing_key' ||
+      operationType == 'create_ingredient_log' ||
+      operationType == 'upsert_transit_handover' ||
+      operationType == 'update_tray_return_sanitation') {
     if (kitchen == null) {
       return (
         belongsToCurrent: false,
-        hint: 'Data ini dibuat dengan akun Dapur SPPG. Masuk sebagai Dapur SPPG untuk mengirim, atau hapus jika hanya data uji coba.',
+        hint: 'Data ini dibuat dengan akun Dapur SPPG atau Kurir SPPG. Masuk dengan akun SPPG terkait untuk mengirim.',
       );
     }
     final payloadSppgId = _cleanStr(payload['sppg_id']);
     if (payloadSppgId != null && payloadSppgId != kitchen.id) {
       return (
         belongsToCurrent: false,
-        hint: 'Data ini milik akun Dapur SPPG lain yang sebelumnya masuk di HP ini.',
+        hint: 'Data ini milik Dapur SPPG lain yang sebelumnya masuk di HP ini.',
       );
     }
     return (belongsToCurrent: true, hint: null);
+  }
+
+  if (operationType == 'upsert_institution_member' ||
+      operationType == 'toggle_institution_member') {
+    final instType = _cleanStr(payload['institution_type']);
+    final instId = _cleanStr(payload['institution_id']);
+    if (instType == 'sppg') {
+      final matches = kitchen != null && (instId == null || instId == kitchen.id);
+      return (
+        belongsToCurrent: matches,
+        hint: matches
+            ? null
+            : 'Data tim ini milik akun Dapur SPPG lain yang sebelumnya masuk di HP ini.',
+      );
+    }
+    if (instType == 'school') {
+      final matches = school != null && (instId == null || instId == school.id);
+      return (
+        belongsToCurrent: matches,
+        hint: matches
+            ? null
+            : 'Data tim ini milik akun Sekolah lain yang sebelumnya masuk di HP ini.',
+      );
+    }
+  }
+
+  if (operationType == 'resolve_cluster_alert') {
+    final payloadSppgId = _cleanStr(payload['sppg_id']);
+    final payloadSchoolId = _cleanStr(payload['reporter_school_id']);
+    if (kitchen != null &&
+        (payloadSppgId == null || payloadSppgId == kitchen.id)) {
+      return (belongsToCurrent: true, hint: null);
+    }
+    if (school != null &&
+        (payloadSchoolId == null || payloadSchoolId == school.id)) {
+      return (belongsToCurrent: true, hint: null);
+    }
+    return (
+      belongsToCurrent: false,
+      hint: 'Klarifikasi status darurat ini milik institusi lain yang sebelumnya masuk di HP ini.',
+    );
   }
 
   // Remaining operations belong to a school account.

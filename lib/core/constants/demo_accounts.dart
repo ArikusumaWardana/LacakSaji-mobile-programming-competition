@@ -8,6 +8,7 @@ class DemoAccountPreset {
     required this.roleTag,
     required this.isKitchen,
     this.isSupervisor = false,
+    this.isCourier = false,
   });
 
   final String email;
@@ -17,6 +18,7 @@ class DemoAccountPreset {
   final String roleTag;
   final bool isKitchen;
   final bool isSupervisor;
+  final bool isCourier;
 }
 
 class SandboxSppgCode {
@@ -115,6 +117,15 @@ const List<DemoAccountPreset> kDemoAccounts = [
     roleTag: 'PENGAWAS',
     isKitchen: false,
     isSupervisor: true,
+  ),
+  DemoAccountPreset(
+    email: 'kurir.a@lacaksaji.id',
+    password: kDemoAccountPassword,
+    title: 'Kurir Pengantar: SPPG A',
+    subtitle: 'Pengantaran SPPG Purwokerto Utara ke Sekolah Mitra',
+    roleTag: 'KURIR',
+    isKitchen: false,
+    isCourier: true,
   ),
 ];
 

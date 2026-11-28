@@ -45,6 +45,7 @@ abstract class KitchenRepository {
     required FoodRiskCategory riskCategory,
     required CapturedWebpPhoto photo,
     required bool isOffline,
+    List<String> allergenTags = const [],
   });
 
   Future<int> syncPendingKitchenBatches({required KitchenProfile kitchen});
@@ -206,16 +207,7 @@ class SupabaseKitchenRepository implements KitchenRepository {
             .from('schools')
             .select('id, verification_status')
             .eq('sppg_id', kitchen.id),
-        client
-            .from('cluster_alerts')
-            .select(
-              'id, batch_id, stage, symptom_count, created_at, '
-              'food_batches(batch_code, menu_name), '
-              'schools(name)',
-            )
-            .eq('sppg_id', kitchen.id)
-            .order('created_at', ascending: false)
-            .limit(20),
+        _fetchDashboardClusterAlerts(client, kitchen.id),
         client
             .from('plate_waste_logs')
             .select(
@@ -238,7 +230,12 @@ class SupabaseKitchenRepository implements KitchenRepository {
       for (final row in alertRows) {
         final createdAt = DateTime.parse(row['created_at'] as String).toUtc();
         final batchId = row['batch_id'] as String;
-        alertBatchIds.add(batchId);
+        final resolutionStatus = AlertResolutionStatus.fromDb(
+          row['resolution_status'] as String?,
+        );
+        if (resolutionStatus != AlertResolutionStatus.clarifiedSafe) {
+          alertBatchIds.add(batchId);
+        }
         if (isSameWibCalendarDay(createdAt, nowUtc)) {
           final batchMeta = row['food_batches'] as Map<String, dynamic>?;
           final schoolMeta = row['schools'] as Map<String, dynamic>?;
@@ -248,10 +245,17 @@ class SupabaseKitchenRepository implements KitchenRepository {
               batchId: batchId,
               batchCode: (batchMeta?['batch_code'] as String?) ?? '-',
               menuName: (batchMeta?['menu_name'] as String?) ?? 'Menu SPPG',
-              reporterSchoolName: (schoolMeta?['name'] as String?) ?? 'Sekolah Mitra',
+              reporterSchoolId: (row['reporter_school_id'] as String?) ?? '',
+              reporterSchoolName:
+                  (schoolMeta?['name'] as String?) ?? 'Sekolah Mitra',
               stage: (row['stage'] as String?) ?? 'pre_consumption',
               symptomCount: (row['symptom_count'] as num?)?.toInt() ?? 0,
               createdAtUtc: createdAt,
+              resolutionStatus: resolutionStatus,
+              resolutionNote: row['resolution_note'] as String?,
+              resolvedAtUtc: row['resolved_at'] == null
+                  ? null
+                  : DateTime.tryParse(row['resolved_at'] as String)?.toUtc(),
             ),
           );
         }
@@ -606,6 +610,7 @@ class SupabaseKitchenRepository implements KitchenRepository {
     required FoodRiskCategory riskCategory,
     required CapturedWebpPhoto photo,
     required bool isOffline,
+    List<String> allergenTags = const [],
   }) async {
     final client = _client;
 
@@ -628,41 +633,38 @@ class SupabaseKitchenRepository implements KitchenRepository {
       }
     }
 
-    // 2. Ensure Ed25519 private key exists locally & public key matches Supabase.
-    var syncedPublicKey = kitchen.publicKey;
-    if (!isOffline && client != null) {
+    // 2. Ensure Ed25519 private key & deterministic key_id exist locally & sync if online.
+    var activeMaterial = await _ed25519Service.getOrCreateActiveKeyMaterial(
+      sppgId: kitchen.id,
+      legacyUserId: kitchen.ownerUserId,
+    );
+    if (!isOffline &&
+        client != null &&
+        kitchen.publicKey != activeMaterial.publicKeyB64) {
       try {
-        syncedPublicKey = await _ed25519Service.ensureKeyPairSynced(
-          sppgId: kitchen.id,
-          remotePublicKeyB64: kitchen.publicKey,
-          legacyUserId: kitchen.ownerUserId,
-          onSyncRemotePublicKey: (publicKeyB64) async {
-            await client
-                .from('sppg_kitchens')
-                .update({'public_key': publicKeyB64})
-                .eq('id', kitchen.id)
-                .eq('owner_user_id', kitchen.ownerUserId);
-          },
-        );
+        await client
+            .from('sppg_kitchens')
+            .update({'public_key': activeMaterial.publicKeyB64})
+            .eq('id', kitchen.id);
+        await client.from('signing_keys').upsert({
+          'key_id': activeMaterial.keyId,
+          'sppg_id': kitchen.id,
+          'public_key': activeMaterial.publicKeyB64,
+          'status': 'active',
+          'device_label': 'Perangkat Dapur SPPG',
+        });
       } catch (_) {
-        syncedPublicKey = await _ed25519Service.getOrCreatePublicKeyB64(
-          sppgId: kitchen.id,
-          legacyUserId: kitchen.ownerUserId,
-        );
+        // Ignore if table/policy update waits on schema 008 migration.
       }
-    } else {
-      syncedPublicKey = await _ed25519Service.getOrCreatePublicKeyB64(
-        sppgId: kitchen.id,
-        legacyUserId: kitchen.ownerUserId,
-      );
     }
 
     await _cachePublicKeyInDrift(
       kitchen: kitchen,
-      publicKeyB64: syncedPublicKey,
+      publicKeyB64: activeMaterial.publicKeyB64,
+      keyId: activeMaterial.keyId,
     );
 
-    // 3. Build batch identity & Ed25519 cryptographic signature.
+    // 3. Build batch identity & Ed25519 cryptographic signature paired with key_id.
     final batchId = _uuid.v4();
     final batchCode = _generateBatchCode(sealedAtUtc);
     final cleanMenu = menuName.trim();
@@ -672,20 +674,26 @@ class SupabaseKitchenRepository implements KitchenRepository {
       isUtc: true,
     );
 
-    final canonicalData = BatchQrPayload.buildCanonicalSigningString(
-      batchId: batchId,
-      batchCode: batchCode,
+    final cleanAllergens = BatchQrPayload.normalizeAllergenTags(allergenTags);
+    final signed = await _ed25519Service.signBatchWithKeyId(
       sppgId: kitchen.id,
-      menuName: cleanMenu,
-      riskCategory: riskCategory.dbValue,
-      sealedAtEpochSec: sealedEpochSec,
-      timestampSource: timestampSource.dbValue,
-    );
-
-    final signatureB64 = await _ed25519Service.signCanonicalPayload(
-      sppgId: kitchen.id,
-      canonicalData: canonicalData,
       legacyUserId: kitchen.ownerUserId,
+      buildCanonicalForKeyId: (keyId) =>
+          BatchQrPayload.buildCanonicalSigningString(
+            batchId: batchId,
+            batchCode: batchCode,
+            sppgId: kitchen.id,
+            menuName: cleanMenu,
+            riskCategory: riskCategory.dbValue,
+            sealedAtEpochSec: sealedEpochSec,
+            timestampSource: timestampSource.dbValue,
+            keyId: keyId,
+            allergenTags: cleanAllergens,
+          ),
+    );
+    activeMaterial = SppgSigningKeyMaterial(
+      keyId: signed.keyId,
+      publicKeyB64: signed.publicKeyB64,
     );
 
     final storagePath = 'batches/${kitchen.id}/$batchId.webp';
@@ -700,9 +708,11 @@ class SupabaseKitchenRepository implements KitchenRepository {
       riskCategory: riskCategory,
       sealedAtUtc: alignedSealedUtc,
       timestampSource: timestampSource,
+      signingKeyId: activeMaterial.keyId,
+      allergenTags: cleanAllergens,
       packagingPhotoUrl: storagePath,
       localPhotoPath: photo.filePath,
-      signatureB64: signatureB64,
+      signatureB64: signed.signatureB64,
       createdAtUtc: alignedSealedUtc,
       isPendingSync: false,
     );
@@ -719,6 +729,8 @@ class SupabaseKitchenRepository implements KitchenRepository {
         riskCategory: batch.riskCategory,
         sealedAtUtc: batch.sealedAtUtc,
         timestampSource: batch.timestampSource,
+        signingKeyId: batch.signingKeyId,
+        allergenTags: batch.allergenTags,
         packagingPhotoUrl: batch.packagingPhotoUrl,
         localPhotoPath: batch.localPhotoPath,
         signatureB64: batch.signatureB64,
@@ -737,7 +749,21 @@ class SupabaseKitchenRepository implements KitchenRepository {
             ),
           );
 
-      await client.from('food_batches').insert(batch.toDbInsertMap());
+      final insertMap = batch.toDbInsertMap();
+      try {
+        await client.from('food_batches').insert(insertMap);
+      } on PostgrestException catch (pgError) {
+        if (pgError.code == 'PGRST204' ||
+            pgError.message.toLowerCase().contains('signing_key_id') ||
+            pgError.message.toLowerCase().contains('allergen_tags')) {
+          final legacyMap = Map<String, dynamic>.from(insertMap)
+            ..remove('signing_key_id')
+            ..remove('allergen_tags');
+          await client.from('food_batches').insert(legacyMap);
+        } else {
+          rethrow;
+        }
+      }
       return batch;
     } on SocketException {
       await _enqueueBatchOffline(batch: batch, localPhotoPath: photo.filePath);
@@ -751,6 +777,7 @@ class SupabaseKitchenRepository implements KitchenRepository {
         riskCategory: batch.riskCategory,
         sealedAtUtc: batch.sealedAtUtc,
         timestampSource: batch.timestampSource,
+        signingKeyId: batch.signingKeyId,
         packagingPhotoUrl: batch.packagingPhotoUrl,
         localPhotoPath: batch.localPhotoPath,
         signatureB64: batch.signatureB64,
@@ -769,6 +796,7 @@ class SupabaseKitchenRepository implements KitchenRepository {
         riskCategory: batch.riskCategory,
         sealedAtUtc: batch.sealedAtUtc,
         timestampSource: batch.timestampSource,
+        signingKeyId: batch.signingKeyId,
         packagingPhotoUrl: batch.packagingPhotoUrl,
         localPhotoPath: batch.localPhotoPath,
         signatureB64: batch.signatureB64,
@@ -908,20 +936,70 @@ class SupabaseKitchenRepository implements KitchenRepository {
     } catch (_) {}
   }
 
+  Future<List<Map<String, dynamic>>> _fetchDashboardClusterAlerts(
+    SupabaseClient client,
+    String sppgId,
+  ) async {
+    try {
+      final rows = await client
+          .from('cluster_alerts')
+          .select(
+            'id, batch_id, reporter_school_id, stage, symptom_count, '
+            'resolution_status, resolution_note, resolved_at, created_at, '
+            'food_batches(batch_code, menu_name), '
+            'schools(name)',
+          )
+          .eq('sppg_id', sppgId)
+          .order('created_at', ascending: false)
+          .limit(20);
+      return List<Map<String, dynamic>>.from(rows as List);
+    } on PostgrestException catch (pgError) {
+      if (pgError.code == 'PGRST204' || pgError.code == '42703') {
+        final rows = await client
+            .from('cluster_alerts')
+            .select(
+              'id, batch_id, stage, symptom_count, created_at, '
+              'food_batches(batch_code, menu_name), '
+              'schools(name)',
+            )
+            .eq('sppg_id', sppgId)
+            .order('created_at', ascending: false)
+            .limit(20);
+        return List<Map<String, dynamic>>.from(rows as List);
+      }
+      rethrow;
+    }
+  }
+
   Future<void> _cachePublicKeyInDrift({
     required KitchenProfile kitchen,
     required String publicKeyB64,
+    String? keyId,
   }) async {
     try {
+      final now = DateTime.now().toUtc();
       await _database.upsertSppgKey(
         LocalSppgKeysCompanion(
           sppgId: Value(kitchen.id),
           sppgName: Value(kitchen.name),
           inviteCode: Value(kitchen.inviteCode),
           publicKeyB64: Value(publicKeyB64),
-          updatedAt: Value(DateTime.now().toUtc()),
+          updatedAt: Value(now),
         ),
       );
+      if (keyId != null && keyId.isNotEmpty) {
+        await _database.upsertSigningKey(
+          LocalSigningKeysCompanion(
+            keyId: Value(keyId),
+            sppgId: Value(kitchen.id),
+            publicKeyB64: Value(publicKeyB64),
+            status: const Value('active'),
+            deviceLabel: const Value('Perangkat Dapur SPPG'),
+            createdAt: Value(now),
+            updatedAt: Value(now),
+          ),
+        );
+      }
     } catch (_) {
       // Do not fail batch creation if local cache upsert fails.
     }

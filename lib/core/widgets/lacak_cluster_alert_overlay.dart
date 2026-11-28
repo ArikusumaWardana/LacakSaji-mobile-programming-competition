@@ -3,6 +3,8 @@ import 'package:material_ui/material_ui.dart';
 
 import '../../features/alerts/domain/cluster_alert_models.dart';
 import '../../features/alerts/presentation/cluster_alert_controller.dart';
+import '../../features/alerts/presentation/widgets/alert_resolution_sheet.dart';
+import '../../features/auth/domain/auth_models.dart';
 import '../../features/auth/presentation/auth_controller.dart';
 import '../../features/kitchen/domain/kitchen_models.dart';
 import '../constants/app_routes.dart';
@@ -76,13 +78,70 @@ class LacakClusterAlertOverlay extends ConsumerWidget {
     ref.read(goRouterProvider).go(targetRoute);
   }
 
+  Future<void> _openResolutionSheet(
+    BuildContext context,
+    WidgetRef ref,
+    AuthState auth,
+  ) async {
+    final verifierName = auth.profile?.fullName.isNotEmpty == true
+        ? auth.profile!.fullName
+        : (auth.kitchen?.name ?? auth.school?.name ?? 'Pejabat Terverifikasi');
+    await showModalBottomSheet<ClusterAlertEvent>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppColors.bgCanvas,
+      constraints: const BoxConstraints(
+        maxWidth: AppSpacing.tabletFormMaxWidth,
+      ),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(
+          top: Radius.circular(AppSpacing.radiusHero),
+        ),
+      ),
+      builder: (_) => AlertResolutionSheet(
+        alert: event,
+        verifierName: verifierName,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final auth = ref.watch(authControllerProvider);
     final isSchoolUser = auth.school != null;
+    final isClarifiedSafe =
+        event.resolutionStatus == AlertResolutionStatus.clarifiedSafe;
+    final isConfirmedKlb =
+        event.resolutionStatus == AlertResolutionStatus.confirmedKlb;
+    final canResolve =
+        !isConfirmedKlb &&
+        canResolveClusterAlert(
+          auth: auth,
+          sppgId: event.sppgId,
+          reporterSchoolId: event.reporterSchoolId,
+        );
     final width = MediaQuery.sizeOf(context).width;
     final horizontalPad = AppSpacing.horizontalPadding(width);
     final maxWidth = AppSpacing.maxContentWidth(width);
+
+    final headerBg = isClarifiedSafe
+        ? AppColors.primary
+        : AppColors.emergencyBg;
+    final headerIcon = isClarifiedSafe
+        ? Icons.verified_user_rounded
+        : Icons.notification_important_rounded;
+    final headerTitle = isClarifiedSafe
+        ? 'PEMBARUAN STATUS DARURAT'
+        : (isConfirmedKlb
+              ? 'TERKONFIRMASI KLB PANGAN'
+              : 'PERINGATAN DARURAT MAKANAN');
+    final headerSubtitle = isClarifiedSafe
+        ? 'Distribusi Aman Dilanjutkan · Klarifikasi Terverifikasi'
+        : (isConfirmedKlb
+              ? 'Status Ditetapkan KLB: Pertahankan Penahanan & Koordinasi Puskesmas'
+              : (event.stage == ClusterAlertStage.postConsumption
+                    ? 'Siaga Pasca-Konsumsi: Tahan Kloter & Siapkan Bank Sampel'
+                    : 'Stop Distribusi Pra-Konsumsi: Jangan Bagikan Makanan Ini'));
 
     return PopScope(
       canPop: false,
@@ -92,7 +151,7 @@ class LacakClusterAlertOverlay extends ConsumerWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Container(
-              color: AppColors.emergencyBg,
+              color: headerBg,
               padding: EdgeInsets.fromLTRB(
                 horizontalPad,
                 AppSpacing.lg,
@@ -107,14 +166,14 @@ class LacakClusterAlertOverlay extends ConsumerWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
-                        const Icon(
-                          Icons.notification_important_rounded,
+                        Icon(
+                          headerIcon,
                           size: 44,
                           color: AppColors.emergencyFg,
                         ),
                         const SizedBox(height: AppSpacing.sm),
                         Text(
-                          'PERINGATAN DARURAT MAKANAN',
+                          headerTitle,
                           textAlign: TextAlign.center,
                           style: AppTypography.displayStatus.copyWith(
                             color: AppColors.emergencyFg,
@@ -122,9 +181,7 @@ class LacakClusterAlertOverlay extends ConsumerWidget {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          event.stage == ClusterAlertStage.postConsumption
-                              ? 'Siaga Pasca-Konsumsi: Tahan Kloter & Siapkan Bank Sampel'
-                              : 'Stop Distribusi Pra-Konsumsi: Jangan Bagikan Makanan Ini',
+                          headerSubtitle,
                           textAlign: TextAlign.center,
                           style: AppTypography.bodyMedium.copyWith(
                             color: Colors.white.withValues(alpha: 0.92),
@@ -154,10 +211,24 @@ class LacakClusterAlertOverlay extends ConsumerWidget {
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
                           LacakStatusBanner(
-                            level: LacakStatusLevel.danger,
-                            icon: Icons.warning_amber_rounded,
-                            title: 'Instruksi Tindakan Segera',
-                            description: event.instructionText,
+                            level: isClarifiedSafe
+                                ? LacakStatusLevel.safe
+                                : LacakStatusLevel.danger,
+                            icon: isClarifiedSafe
+                                ? Icons.check_circle_rounded
+                                : Icons.warning_amber_rounded,
+                            title: isClarifiedSafe
+                                ? 'Distribusi Aman Dilanjutkan'
+                                : (isConfirmedKlb
+                                      ? 'Terkonfirmasi Kejadian Luar Biasa'
+                                      : 'Instruksi Tindakan Segera'),
+                            description: isClarifiedSafe
+                                ? '${event.resolutionNote ?? 'Anomali dinyatakan terlokalisir dan aman dilanjutkan.'}${event.resolvedByName != null && event.resolvedByName!.isNotEmpty ? ' Diverifikasi oleh ${event.resolvedByName}.' : ''}'
+                                : (isConfirmedKlb &&
+                                          event.resolutionNote != null &&
+                                          event.resolutionNote!.isNotEmpty
+                                      ? '${event.resolutionNote} ${event.instructionText}'
+                                      : event.instructionText),
                           ),
                           const SizedBox(height: AppSpacing.xl),
                           Text(
@@ -189,6 +260,38 @@ class LacakClusterAlertOverlay extends ConsumerWidget {
                             value: formatWibDateTime(event.createdAtUtc),
                             tabular: true,
                           ),
+                          if (event.resolutionStatus !=
+                              AlertResolutionStatus.active) ...[
+                            const Divider(height: 1),
+                            _OverlayDetailRow(
+                              label: 'Status Klarifikasi',
+                              value: event.resolutionStatus.label,
+                            ),
+                            if (event.resolvedByName != null &&
+                                event.resolvedByName!.isNotEmpty) ...[
+                              const Divider(height: 1),
+                              _OverlayDetailRow(
+                                label: 'Pejabat Pemverifikasi',
+                                value: event.resolvedByName!,
+                              ),
+                            ],
+                            if (event.resolvedAtUtc != null) ...[
+                              const Divider(height: 1),
+                              _OverlayDetailRow(
+                                label: 'Waktu Pembaruan Audit',
+                                value: formatWibDateTime(event.resolvedAtUtc!),
+                                tabular: true,
+                              ),
+                            ],
+                            if (event.resolutionNote != null &&
+                                event.resolutionNote!.isNotEmpty) ...[
+                              const Divider(height: 1),
+                              _OverlayDetailRow(
+                                label: 'Catatan Klarifikasi Resmi',
+                                value: event.resolutionNote!,
+                              ),
+                            ],
+                          ],
                           if (event.stage ==
                               ClusterAlertStage.postConsumption) ...[
                             const Divider(height: 1),
@@ -230,12 +333,20 @@ class LacakClusterAlertOverlay extends ConsumerWidget {
                             ),
                           ],
                           const SizedBox(height: AppSpacing.xl),
-                          LacakDangerButton(
-                            label: 'Saya Mengerti & Tahan Distribusi',
-                            icon: Icons.check_circle_rounded,
-                            isLoading: isAcknowledging,
-                            onPressed: () => _ackAndStay(ref),
-                          ),
+                          if (isClarifiedSafe)
+                            LacakPrimaryButton(
+                              label: 'Saya Mengerti & Lanjutkan Distribusi',
+                              icon: Icons.check_circle_rounded,
+                              isLoading: isAcknowledging,
+                              onPressed: () => _ackAndStay(ref),
+                            )
+                          else
+                            LacakDangerButton(
+                              label: 'Saya Mengerti & Tahan Distribusi',
+                              icon: Icons.check_circle_rounded,
+                              isLoading: isAcknowledging,
+                              onPressed: () => _ackAndStay(ref),
+                            ),
                           const SizedBox(height: AppSpacing.md),
                           if (isSchoolUser)
                             LacakSecondaryButton(
@@ -259,6 +370,19 @@ class LacakClusterAlertOverlay extends ConsumerWidget {
                                       AppRoutes.kitchenHome,
                                     ),
                             ),
+                          if (canResolve) ...[
+                            const SizedBox(height: AppSpacing.sm),
+                            LacakSecondaryButton(
+                              label: isClarifiedSafe
+                                  ? 'Ubah ke Terkonfirmasi KLB'
+                                  : 'Klarifikasi / Ubah Status Darurat',
+                              icon: Icons.verified_user_outlined,
+                              onPressed: isAcknowledging
+                                  ? null
+                                  : () =>
+                                        _openResolutionSheet(context, ref, auth),
+                            ),
+                          ],
                         ],
                       ),
                     ),

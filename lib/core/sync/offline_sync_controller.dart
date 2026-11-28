@@ -3,10 +3,12 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../features/alerts/data/cluster_alert_repository.dart';
+import '../../features/allergens/presentation/allergen_providers.dart';
 import '../../features/auth/domain/auth_models.dart';
 import '../../features/auth/presentation/auth_controller.dart';
 import '../../features/kitchen/presentation/kitchen_providers.dart';
 import '../../features/school/presentation/school_providers.dart';
+import '../../features/traceability/presentation/traceability_providers.dart';
 import '../database/database_provider.dart';
 import '../network/connectivity_provider.dart';
 import 'sync_queue_presenter.dart';
@@ -159,6 +161,16 @@ class OfflineSyncController extends Notifier<OfflineSyncState> {
           ref.invalidate(kitchenDashboardProvider);
           ref.invalidate(kitchenHistoryProvider);
         }
+        final kitchenAlertCount = await ref
+            .read(clusterAlertRepositoryProvider)
+            .syncPendingAlerts(kitchenId: kitchen.id);
+        if (!ref.mounted) {
+          return OfflineSyncRunReport(syncedCount: totalSynced);
+        }
+        totalSynced += kitchenAlertCount;
+        if (kitchenAlertCount > 0) {
+          ref.invalidate(kitchenDashboardProvider);
+        }
       }
 
       if (school != null) {
@@ -174,12 +186,39 @@ class OfflineSyncController extends Notifier<OfflineSyncState> {
         if (!ref.mounted) {
           return OfflineSyncRunReport(syncedCount: totalSynced);
         }
-        final combined = schoolCount + alertCount;
+        final allergenCount = await ref
+            .read(allergenRepositoryProvider)
+            .syncPendingAllergenProfiles(schoolId: school.id);
+        if (!ref.mounted) {
+          return OfflineSyncRunReport(syncedCount: totalSynced);
+        }
+        final combined = schoolCount + alertCount + allergenCount;
         totalSynced += combined;
         if (combined > 0) {
           ref.invalidate(schoolDashboardProvider);
           ref.invalidate(selectableWasteBatchesProvider);
+          ref.invalidate(schoolAllergensProvider);
         }
+      }
+
+      final traceabilityCount = await ref
+          .read(traceabilityRepositoryProvider)
+          .syncPendingTraceabilityQueue(
+            sppgId: kitchen?.id,
+            schoolId: school?.id,
+          );
+      if (!ref.mounted) {
+        return OfflineSyncRunReport(syncedCount: totalSynced);
+      }
+      totalSynced += traceabilityCount;
+      if (traceabilityCount > 0) {
+        ref.invalidate(kitchenIngredientHistoryProvider);
+        ref.invalidate(batchIngredientLogsProvider);
+        ref.invalidate(recentKitchenBatchesForLogProvider);
+        ref.invalidate(courierDeliveriesProvider);
+        ref.invalidate(batchSupplyChainTimelineProvider);
+        ref.invalidate(schoolTrayReturnsProvider);
+        ref.invalidate(kitchenTrayReturnsProvider);
       }
 
       final report = await _buildRunReport(

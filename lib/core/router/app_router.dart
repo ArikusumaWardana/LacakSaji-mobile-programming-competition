@@ -10,12 +10,16 @@ import '../../features/auth/presentation/register_kitchen_screen.dart';
 import '../../features/auth/presentation/register_school_screen.dart';
 import '../../features/auth/presentation/role_selection_screen.dart';
 import '../../features/auth/presentation/splash_screen.dart';
+import '../../features/courier/presentation/courier_dashboard_screen.dart';
+import '../../features/courier/presentation/courier_scan_screen.dart';
 import '../../features/kitchen/domain/kitchen_models.dart';
 import '../../features/kitchen/presentation/batch_qr_detail_screen.dart';
 import '../../features/kitchen/presentation/create_batch_screen.dart';
+import '../../features/kitchen/presentation/ingredient_history_screen.dart';
 import '../../features/kitchen/presentation/kitchen_dashboard_screen.dart';
 import '../../features/kitchen/presentation/kitchen_history_screen.dart';
 import '../../features/kitchen/presentation/kitchen_schools_screen.dart';
+import '../../features/kitchen/presentation/tray_logistics_screen.dart';
 import '../../features/alerts/domain/cluster_alert_models.dart';
 import '../../features/school/domain/school_models.dart';
 import '../../features/school/presentation/anomaly_report_screen.dart';
@@ -27,7 +31,9 @@ import '../../features/school/presentation/scan_qr_screen.dart';
 import '../../features/school/presentation/school_dashboard_screen.dart';
 import '../../features/school/presentation/visual_audit_screen.dart';
 import '../../features/settings/presentation/settings_screen.dart';
+import '../../features/settings/presentation/team_security_screen.dart';
 import '../../features/supervisor/presentation/supervisor_home_screen.dart';
+import '../../features/traceability/domain/traceability_models.dart';
 import '../constants/app_routes.dart';
 import '../widgets/lacak_adaptive_shell.dart';
 
@@ -96,23 +102,39 @@ final goRouterProvider = Provider<GoRouter>((ref) {
 
       if (role == UserRole.kitchen &&
           (location.startsWith(AppRoutes.schoolHome) ||
+              location.startsWith(AppRoutes.courierHome) ||
               location == AppRoutes.pendingVerification ||
               location == AppRoutes.supervisor)) {
         return AppRoutes.kitchenHome;
       }
 
+      if (role == UserRole.courier &&
+          (location.startsWith(AppRoutes.kitchenHome) ||
+              location.startsWith(AppRoutes.schoolHome) ||
+              location == AppRoutes.pendingVerification ||
+              location == AppRoutes.settingsTeamSecurity ||
+              location == AppRoutes.supervisor)) {
+        return AppRoutes.courierHome;
+      }
+
       if (role == UserRole.school &&
           (location.startsWith(AppRoutes.kitchenHome) ||
+              location.startsWith(AppRoutes.courierHome) ||
               location == AppRoutes.pendingVerification ||
               location == AppRoutes.supervisor)) {
         return AppRoutes.schoolHome;
       }
 
       if (role == UserRole.supervisor &&
-          (location.startsWith(AppRoutes.kitchenHome) ||
-              location.startsWith(AppRoutes.schoolHome) ||
-              location == AppRoutes.pendingVerification)) {
+          location != AppRoutes.supervisor &&
+          location != AppRoutes.supervisorSettings &&
+          location != AppRoutes.settings) {
         return AppRoutes.supervisor;
+      }
+
+      if (location == AppRoutes.settingsTeamSecurity &&
+          !authState.isInstitutionAdmin) {
+        return target;
       }
 
       return null;
@@ -143,12 +165,12 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const PendingVerificationScreen(),
       ),
       GoRoute(
-        path: AppRoutes.supervisor,
-        builder: (context, state) => const SupervisorHomeScreen(),
-      ),
-      GoRoute(
         path: AppRoutes.settings,
         builder: (context, state) => const SettingsScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.settingsTeamSecurity,
+        builder: (context, state) => const TeamSecurityScreen(),
       ),
       GoRoute(
         path: AppRoutes.kitchenCreateBatch,
@@ -162,6 +184,15 @@ final goRouterProvider = Provider<GoRouter>((ref) {
           return BatchQrDetailScreen(
             batchId: batchId,
             initialBatch: extra is FoodBatchItem ? extra : null,
+          );
+        },
+      ),
+      GoRoute(
+        path: AppRoutes.courierScan,
+        builder: (context, state) {
+          final extra = state.extra;
+          return CourierScanScreen(
+            initialMode: extra is CourierScanMode ? extra : null,
           );
         },
       ),
@@ -239,6 +270,22 @@ final goRouterProvider = Provider<GoRouter>((ref) {
           StatefulShellBranch(
             routes: [
               GoRoute(
+                path: AppRoutes.kitchenIngredients,
+                builder: (context, state) => const IngredientHistoryScreen(),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: AppRoutes.kitchenTrays,
+                builder: (context, state) => const TrayLogisticsScreen(),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
                 path: AppRoutes.kitchenHistory,
                 builder: (context, state) => const KitchenHistoryScreen(),
               ),
@@ -288,6 +335,54 @@ final goRouterProvider = Provider<GoRouter>((ref) {
             routes: [
               GoRoute(
                 path: AppRoutes.schoolSettings,
+                builder: (context, state) => const SettingsScreen(),
+              ),
+            ],
+          ),
+        ],
+      ),
+      StatefulShellRoute.indexedStack(
+        builder: (context, state, navigationShell) => LacakAdaptiveShell(
+          navigationShell: navigationShell,
+          destinations: LacakShellDestinations.courier,
+        ),
+            branches: [
+              StatefulShellBranch(
+                routes: [
+                  GoRoute(
+                    path: AppRoutes.courierHome,
+                    builder: (context, state) => const CourierDashboardScreen(),
+                  ),
+                ],
+              ),
+              StatefulShellBranch(
+                routes: [
+                  GoRoute(
+                    path: AppRoutes.courierSettings,
+                    builder: (context, state) => const SettingsScreen(),
+                  ),
+                ],
+              ),
+            ],
+          ),
+      StatefulShellRoute.indexedStack(
+        builder: (context, state, navigationShell) => LacakAdaptiveShell(
+          navigationShell: navigationShell,
+          destinations: LacakShellDestinations.supervisor,
+        ),
+        branches: [
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: AppRoutes.supervisor,
+                builder: (context, state) => const SupervisorHomeScreen(),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: AppRoutes.supervisorSettings,
                 builder: (context, state) => const SettingsScreen(),
               ),
             ],

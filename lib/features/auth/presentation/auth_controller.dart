@@ -112,6 +112,7 @@ class AuthController extends Notifier<AuthState> {
           profile: snapshot.profile,
           kitchen: snapshot.kitchen,
           school: snapshot.school,
+          institutionRole: snapshot.institutionRole,
         );
       }
     } catch (_) {
@@ -154,6 +155,7 @@ class AuthController extends Notifier<AuthState> {
         profile: snapshot.profile,
         kitchen: snapshot.kitchen,
         school: snapshot.school,
+        institutionRole: snapshot.institutionRole,
       );
       ref.read(authFeedbackProvider.notifier).showLoginSuccess(snapshot);
       return true;
@@ -217,6 +219,7 @@ class AuthController extends Notifier<AuthState> {
           profile: session.profile,
           kitchen: session.kitchen,
           school: session.school,
+          institutionRole: session.institutionRole,
           holdKitchenActivationSummary: true,
         );
       }
@@ -289,6 +292,7 @@ class AuthController extends Notifier<AuthState> {
           profile: session.profile,
           kitchen: session.kitchen,
           school: session.school,
+          institutionRole: session.institutionRole,
         );
       }
       return result;
@@ -317,6 +321,7 @@ class AuthController extends Notifier<AuthState> {
         profile: snapshot.profile,
         kitchen: snapshot.kitchen,
         school: snapshot.school,
+        institutionRole: snapshot.institutionRole,
       );
       return true;
     } catch (error) {
@@ -340,6 +345,7 @@ class AuthController extends Notifier<AuthState> {
         profile: snapshot.profile,
         kitchen: snapshot.kitchen,
         school: snapshot.school,
+        institutionRole: snapshot.institutionRole,
       );
       return true;
     } catch (error) {
@@ -369,6 +375,7 @@ class AuthController extends Notifier<AuthState> {
         profile: snapshot.profile,
         kitchen: snapshot.kitchen,
         school: snapshot.school,
+        institutionRole: snapshot.institutionRole,
       );
       return true;
     } catch (error) {
@@ -400,6 +407,7 @@ class AuthController extends Notifier<AuthState> {
         profile: snapshot.profile,
         kitchen: snapshot.kitchen,
         school: snapshot.school,
+        institutionRole: snapshot.institutionRole,
       );
       return true;
     } catch (error) {

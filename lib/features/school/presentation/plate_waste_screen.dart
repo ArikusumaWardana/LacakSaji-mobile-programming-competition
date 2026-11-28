@@ -10,8 +10,11 @@ import '../../../core/widgets/editorial_widgets.dart';
 import '../../../core/widgets/lacak_buttons.dart';
 import '../../../core/widgets/lacak_feedback_states.dart';
 import '../../../core/widgets/lacak_status_badge.dart';
+import '../../../core/widgets/lacak_text_field.dart';
 import '../../auth/presentation/auth_controller.dart';
 import '../../kitchen/domain/kitchen_models.dart';
+import '../../traceability/domain/traceability_models.dart';
+import '../../traceability/presentation/traceability_providers.dart';
 import '../data/hybrid_vision_service.dart';
 import '../domain/school_models.dart';
 import 'school_providers.dart';
@@ -592,6 +595,8 @@ class _PlateWasteScreenState extends ConsumerState<PlateWasteScreen> {
                                     ],
                                   ),
                                 ],
+                                const SizedBox(height: AppSpacing.xxl),
+                                _EmptyTrayHandoverSection(batch: activeBatch),
                               ],
                             ),
                           ),
@@ -610,6 +615,274 @@ class _PlateWasteScreenState extends ConsumerState<PlateWasteScreen> {
                 );
               },
             ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _EmptyTrayHandoverSection extends ConsumerStatefulWidget {
+  const _EmptyTrayHandoverSection({required this.batch});
+
+  final SchoolBatchOption batch;
+
+  @override
+  ConsumerState<_EmptyTrayHandoverSection> createState() =>
+      _EmptyTrayHandoverSectionState();
+}
+
+class _EmptyTrayHandoverSectionState
+    extends ConsumerState<_EmptyTrayHandoverSection> {
+  final TextEditingController _notesController = TextEditingController();
+  int _traysSent = 100;
+  int _traysReturned = 100;
+  bool _submitting = false;
+
+  @override
+  void dispose() {
+    _notesController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submitTrayReturn() async {
+    if (_submitting) {
+      return;
+    }
+    final school = ref.read(authControllerProvider).school;
+    if (school == null) {
+      return;
+    }
+    setState(() => _submitting = true);
+    final isOffline = ref.read(isOfflineProvider).value ?? false;
+    try {
+      final saved = await ref
+          .read(traceabilityRepositoryProvider)
+          .submitSchoolTrayReturn(
+            school: school,
+            batchId: widget.batch.batchId,
+            batchCode: widget.batch.batchCode,
+            menuName: widget.batch.menuName,
+            traysSent: _traysSent,
+            traysReturned: _traysReturned,
+            isOffline: isOffline,
+            notes: _notesController.text.trim(),
+          );
+      invalidateTraceabilityProviders(ref);
+      if (!mounted) {
+        return;
+      }
+      _notesController.clear();
+      setState(() => _submitting = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            saved.isPendingSync
+                ? 'Serah terima ompreng kosong disimpan offline di HP (${saved.traysReturned}/${saved.traysSent} kembali).'
+                : 'Serah terima ompreng kosong berhasil dicatat (${saved.traysReturned}/${saved.traysSent} kembali).',
+          ),
+        ),
+      );
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      setState(() => _submitting = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Gagal mencatat serah terima ompreng: $error')),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final returnsAsync = ref.watch(schoolTrayReturnsProvider);
+    final missing = (_traysSent - _traysReturned) > 0
+        ? (_traysSent - _traysReturned)
+        : 0;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const Divider(height: 1),
+        const SizedBox(height: AppSpacing.xl),
+        Text(
+          '4. Serah Terima Ompreng Kosong',
+          style: AppTypography.titleSection,
+        ),
+        const SizedBox(height: 2),
+        Text(
+          'Catat jumlah wadah/ompreng kosong yang dikembalikan ke kurir atau Dapur SPPG.',
+          style: AppTypography.bodyMedium,
+        ),
+        const SizedBox(height: AppSpacing.md),
+        _TrayCountStepperCard(
+          label: 'Ompreng Diterima Sekolah',
+          value: _traysSent,
+          onDecrease: () => setState(() {
+            _traysSent = (_traysSent - 5).clamp(1, 5000);
+            if (_traysReturned > _traysSent) {
+              _traysReturned = _traysSent;
+            }
+          }),
+          onIncrease: () => setState(() {
+            _traysSent = (_traysSent + 5).clamp(1, 5000);
+          }),
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        _TrayCountStepperCard(
+          label: 'Ompreng Kosong Dikembalikan',
+          value: _traysReturned,
+          onDecrease: () => setState(() {
+            _traysReturned = (_traysReturned - 5).clamp(0, 5000);
+          }),
+          onIncrease: () => setState(() {
+            _traysReturned = (_traysReturned + 5).clamp(0, 5000);
+          }),
+        ),
+        if (missing > 0) ...[
+          const SizedBox(height: AppSpacing.sm),
+          LacakStatusBanner(
+            level: LacakStatusLevel.warning,
+            title: 'Selisih $missing Ompreng Belum Kembali',
+            description:
+                'Tambahkan catatan singkat jika ada wadah yang tertahan di kelas atau rusak.',
+          ),
+        ],
+        const SizedBox(height: AppSpacing.md),
+        LacakTextField(
+          label: 'Catatan Ompreng Hilang / Rusak (Opsional)',
+          controller: _notesController,
+          hintText: 'Contoh: 2 tutup penyok, 1 ompreng masih di UKS',
+          maxLines: 2,
+        ),
+        const SizedBox(height: AppSpacing.md),
+        LacakSecondaryButton(
+          label: 'Simpan Serah Terima Ompreng',
+          icon: Icons.cleaning_services_rounded,
+          isLoading: _submitting,
+          onPressed: _submitTrayReturn,
+        ),
+        if ((returnsAsync.value ?? const []).isNotEmpty) ...[
+          const SizedBox(height: AppSpacing.lg),
+          Text(
+            'Riwayat Pengembalian Terbaru',
+            style: AppTypography.captionMuted,
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          for (final item in (returnsAsync.value ?? const <TrayReturnLogItem>[])
+              .take(2)) ...[
+            const Divider(height: 1),
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          item.menuName ?? item.batchCode ?? 'Batch MBG',
+                          style: AppTypography.titleItem,
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          '${item.traysReturned}/${item.traysSent} kembali · ${item.sanitizationStatus.label}',
+                          style: AppTypography.tabular(
+                            AppTypography.captionMuted,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (item.isPendingSync)
+                    const LacakStatusTag(
+                      level: LacakStatusLevel.offline,
+                      label: 'Offline',
+                    )
+                  else if (item.missingTrays > 0)
+                    LacakStatusTag(
+                      level: LacakStatusLevel.warning,
+                      label: '-${item.missingTrays}',
+                    )
+                  else
+                    const LacakStatusTag(
+                      level: LacakStatusLevel.safe,
+                      label: 'Lengkap',
+                    ),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ],
+    );
+  }
+}
+
+class _TrayCountStepperCard extends StatelessWidget {
+  const _TrayCountStepperCard({
+    required this.label,
+    required this.value,
+    required this.onDecrease,
+    required this.onIncrease,
+  });
+
+  final String label;
+  final int value;
+  final VoidCallback onDecrease;
+  final VoidCallback onIncrease;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.md,
+        vertical: AppSpacing.sm,
+      ),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceSoft,
+        borderRadius: BorderRadius.circular(AppSpacing.radiusSurface),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(label, style: AppTypography.captionMuted),
+                const SizedBox(height: 2),
+                Text(
+                  '$value ompreng',
+                  style: AppTypography.tabular(AppTypography.titleItem),
+                ),
+              ],
+            ),
+          ),
+          IconButton(
+            tooltip: 'Kurangi 5 ompreng',
+            onPressed: onDecrease,
+            style: IconButton.styleFrom(
+              minimumSize: const Size(
+                AppSpacing.minTouchTarget,
+                AppSpacing.minTouchTarget,
+              ),
+              backgroundColor: AppColors.surfaceBase,
+            ),
+            icon: const Icon(Icons.remove_rounded),
+          ),
+          const SizedBox(width: AppSpacing.xs),
+          IconButton(
+            tooltip: 'Tambah 5 ompreng',
+            onPressed: onIncrease,
+            style: IconButton.styleFrom(
+              minimumSize: const Size(
+                AppSpacing.minTouchTarget,
+                AppSpacing.minTouchTarget,
+              ),
+              backgroundColor: AppColors.surfaceBase,
+            ),
+            icon: const Icon(Icons.add_rounded),
           ),
         ],
       ),

@@ -53,6 +53,47 @@ class FilterChipStrip<T> extends StatelessWidget {
   }
 }
 
+/// Wrapped multi-select filter chip strip (active: solid #234B3E, inactive: #F4F5F4).
+class MultiSelectFilterChipStrip<T> extends StatelessWidget {
+  const MultiSelectFilterChipStrip({
+    super.key,
+    required this.items,
+    required this.selectedValues,
+    required this.onToggled,
+    this.padding = EdgeInsets.zero,
+  });
+
+  final List<FilterChipItem<T>> items;
+  final Set<T> selectedValues;
+  final ValueChanged<T> onToggled;
+  final EdgeInsetsGeometry padding;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: padding,
+      child: Wrap(
+        spacing: AppSpacing.sm,
+        runSpacing: AppSpacing.sm,
+        children: [
+          for (final item in items)
+            _EditorialFilterChip<T>(
+              item: FilterChipItem<T>(
+                value: item.value,
+                label: item.label,
+                icon: selectedValues.contains(item.value)
+                    ? Icons.check_rounded
+                    : item.icon,
+              ),
+              selected: selectedValues.contains(item.value),
+              onTap: () => onToggled(item.value),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
 class _EditorialFilterChip<T> extends StatelessWidget {
   const _EditorialFilterChip({
     required this.item,
@@ -95,13 +136,15 @@ class _EditorialFilterChip<T> extends StatelessWidget {
                     Icon(item.icon, size: 18, color: fgColor),
                     const SizedBox(width: 6),
                   ],
-                  Text(
-                    item.label,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: AppTypography.labelTag.copyWith(
-                      color: fgColor,
-                      fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+                  Flexible(
+                    child: Text(
+                      item.label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppTypography.labelTag.copyWith(
+                        color: fgColor,
+                        fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+                      ),
                     ),
                   ),
                 ],

@@ -310,6 +310,7 @@ class _RichKitchenRepository implements KitchenRepository {
     required FoodRiskCategory riskCategory,
     required CapturedWebpPhoto photo,
     required bool isOffline,
+    List<String> allergenTags = const [],
   }) => throw UnimplementedError();
 
   @override

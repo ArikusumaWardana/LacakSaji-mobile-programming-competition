@@ -466,29 +466,60 @@ class SupabaseAuthRepository implements AuthRepository {
 
     KitchenProfile? kitchen;
     SchoolProfile? school;
+    InstitutionMemberRole? institutionRole;
 
     if (profile.role == UserRole.kitchen) {
-      final kitchenRow = await client
+      var kitchenRow = await client
           .from('sppg_kitchens')
           .select()
           .eq('owner_user_id', user.id)
           .maybeSingle();
+
+      if (kitchenRow == null) {
+        try {
+          final memberRow = await client
+              .from('institution_members')
+              .select('institution_id, role')
+              .eq('institution_type', 'sppg')
+              .eq('user_id', user.id)
+              .eq('is_active', true)
+              .maybeSingle();
+          if (memberRow != null) {
+            institutionRole = InstitutionMemberRole.fromDb(
+              memberRow['role'] as String?,
+            );
+            kitchenRow = await client
+                .from('sppg_kitchens')
+                .select()
+                .eq('id', memberRow['institution_id'] as String)
+                .maybeSingle();
+          }
+        } catch (_) {
+          // Non-fatal when migration 008 has not been applied yet.
+        }
+      } else {
+        institutionRole = InstitutionMemberRole.admin;
+      }
+
       if (kitchenRow != null) {
         final loaded = KitchenProfile.fromMap(kitchenRow);
+        institutionRole ??= loaded.ownerUserId == user.id
+            ? InstitutionMemberRole.admin
+            : InstitutionMemberRole.staff;
         var activePublicKey = loaded.publicKey;
         try {
-          activePublicKey = await _ed25519Service.ensureKeyPairSynced(
+          final material = await _ed25519Service.getOrCreateActiveKeyMaterial(
             sppgId: loaded.id,
-            remotePublicKeyB64: loaded.publicKey,
             legacyUserId: user.id,
-            onSyncRemotePublicKey: (publicKeyB64) async {
-              await client
-                  .from('sppg_kitchens')
-                  .update({'public_key': publicKeyB64})
-                  .eq('id', loaded.id)
-                  .eq('owner_user_id', user.id);
-            },
           );
+          activePublicKey = material.publicKeyB64;
+          if (activePublicKey != loaded.publicKey &&
+              institutionRole == InstitutionMemberRole.admin) {
+            await client
+                .from('sppg_kitchens')
+                .update({'public_key': activePublicKey})
+                .eq('id', loaded.id);
+          }
         } catch (_) {
           // Preserve loaded public key when offline or secure storage fails.
         }
@@ -512,14 +543,45 @@ class SupabaseAuthRepository implements AuthRepository {
           inviteCode: kitchen.inviteCode,
           publicKeyB64: kitchen.publicKey,
         );
+        await _cacheSigningKeysForSppg(client, kitchen.id);
       }
     } else if (profile.role == UserRole.school) {
-      final schoolRow = await client
+      var schoolRow = await client
           .from('schools')
           .select()
           .eq('owner_user_id', user.id)
           .maybeSingle();
+
+      if (schoolRow == null) {
+        try {
+          final memberRow = await client
+              .from('institution_members')
+              .select('institution_id, role')
+              .eq('institution_type', 'school')
+              .eq('user_id', user.id)
+              .eq('is_active', true)
+              .maybeSingle();
+          if (memberRow != null) {
+            institutionRole = InstitutionMemberRole.fromDb(
+              memberRow['role'] as String?,
+            );
+            schoolRow = await client
+                .from('schools')
+                .select()
+                .eq('id', memberRow['institution_id'] as String)
+                .maybeSingle();
+          }
+        } catch (_) {
+          // Non-fatal when migration 008 has not been applied yet.
+        }
+      } else {
+        institutionRole = InstitutionMemberRole.admin;
+      }
+
       if (schoolRow != null) {
+        institutionRole ??= schoolRow['owner_user_id'] == user.id
+            ? InstitutionMemberRole.admin
+            : InstitutionMemberRole.staff;
         Map<String, dynamic>? partnerRow;
         final sppgId = schoolRow['sppg_id'] as String?;
         if (sppgId != null && sppgId.isNotEmpty) {
@@ -535,16 +597,52 @@ class SupabaseAuthRepository implements AuthRepository {
               inviteCode: partnerRow['invite_code'] as String,
               publicKeyB64: partnerRow['public_key'] as String,
             );
+            await _cacheSigningKeysForSppg(client, sppgId);
           }
         }
         school = SchoolProfile.fromMap(schoolRow, partnerKitchen: partnerRow);
+        await _cacheSchoolAllergens(client, school.id);
       }
+    } else if (profile.role == UserRole.courier) {
+      try {
+        final memberRow = await client
+            .from('institution_members')
+            .select('institution_id, role')
+            .eq('institution_type', 'sppg')
+            .eq('user_id', user.id)
+            .eq('is_active', true)
+            .maybeSingle();
+        if (memberRow != null) {
+          institutionRole =
+              InstitutionMemberRole.fromDb(memberRow['role'] as String?) ??
+              InstitutionMemberRole.courier;
+          final kitchenRow = await client
+              .from('sppg_kitchens')
+              .select()
+              .eq('id', memberRow['institution_id'] as String)
+              .maybeSingle();
+          if (kitchenRow != null) {
+            kitchen = KitchenProfile.fromMap(kitchenRow);
+            await _cacheKitchenPublicKey(
+              sppgId: kitchen.id,
+              sppgName: kitchen.name,
+              inviteCode: kitchen.inviteCode,
+              publicKeyB64: kitchen.publicKey,
+            );
+            await _cacheSigningKeysForSppg(client, kitchen.id);
+          }
+        }
+      } catch (_) {
+        // Non-fatal if migration 008 is not yet pushed or offline.
+      }
+      institutionRole ??= InstitutionMemberRole.courier;
     }
 
     return AuthSessionSnapshot(
       profile: profile,
       kitchen: kitchen,
       school: school,
+      institutionRole: institutionRole,
     );
   }
 
@@ -700,6 +798,90 @@ class SupabaseAuthRepository implements AuthRepository {
       );
     } catch (_) {
       // Do not block auth completion if local Drift cache write fails.
+    }
+  }
+
+  Future<void> _cacheSigningKeysForSppg(
+    SupabaseClient client,
+    String sppgId,
+  ) async {
+    try {
+      final rows = List<Map<String, dynamic>>.from(
+        await client
+                .from('signing_keys')
+                .select(
+                  'key_id, sppg_id, public_key, status, device_label, created_at, retired_at, revoked_at',
+                )
+                .eq('sppg_id', sppgId)
+            as List,
+      );
+      final now = DateTime.now().toUtc();
+      final entries = rows
+          .where((r) => (r['key_id'] as String?)?.isNotEmpty == true)
+          .map(
+            (r) => LocalSigningKeysCompanion(
+              keyId: Value(r['key_id'] as String),
+              sppgId: Value((r['sppg_id'] as String?) ?? sppgId),
+              publicKeyB64: Value((r['public_key'] as String?) ?? ''),
+              status: Value((r['status'] as String?) ?? 'active'),
+              deviceLabel: Value(r['device_label'] as String?),
+              createdAt: Value(
+                DateTime.tryParse('${r['created_at'] ?? ''}')?.toUtc() ?? now,
+              ),
+              retiredAt: Value(
+                DateTime.tryParse('${r['retired_at'] ?? ''}')?.toUtc(),
+              ),
+              revokedAt: Value(
+                DateTime.tryParse('${r['revoked_at'] ?? ''}')?.toUtc(),
+              ),
+              updatedAt: Value(now),
+            ),
+          )
+          .toList(growable: false);
+      await _database.upsertSigningKeys(entries);
+    } catch (_) {
+      // Non-fatal when migration 008 has not been applied yet.
+    }
+  }
+
+  Future<void> _cacheSchoolAllergens(
+    SupabaseClient client,
+    String schoolId,
+  ) async {
+    try {
+      final rows = List<Map<String, dynamic>>.from(
+        await client
+                .from('school_allergen_profiles')
+                .select(
+                  'id, school_id, allergen_tag, student_count, severity_level, handling_note, updated_at',
+                )
+                .eq('school_id', schoolId)
+            as List,
+      );
+      final now = DateTime.now().toUtc();
+      await _database.replaceSchoolAllergens(
+        schoolId: schoolId,
+        entries: rows
+            .where((r) => (r['id'] as String?)?.isNotEmpty == true)
+            .map(
+              (r) => LocalSchoolAllergensCompanion(
+                id: Value(r['id'] as String),
+                schoolId: Value(schoolId),
+                allergenTag: Value((r['allergen_tag'] as String?) ?? 'telur'),
+                studentCount: Value((r['student_count'] as num?)?.toInt() ?? 1),
+                severityLevel: Value(
+                  (r['severity_level'] as String?) ?? 'moderate',
+                ),
+                handlingNote: Value(r['handling_note'] as String?),
+                updatedAt: Value(
+                  DateTime.tryParse('${r['updated_at'] ?? ''}')?.toUtc() ?? now,
+                ),
+              ),
+            )
+            .toList(growable: false),
+      );
+    } catch (_) {
+      // Non-fatal when migration 008 has not been applied yet.
     }
   }
 }

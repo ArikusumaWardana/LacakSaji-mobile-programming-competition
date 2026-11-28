@@ -31,9 +31,32 @@ abstract final class LacakShellDestinations {
       group: AppShellNavGroup.operational,
     ),
     LacakNavDestination(
+      label: 'Bahan Baku',
+      icon: Icons.inventory_2_rounded,
+      group: AppShellNavGroup.operational,
+    ),
+    LacakNavDestination(
+      label: 'Logistik Wadah',
+      icon: Icons.cleaning_services_rounded,
+      group: AppShellNavGroup.operational,
+    ),
+    LacakNavDestination(
       label: 'Riwayat',
       icon: Icons.history_rounded,
       group: AppShellNavGroup.operational,
+    ),
+    LacakNavDestination(
+      label: 'Profil',
+      icon: Icons.person_rounded,
+      group: AppShellNavGroup.account,
+    ),
+  ];
+
+  static const List<LacakNavDestination> courier = [
+    LacakNavDestination(
+      label: 'Pengiriman',
+      icon: Icons.local_shipping_rounded,
+      group: AppShellNavGroup.primary,
     ),
     LacakNavDestination(
       label: 'Profil',
@@ -57,6 +80,19 @@ abstract final class LacakShellDestinations {
       label: 'Sisa Makan',
       icon: Icons.restaurant_rounded,
       group: AppShellNavGroup.operational,
+    ),
+    LacakNavDestination(
+      label: 'Profil',
+      icon: Icons.person_rounded,
+      group: AppShellNavGroup.account,
+    ),
+  ];
+
+  static const List<LacakNavDestination> supervisor = [
+    LacakNavDestination(
+      label: 'Ringkasan Wilayah',
+      icon: Icons.analytics_rounded,
+      group: AppShellNavGroup.primary,
     ),
     LacakNavDestination(
       label: 'Profil',
@@ -90,8 +126,14 @@ class LacakAdaptiveShell extends ConsumerWidget {
     if (identical(destinations, LacakShellDestinations.kitchen)) {
       return 'Dapur SPPG';
     }
+    if (identical(destinations, LacakShellDestinations.courier)) {
+      return 'Kurir Pengantar';
+    }
     if (identical(destinations, LacakShellDestinations.school)) {
       return 'Sekolah Binaan';
+    }
+    if (identical(destinations, LacakShellDestinations.supervisor)) {
+      return 'Pengawas BGN';
     }
     return null;
   }
@@ -100,9 +142,17 @@ class LacakAdaptiveShell extends ConsumerWidget {
     if (embeddedHeaderBranches != null) {
       return embeddedHeaderBranches!;
     }
-    if (identical(destinations, LacakShellDestinations.kitchen) ||
-        identical(destinations, LacakShellDestinations.school)) {
+    if (identical(destinations, LacakShellDestinations.kitchen)) {
+      return const {0, 1, 2, 3, 4, 5};
+    }
+    if (identical(destinations, LacakShellDestinations.school)) {
       return const {0, 1, 2, 3};
+    }
+    if (identical(destinations, LacakShellDestinations.courier)) {
+      return const {0, 1};
+    }
+    if (identical(destinations, LacakShellDestinations.supervisor)) {
+      return const {0, 1};
     }
     return const <int>{};
   }
@@ -112,6 +162,7 @@ class LacakAdaptiveShell extends ConsumerWidget {
     return AppShell(
       navigationShell: navigationShell,
       roleLabel: _inferRoleLabel(),
+      showSignOutAction: true,
       useEmbeddedHeader: useEmbeddedHeader,
       embeddedHeaderBranches: _resolveEmbeddedHeaderBranches(),
       destinations: destinations

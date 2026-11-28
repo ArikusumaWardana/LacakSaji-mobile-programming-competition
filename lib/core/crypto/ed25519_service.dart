@@ -29,30 +29,76 @@ class FlutterSecureKeyStore implements SecureKeyStore {
       _storage.write(key: key, value: value);
 }
 
-/// Manages per-SPPG Ed25519 asymmetric keypairs, signing, and offline verification.
+/// Public key metadata paired with a deterministic key identifier (`key_id`).
+class SppgSigningKeyMaterial {
+  const SppgSigningKeyMaterial({
+    required this.keyId,
+    required this.publicKeyB64,
+  });
+
+  final String keyId;
+  final String publicKeyB64;
+}
+
+/// Manages per-SPPG Ed25519 asymmetric keypairs, key rotation, signing, and offline verification.
 class Ed25519Service {
   Ed25519Service({SecureKeyStore? secureStore})
       : _secureStore = secureStore ?? FlutterSecureKeyStore();
 
   final SecureKeyStore _secureStore;
   final Ed25519 _algorithm = Ed25519();
+  static final Sha256 _sha256 = Sha256();
 
   static String _sppgStorageKey(String sppgId) => 'lacak_ed25519_priv_sppg_$sppgId';
 
+  static String _sppgKeyIdStorageKey(String sppgId) =>
+      'lacak_ed25519_kid_sppg_$sppgId';
+
+  static String _seedByKeyIdStorageKey(String keyId) =>
+      'lacak_ed25519_priv_kid_$keyId';
+
   static String _legacyUserStorageKey(String userId) =>
       'lacak_ed25519_priv_$userId';
+
+  /// Derives a compact, deterministic `key_id` from an Ed25519 public key.
+  static Future<String> deriveDeterministicKeyId(String publicKeyB64) async {
+    final digest = await _sha256.hash(utf8.encode(publicKeyB64));
+    final prefixHex = digest.bytes
+        .take(6)
+        .map((b) => b.toRadixString(16).padLeft(2, '0'))
+        .join();
+    return 'key-$prefixHex';
+  }
+
+  /// Checks whether a key marked [status] must reject a QR sealed at [sealedAtUtc].
+  /// Retired keys remain valid for older QRs; revoked keys reject QRs sealed at or
+  /// after [revokedAtUtc] (or all QRs if revocation timestamp is absent).
+  static bool isRevokedForSealTime({
+    required String status,
+    required DateTime? revokedAtUtc,
+    required DateTime sealedAtUtc,
+  }) {
+    if (status != 'revoked') {
+      return false;
+    }
+    if (revokedAtUtc == null) {
+      return true;
+    }
+    return !sealedAtUtc.toUtc().isBefore(revokedAtUtc.toUtc());
+  }
 
   /// Used during initial registration before an `sppg_kitchens.id` exists.
   Future<String> generateAndStoreKeyPair(String userId) async {
     final keyPair = await _algorithm.newKeyPair();
     final privateBytes = await keyPair.extractPrivateKeyBytes();
     final publicKey = await keyPair.extractPublicKey();
+    final pubB64 = base64Encode(publicKey.bytes);
+    final seedB64 = base64Encode(privateBytes);
 
-    await _secureStore.write(
-      _legacyUserStorageKey(userId),
-      base64Encode(privateBytes),
-    );
-    return base64Encode(publicKey.bytes);
+    await _secureStore.write(_legacyUserStorageKey(userId), seedB64);
+    final keyId = await deriveDeterministicKeyId(pubB64);
+    await _secureStore.write(_seedByKeyIdStorageKey(keyId), seedB64);
+    return pubB64;
   }
 
   Future<String?> readStoredPrivateKeyB64(String userId) {
@@ -127,6 +173,94 @@ class Ed25519Service {
       keyPair: keyPair,
     );
     return base64Encode(signature.bytes);
+  }
+
+  /// Returns active key material (`key_id` + public key) for [sppgId], ensuring
+  /// the private seed is persisted both by `sppgId` and by `keyId`.
+  Future<SppgSigningKeyMaterial> getOrCreateActiveKeyMaterial({
+    required String sppgId,
+    String? legacyUserId,
+  }) async {
+    final keyPair = await _loadOrCreateSppgKeyPair(
+      sppgId: sppgId,
+      legacyUserId: legacyUserId,
+    );
+    final publicKey = await keyPair.extractPublicKey();
+    final pubB64 = base64Encode(publicKey.bytes);
+    final seedBytes = await keyPair.extractPrivateKeyBytes();
+    final seedB64 = base64Encode(seedBytes);
+
+    final storedKeyId = await _secureStore.read(_sppgKeyIdStorageKey(sppgId));
+    final derivedKeyId = (storedKeyId != null && storedKeyId.isNotEmpty)
+        ? storedKeyId
+        : await deriveDeterministicKeyId(pubB64);
+
+    if (storedKeyId == null || storedKeyId.isEmpty) {
+      await _secureStore.write(_sppgKeyIdStorageKey(sppgId), derivedKeyId);
+    }
+    await _secureStore.write(_seedByKeyIdStorageKey(derivedKeyId), seedB64);
+
+    return SppgSigningKeyMaterial(
+      keyId: derivedKeyId,
+      publicKeyB64: pubB64,
+    );
+  }
+
+  /// Rotates the active Ed25519 keypair for [sppgId] on this device and returns the new key material.
+  Future<SppgSigningKeyMaterial> rotateKeyPair({
+    required String sppgId,
+  }) async {
+    final generated = await _algorithm.newKeyPair();
+    final seedBytes = await generated.extractPrivateKeyBytes();
+    final publicKey = await generated.extractPublicKey();
+    final pubB64 = base64Encode(publicKey.bytes);
+    final seedB64 = base64Encode(seedBytes);
+    final keyId = await deriveDeterministicKeyId(pubB64);
+
+    await _secureStore.write(_sppgStorageKey(sppgId), seedB64);
+    await _secureStore.write(_sppgKeyIdStorageKey(sppgId), keyId);
+    await _secureStore.write(_seedByKeyIdStorageKey(keyId), seedB64);
+
+    return SppgSigningKeyMaterial(
+      keyId: keyId,
+      publicKeyB64: pubB64,
+    );
+  }
+
+  /// Signs a canonical batch string generated from the active `key_id`.
+  Future<({String keyId, String publicKeyB64, String signatureB64})>
+  signBatchWithKeyId({
+    required String sppgId,
+    required String Function(String keyId) buildCanonicalForKeyId,
+    String? legacyUserId,
+  }) async {
+    final material = await getOrCreateActiveKeyMaterial(
+      sppgId: sppgId,
+      legacyUserId: legacyUserId,
+    );
+    final seedByKey = await _secureStore.read(
+      _seedByKeyIdStorageKey(material.keyId),
+    );
+    final SimpleKeyPair keyPair;
+    if (seedByKey != null && seedByKey.isNotEmpty) {
+      keyPair = await _algorithm.newKeyPairFromSeed(base64Decode(seedByKey));
+    } else {
+      keyPair = await _loadOrCreateSppgKeyPair(
+        sppgId: sppgId,
+        legacyUserId: legacyUserId,
+      );
+    }
+
+    final canonicalData = buildCanonicalForKeyId(material.keyId);
+    final signature = await _algorithm.sign(
+      utf8.encode(canonicalData),
+      keyPair: keyPair,
+    );
+    return (
+      keyId: material.keyId,
+      publicKeyB64: material.publicKeyB64,
+      signatureB64: base64Encode(signature.bytes),
+    );
   }
 
   Future<bool> verifyCanonicalPayload({

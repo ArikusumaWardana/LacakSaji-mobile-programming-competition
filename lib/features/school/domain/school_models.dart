@@ -1,6 +1,7 @@
 import '../../../core/crypto/batch_qr_payload.dart';
 import '../../../core/network/bmkg_weather_service.dart';
 import '../../alerts/domain/cluster_alert_models.dart';
+import '../../allergens/domain/allergen_models.dart';
 import '../../auth/domain/auth_models.dart';
 import '../../kitchen/domain/kitchen_models.dart';
 import 'danger_zone_calculator.dart';
@@ -9,6 +10,7 @@ enum QrVerificationOutcome {
   valid,
   invalidFormat,
   invalidSignature,
+  revokedKey,
   missingPublicKey,
   foreignSppg,
 }
@@ -26,6 +28,9 @@ class VerifiedBatchScanContext {
     required this.dangerEvaluation,
     required this.gpsWithinRadius,
     this.distanceMeters,
+    this.actualTempC,
+    this.tempSource = FoodTemperatureSource.bmkgEstimate,
+    this.matchedAllergens = const [],
   });
 
   final BatchQrPayload payload;
@@ -39,6 +44,37 @@ class VerifiedBatchScanContext {
   final DangerZoneEvaluation dangerEvaluation;
   final bool gpsWithinRadius;
   final double? distanceMeters;
+  final double? actualTempC;
+  final FoodTemperatureSource tempSource;
+  final List<SchoolAllergenEntry> matchedAllergens;
+
+  double get effectiveTemperatureC => actualTempC ?? weather.temperatureC;
+
+  String get formattedEffectiveTemp =>
+      '${effectiveTemperatureC.toStringAsFixed(1)} C';
+
+  VerifiedBatchScanContext copyWithActualTemp({
+    double? actualTempC,
+    required FoodTemperatureSource tempSource,
+    required DangerZoneEvaluation dangerEvaluation,
+  }) {
+    return VerifiedBatchScanContext(
+      payload: payload,
+      riskCategory: riskCategory,
+      timestampSource: timestampSource,
+      sealedAtUtc: sealedAtUtc,
+      scannedAtUtc: scannedAtUtc,
+      sppgName: sppgName,
+      sppgPublicKeyB64: sppgPublicKeyB64,
+      weather: weather,
+      dangerEvaluation: dangerEvaluation,
+      gpsWithinRadius: gpsWithinRadius,
+      distanceMeters: distanceMeters,
+      actualTempC: actualTempC,
+      tempSource: tempSource,
+      matchedAllergens: matchedAllergens,
+    );
+  }
 }
 
 class QrVerificationResult {
@@ -222,6 +258,9 @@ class SchoolInspectionItem {
     this.tfliteLabel,
     this.tfliteConfidence,
     this.geminiSummaryJson,
+    this.actualTempC,
+    this.tempSource = FoodTemperatureSource.bmkgEstimate,
+    this.allergenTags = const [],
     this.isPendingSync = false,
   });
 
@@ -243,6 +282,9 @@ class SchoolInspectionItem {
   final String? tfliteLabel;
   final double? tfliteConfidence;
   final Map<String, dynamic>? geminiSummaryJson;
+  final double? actualTempC;
+  final FoodTemperatureSource tempSource;
+  final List<String> allergenTags;
   final bool manualSmellOk;
   final bool manualVisualOk;
   final bool manualPackOk;

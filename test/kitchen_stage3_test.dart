@@ -398,6 +398,7 @@ class _FakeKitchenRepository implements KitchenRepository {
     required FoodRiskCategory riskCategory,
     required CapturedWebpPhoto photo,
     required bool isOffline,
+    List<String> allergenTags = const [],
   }) async {
     final created = FoodBatchItem(
       id: 'b-created-${_batches.length + 1}',

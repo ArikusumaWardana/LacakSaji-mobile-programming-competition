@@ -180,11 +180,14 @@ class ClusterAlertController extends Notifier<ClusterAlertOverlayState> {
     if (scope == null) {
       return;
     }
-    // Hard tenant isolation + self-report + broadcast guards.
+    // Hard tenant isolation & broadcast guards.
     if (!event.broadcastEnabled || event.sppgId != scope.sppgId) {
       return;
     }
-    if (scope.excludeSchoolId != null &&
+    final isResolvedUpdate =
+        event.resolutionStatus != AlertResolutionStatus.active;
+    if (!isResolvedUpdate &&
+        scope.excludeSchoolId != null &&
         event.reporterSchoolId == scope.excludeSchoolId) {
       return;
     }
@@ -193,7 +196,35 @@ class ClusterAlertController extends Notifier<ClusterAlertOverlayState> {
       ref.invalidate(kitchenDashboardProvider);
     }
 
+    if (isResolvedUpdate) {
+      if (state.handledIds.contains(event.handledStateKey)) {
+        return;
+      }
+      if (state.activeAlert?.id == event.id) {
+        state = state.copyWith(activeAlert: event);
+        return;
+      }
+      final idx = state.pendingQueue.indexWhere((e) => e.id == event.id);
+      if (idx >= 0) {
+        final nextQueue = [...state.pendingQueue];
+        nextQueue[idx] = event;
+        state = state.copyWith(pendingQueue: nextQueue);
+        return;
+      }
+      // Surface clarification/confirmation immediately on O01 even if initial alert was acknowledged.
+      if (state.activeAlert != null) {
+        state = state.copyWith(
+          activeAlert: event,
+          pendingQueue: [state.activeAlert!, ...state.pendingQueue],
+        );
+      } else {
+        state = state.copyWith(activeAlert: event);
+      }
+      return;
+    }
+
     if (state.handledIds.contains(event.id) ||
+        state.handledIds.contains(event.handledStateKey) ||
         state.activeAlert?.id == event.id ||
         state.pendingQueue.any((e) => e.id == event.id)) {
       return;
@@ -206,6 +237,45 @@ class ClusterAlertController extends Notifier<ClusterAlertOverlayState> {
     }
   }
 
+  Future<ClusterAlertEvent?> resolveAlertStatus({
+    required ClusterAlertEvent alert,
+    required AlertResolutionStatus newStatus,
+    required String resolutionNote,
+  }) async {
+    final auth = ref.read(authControllerProvider);
+    final profile = auth.profile;
+    if (profile == null) {
+      return null;
+    }
+    final resolverName =
+        resolveAuthActorName(
+          profile: profile,
+          kitchen: auth.kitchen,
+          school: auth.school,
+        ) ??
+        profile.fullName;
+    final isOffline = ref.read(isOfflineProvider).value ?? false;
+
+    final updated = await ref
+        .read(clusterAlertRepositoryProvider)
+        .resolveClusterAlert(
+          alert: alert,
+          newStatus: newStatus,
+          resolutionNote: resolutionNote,
+          resolverUserId: profile.id,
+          resolverName: resolverName,
+          isOffline: isOffline,
+        );
+    if (!ref.mounted) {
+      return updated;
+    }
+    if (state.activeAlert?.id == updated.id) {
+      state = state.copyWith(activeAlert: updated);
+    }
+    ref.invalidate(kitchenDashboardProvider);
+    return updated;
+  }
+
   Future<void> acknowledgeActiveAlert() async {
     final active = state.activeAlert;
     if (active == null || state.isAcknowledging) {
@@ -216,7 +286,8 @@ class ClusterAlertController extends Notifier<ClusterAlertOverlayState> {
     final auth = ref.read(authControllerProvider);
     final school = auth.school;
 
-    if (school != null) {
+    if (school != null &&
+        active.resolutionStatus == AlertResolutionStatus.active) {
       final isOffline = ref.read(isOfflineProvider).value ?? false;
       try {
         await ref.read(clusterAlertRepositoryProvider).acknowledgeAlert(
@@ -232,7 +303,11 @@ class ClusterAlertController extends Notifier<ClusterAlertOverlayState> {
       return;
     }
 
-    final nextHandled = {...state.handledIds, active.id};
+    final nextHandled = {
+      ...state.handledIds,
+      if (active.resolutionStatus == AlertResolutionStatus.active) active.id,
+      active.handledStateKey,
+    };
     final remaining = state.pendingQueue;
     if (remaining.isEmpty) {
       state = ClusterAlertOverlayState(

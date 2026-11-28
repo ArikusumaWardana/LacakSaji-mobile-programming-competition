@@ -11,6 +11,8 @@ class BatchQrPayload {
     required this.sealedAtEpochSec,
     required this.timestampSource,
     required this.signatureB64,
+    this.keyId,
+    this.allergenTags = const [],
   });
 
   final String batchId;
@@ -21,8 +23,23 @@ class BatchQrPayload {
   final int sealedAtEpochSec;
   final String timestampSource;
   final String signatureB64;
+  final String? keyId;
+  final List<String> allergenTags;
+
+  static List<String> normalizeAllergenTags(Iterable<String> raw) {
+    final cleaned = <String>{};
+    for (final tag in raw) {
+      final t = tag.trim().toLowerCase();
+      if (t.isNotEmpty) {
+        cleaned.add(t);
+      }
+    }
+    final sorted = cleaned.toList()..sort();
+    return List<String>.unmodifiable(sorted);
+  }
 
   /// Deterministic string signed and verified offline using Ed25519.
+  /// Legacy QRs without `key_id` or `alg` keep exact v1/v2 canonical compatibility.
   String toCanonicalSigningString() {
     return buildCanonicalSigningString(
       batchId: batchId,
@@ -32,6 +49,8 @@ class BatchQrPayload {
       riskCategory: riskCategory,
       sealedAtEpochSec: sealedAtEpochSec,
       timestampSource: timestampSource,
+      keyId: keyId,
+      allergenTags: allergenTags,
     );
   }
 
@@ -43,12 +62,22 @@ class BatchQrPayload {
     required String riskCategory,
     required int sealedAtEpochSec,
     required String timestampSource,
+    String? keyId,
+    List<String> allergenTags = const [],
   }) {
-    return '$batchId|$batchCode|$sppgId|$menuName|$riskCategory|$sealedAtEpochSec|$timestampSource';
+    final base =
+        '$batchId|$batchCode|$sppgId|$menuName|$riskCategory|$sealedAtEpochSec|$timestampSource';
+    final withKey = (keyId != null && keyId.isNotEmpty) ? '$base|$keyId' : base;
+    final normalizedAllergens = normalizeAllergenTags(allergenTags);
+    if (normalizedAllergens.isNotEmpty) {
+      return '$withKey|alg:${normalizedAllergens.join(',')}';
+    }
+    return withKey;
   }
 
   /// Minified JSON stored directly inside QR code (PRD Section 3.2).
   String toMinifiedJson() {
+    final normalizedAllergens = normalizeAllergenTags(allergenTags);
     return jsonEncode({
       'batch_id': batchId,
       'batch_code': batchCode,
@@ -57,6 +86,8 @@ class BatchQrPayload {
       'risk_category': riskCategory,
       'sealed_at': sealedAtEpochSec,
       'timestamp_source': timestampSource,
+      if (keyId != null && keyId!.isNotEmpty) 'key_id': keyId,
+      if (normalizedAllergens.isNotEmpty) 'alg': normalizedAllergens,
       'sig': signatureB64,
     });
   }
@@ -75,6 +106,8 @@ class BatchQrPayload {
       final sealedAt = decoded['sealed_at'];
       final timestampSource = decoded['timestamp_source'];
       final sig = decoded['sig'];
+      final keyId = decoded['key_id'];
+      final rawAlg = decoded['alg'] ?? decoded['allergens'];
 
       if (batchId is! String ||
           batchCode is! String ||
@@ -83,8 +116,14 @@ class BatchQrPayload {
           riskCategory is! String ||
           sealedAt is! int ||
           timestampSource is! String ||
-          sig is! String) {
+          sig is! String ||
+          (keyId != null && keyId is! String)) {
         return null;
+      }
+
+      var parsedAllergens = const <String>[];
+      if (rawAlg is List) {
+        parsedAllergens = normalizeAllergenTags(rawAlg.whereType<String>());
       }
 
       return BatchQrPayload(
@@ -96,6 +135,8 @@ class BatchQrPayload {
         sealedAtEpochSec: sealedAt,
         timestampSource: timestampSource,
         signatureB64: sig,
+        keyId: (keyId is String && keyId.isNotEmpty) ? keyId : null,
+        allergenTags: parsedAllergens,
       );
     } catch (_) {
       return null;

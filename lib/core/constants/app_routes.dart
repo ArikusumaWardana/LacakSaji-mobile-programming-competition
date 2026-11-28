@@ -14,7 +14,14 @@ abstract final class AppRoutes {
   static const String kitchenBatchDetail = '/kitchen/batch/:batchId'; // D03
   static const String kitchenSchools = '/kitchen/schools'; // D04
   static const String kitchenHistory = '/kitchen/history'; // D05
+  static const String kitchenIngredients = '/kitchen/ingredients'; // D06
+  static const String kitchenTrays = '/kitchen/trays'; // Logistik & Sanitasi Wadah
   static const String kitchenSettings = '/kitchen/settings'; // C01 (Kitchen tab)
+
+  // Module C2: Courier / Pengantar (Role 3)
+  static const String courierHome = '/courier'; // K01
+  static const String courierScan = '/courier/scan'; // K02
+  static const String courierSettings = '/courier/settings'; // C01 (Courier tab)
 
   // Module C: School PIC (Role 2)
   static const String schoolHome = '/school'; // G01
@@ -30,7 +37,9 @@ abstract final class AppRoutes {
 
   // Module D: Shared Settings & Supervisor (P1)
   static const String settings = '/settings'; // C01
+  static const String settingsTeamSecurity = '/settings/team-security'; // C02
   static const String supervisor = '/supervisor'; // B01
+  static const String supervisorSettings = '/supervisor/settings'; // C01 (Supervisor tab)
 
   static String batchDetailPath(String batchId) => '/kitchen/batch/$batchId';
 }

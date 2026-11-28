@@ -59,7 +59,16 @@ abstract class ClusterAlertRepository {
     String? excludeSchoolId,
   });
 
-  Future<int> syncPendingAlerts({String? schoolId});
+  Future<ClusterAlertEvent> resolveClusterAlert({
+    required ClusterAlertEvent alert,
+    required AlertResolutionStatus newStatus,
+    required String resolutionNote,
+    required String resolverUserId,
+    required String resolverName,
+    required bool isOffline,
+  });
+
+  Future<int> syncPendingAlerts({String? schoolId, String? kitchenId});
 }
 
 class SupabaseClusterAlertRepository implements ClusterAlertRepository {
@@ -392,6 +401,12 @@ class SupabaseClusterAlertRepository implements ClusterAlertRepository {
         }
         final alertId = row['id'] as String;
         final reporterId = row['reporter_school_id'] as String?;
+        final rowStatus = AlertResolutionStatus.fromDb(
+          row['resolution_status'] as String?,
+        );
+        if (rowStatus != AlertResolutionStatus.active) {
+          continue;
+        }
         if (currentSchoolId != null &&
             (reporterId == currentSchoolId || ackedIds.contains(alertId))) {
           continue;
@@ -450,6 +465,32 @@ class SupabaseClusterAlertRepository implements ClusterAlertRepository {
               }
             },
           )
+          ..onPostgresChanges(
+            event: PostgresChangeEvent.update,
+            schema: 'public',
+            table: 'cluster_alerts',
+            filter: PostgresChangeFilter(
+              type: PostgresChangeFilterType.eq,
+              column: 'sppg_id',
+              value: sppgId,
+            ),
+            callback: (payload) async {
+              final row = payload.newRecord;
+              if (row.isEmpty || row['sppg_id'] != sppgId) {
+                return;
+              }
+              final nextStatus = AlertResolutionStatus.fromDb(
+                row['resolution_status'] as String?,
+              );
+              if (nextStatus == AlertResolutionStatus.active) {
+                return;
+              }
+              final enriched = await _enrichAlertRow(client, row);
+              if (!controller.isClosed) {
+                controller.add(enriched);
+              }
+            },
+          )
           ..subscribe();
       },
       onCancel: () async {
@@ -471,6 +512,28 @@ class SupabaseClusterAlertRepository implements ClusterAlertRepository {
     Map<String, dynamic> row,
   ) async {
     final alertId = row['id'] as String;
+    final rowResolutionStatus = AlertResolutionStatus.fromDb(
+      row['resolution_status'] as String?,
+    );
+    final rowResolutionNote = (row['resolution_note'] as String?)?.trim();
+    final rowResolvedBy = row['resolved_by'] as String?;
+    final rowResolvedAt = DateTime.tryParse(
+      '${row['resolved_at'] ?? ''}',
+    )?.toUtc();
+
+    try {
+      final rpcV2 = await client.rpc(
+        'get_cluster_alert_details_v2',
+        params: {'p_alert_id': alertId},
+      );
+      if (rpcV2 is List && rpcV2.isNotEmpty) {
+        final detail = Map<String, dynamic>.from(rpcV2.first as Map);
+        return _mapEnrichedDetail(detail);
+      }
+    } catch (_) {
+      // Fall back to v1 RPC if v2 is not installed yet.
+    }
+
     try {
       final rpcResp = await client.rpc(
         'get_cluster_alert_details',
@@ -478,7 +541,17 @@ class SupabaseClusterAlertRepository implements ClusterAlertRepository {
       );
       if (rpcResp is List && rpcResp.isNotEmpty) {
         final detail = Map<String, dynamic>.from(rpcResp.first as Map);
-        return _mapEnrichedDetail(detail);
+        final mapped = _mapEnrichedDetail(detail);
+        if (mapped.resolutionStatus == AlertResolutionStatus.active &&
+            rowResolutionStatus != AlertResolutionStatus.active) {
+          return mapped.copyWith(
+            resolutionStatus: rowResolutionStatus,
+            resolutionNote: rowResolutionNote,
+            resolvedByUserId: rowResolvedBy,
+            resolvedAtUtc: rowResolvedAt,
+          );
+        }
+        return mapped;
       }
     } catch (_) {
       // Fall back gracefully when RPC is not yet installed.
@@ -533,10 +606,18 @@ class SupabaseClusterAlertRepository implements ClusterAlertRepository {
           DateTime.tryParse('${row['created_at'] ?? ''}')?.toUtc() ??
           _clockUtc(),
       activeReporterCount: 1,
+      resolutionStatus: rowResolutionStatus,
+      resolutionNote: (rowResolutionNote != null && rowResolutionNote.isNotEmpty)
+          ? sanitizeZeroSlopCopy(rowResolutionNote)
+          : null,
+      resolvedByUserId: rowResolvedBy,
+      resolvedAtUtc: rowResolvedAt,
     );
   }
 
   ClusterAlertEvent _mapEnrichedDetail(Map<String, dynamic> detail) {
+    final rawNote = (detail['resolution_note'] as String?)?.trim();
+    final rawResolverName = (detail['resolved_by_name'] as String?)?.trim();
     return ClusterAlertEvent(
       id: detail['id'] as String,
       sppgId: detail['sppg_id'] as String,
@@ -567,14 +648,147 @@ class SupabaseClusterAlertRepository implements ClusterAlertRepository {
           _clockUtc(),
       activeReporterCount:
           (detail['active_reporter_count'] as num?)?.toInt() ?? 1,
+      resolutionStatus: AlertResolutionStatus.fromDb(
+        detail['resolution_status'] as String?,
+      ),
+      resolutionNote: (rawNote != null && rawNote.isNotEmpty)
+          ? sanitizeZeroSlopCopy(rawNote)
+          : null,
+      resolvedByUserId: detail['resolved_by'] as String?,
+      resolvedByName: (rawResolverName != null && rawResolverName.isNotEmpty)
+          ? sanitizeZeroSlopCopy(rawResolverName)
+          : null,
+      resolvedAtUtc: DateTime.tryParse(
+        '${detail['resolved_at'] ?? ''}',
+      )?.toUtc(),
     );
   }
 
   @override
-  Future<int> syncPendingAlerts({String? schoolId}) async {
+  Future<ClusterAlertEvent> resolveClusterAlert({
+    required ClusterAlertEvent alert,
+    required AlertResolutionStatus newStatus,
+    required String resolutionNote,
+    required String resolverUserId,
+    required String resolverName,
+    required bool isOffline,
+  }) async {
+    if (!alert.resolutionStatus.canTransitionTo(newStatus)) {
+      throw const FormatException(
+        'Transisi status darurat tidak diizinkan untuk laporan ini.',
+      );
+    }
+    final cleanNote = sanitizeZeroSlopCopy(resolutionNote);
+    if (cleanNote.length < 10) {
+      throw const FormatException(
+        'Alasan klarifikasi atau konfirmasi wajib diisi minimal 10 karakter.',
+      );
+    }
+    final cleanResolver = sanitizeZeroSlopCopy(
+      resolverName.trim().isEmpty ? 'Admin SPPG / Sekolah Pelapor' : resolverName,
+    );
+    var resolvedAtUtc = _clockUtc();
+    var pendingSync = true;
+
+    final client = _client;
+    if (!isOffline && client != null) {
+      try {
+        final raw = await client.rpc(
+          'resolve_cluster_alert',
+          params: {
+            'p_alert_id': alert.id,
+            'p_new_status': newStatus.dbValue,
+            'p_resolution_note': cleanNote,
+          },
+        );
+        if (raw is Map && raw['ok'] == true) {
+          resolvedAtUtc =
+              DateTime.tryParse('${raw['resolved_at'] ?? ''}')?.toUtc() ??
+              resolvedAtUtc;
+          pendingSync = false;
+        } else {
+          throw StateError('RPC returned failure');
+        }
+      } catch (_) {
+        try {
+          await client
+              .from('cluster_alerts')
+              .update({
+                'resolution_status': newStatus.dbValue,
+                'resolution_note': cleanNote,
+                'resolved_by': resolverUserId,
+                'resolved_at': resolvedAtUtc.toIso8601String(),
+              })
+              .eq('id', alert.id);
+          pendingSync = false;
+        } catch (_) {
+          pendingSync = true;
+        }
+      }
+    }
+
+    final payload = {
+      'id': alert.id,
+      'sppg_id': alert.sppgId,
+      'reporter_school_id': alert.reporterSchoolId,
+      'resolution_status': newStatus.dbValue,
+      'resolution_note': cleanNote,
+      'resolved_by': resolverUserId,
+      'resolved_by_name': cleanResolver,
+      'resolved_at': resolvedAtUtc.toIso8601String(),
+    };
+
+    await _database.upsertTraceabilityDraft(
+      LocalTraceabilityDraftsCompanion(
+        id: Value('alert_res_${alert.id}'),
+        recordType: const Value('alert_resolution'),
+        institutionId: Value(alert.sppgId),
+        batchId: Value(alert.batchId),
+        payloadJson: Value(jsonEncode(payload)),
+        isSynced: Value(!pendingSync),
+        createdAt: Value(resolvedAtUtc),
+        updatedAt: Value(resolvedAtUtc),
+      ),
+    );
+
+    if (pendingSync) {
+      await _database.enqueueSyncItem(
+        LocalSyncQueueCompanion.insert(
+          operationType: 'resolve_cluster_alert',
+          entityId: alert.id,
+          payloadJson: jsonEncode(payload),
+          status: const Value('pending'),
+          createdAt: resolvedAtUtc,
+          updatedAt: resolvedAtUtc,
+        ),
+      );
+      await _triggerWorkmanagerSafe();
+    }
+
+    return alert.copyWith(
+      resolutionStatus: newStatus,
+      resolutionNote: cleanNote,
+      resolvedByUserId: resolverUserId,
+      resolvedByName: cleanResolver,
+      resolvedAtUtc: resolvedAtUtc,
+      isPendingSync: pendingSync,
+    );
+  }
+
+  @override
+  Future<int> syncPendingAlerts({String? schoolId, String? kitchenId}) async {
     final client = _client;
     if (client == null) {
       return 0;
+    }
+    if (kitchenId != null && schoolId == null) {
+      final result = await replayDriftSyncQueue(
+        database: _database,
+        client: client,
+        kitchenId: kitchenId,
+        operationTypes: const {'resolve_cluster_alert'},
+      );
+      return result.syncedCount;
     }
     final result = await replayDriftSyncQueue(
       database: _database,
@@ -584,6 +798,7 @@ class SupabaseClusterAlertRepository implements ClusterAlertRepository {
         'create_alert',
         'update_alert_pdf_dispatched',
         'ack_alert',
+        'resolve_cluster_alert',
       },
     );
     return result.syncedCount;

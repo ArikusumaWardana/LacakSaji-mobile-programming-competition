@@ -37,6 +37,35 @@ class SupervisorAlertBrief {
   final DateTime createdAtUtc;
 }
 
+/// Read-only alarm clarification & KLB confirmation audit log entry on B01.
+class SupervisorAlertResolutionBrief {
+  const SupervisorAlertResolutionBrief({
+    required this.id,
+    required this.alertId,
+    required this.sppgId,
+    required this.sppgName,
+    required this.batchCode,
+    required this.menuName,
+    required this.previousStatus,
+    required this.newStatus,
+    required this.resolutionNote,
+    required this.actorName,
+    required this.createdAtUtc,
+  });
+
+  final String id;
+  final String alertId;
+  final String sppgId;
+  final String sppgName;
+  final String batchCode;
+  final String menuName;
+  final AlertResolutionStatus previousStatus;
+  final AlertResolutionStatus newStatus;
+  final String resolutionNote;
+  final String actorName;
+  final DateTime createdAtUtc;
+}
+
 /// Aggregated compliance and plate-waste record for a single SPPG kitchen on B01.
 class SupervisorSppgSummary {
   const SupervisorSppgSummary({
@@ -55,6 +84,11 @@ class SupervisorSppgSummary {
     required this.avgVegWastePct,
     required this.avgOverallWastePct,
     required this.wasteLogCount,
+    this.avgTransitMinutes,
+    this.transitCount = 0,
+    this.trayReturnRatePct,
+    this.totalTraysSent = 0,
+    this.totalTraysReturned = 0,
   });
 
   final String sppgId;
@@ -72,6 +106,11 @@ class SupervisorSppgSummary {
   final int avgVegWastePct;
   final int avgOverallWastePct;
   final int wasteLogCount;
+  final int? avgTransitMinutes;
+  final int transitCount;
+  final int? trayReturnRatePct;
+  final int totalTraysSent;
+  final int totalTraysReturned;
 
   bool get needsAttention =>
       activeAlertsCount > 0 ||
@@ -95,6 +134,10 @@ class SupervisorNationalOverview {
     required this.activeAlerts,
     required this.sppgSummaries,
     required this.generatedAtUtc,
+    this.avgTransitMinutes,
+    this.trayReturnRatePct,
+    this.resolvedAlertsCount = 0,
+    this.alertResolutionHistory = const [],
   });
 
   final SupervisorDateFilter dateFilter;
@@ -110,6 +153,10 @@ class SupervisorNationalOverview {
   final List<SupervisorAlertBrief> activeAlerts;
   final List<SupervisorSppgSummary> sppgSummaries;
   final DateTime generatedAtUtc;
+  final int? avgTransitMinutes;
+  final int? trayReturnRatePct;
+  final int resolvedAlertsCount;
+  final List<SupervisorAlertResolutionBrief> alertResolutionHistory;
 }
 
 /// Resolves human-readable kecamatan/wilayah name from BMKG adm4 village code.

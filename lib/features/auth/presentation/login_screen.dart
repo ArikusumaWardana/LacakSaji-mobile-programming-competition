@@ -101,14 +101,21 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 ),
                 const SizedBox(height: AppSpacing.sm),
                 Text(
-                  '2. Guru / PIC Sekolah: Masuk dengan akun sekolah berbasis NPSN yang telah ditautkan ke Kode Mitra SPPG.',
+                  '2. Kurir / Pengantar: Pindai muat dari dapur SPPG dan serah terima tiba di gerbang sekolah.',
                   style: AppTypography.bodyMedium.copyWith(
                     color: AppColors.textPrimary,
                   ),
                 ),
                 const SizedBox(height: AppSpacing.sm),
                 Text(
-                  '3. Uji Coba Cepat: Gunakan tombol Masuk Cepat - Akun Demo di bagian bawah untuk mencoba fitur Dapur, Sekolah, atau Pengawas.',
+                  '3. Guru / PIC Sekolah: Masuk dengan akun sekolah berbasis NPSN yang telah ditautkan ke Kode Mitra SPPG.',
+                  style: AppTypography.bodyMedium.copyWith(
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                Text(
+                  '4. Uji Coba Cepat: Gunakan tombol Masuk Cepat di bagian bawah untuk mencoba peran Dapur, Kurir, Sekolah, atau Pengawas BGN.',
                   style: AppTypography.bodyMedium.copyWith(
                     color: AppColors.textPrimary,
                   ),
@@ -155,18 +162,24 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const LacakLogoMark(size: 32),
-                            const SizedBox(width: AppSpacing.sm),
-                            Text(
-                              'LacakSaji',
-                              style: AppTypography.titleSection.copyWith(
-                                fontWeight: FontWeight.w700,
+                        Expanded(
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const LacakLogoMark(size: 32),
+                              const SizedBox(width: AppSpacing.sm),
+                              Flexible(
+                                child: Text(
+                                  'LacakSaji',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: AppTypography.titleSection.copyWith(
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
                         Material(
                           color: AppColors.surfaceSoft,
@@ -296,13 +309,18 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     Row(
                       children: [
                         const Expanded(child: Divider()),
-                        Padding(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: AppSpacing.md,
-                          ),
-                          child: Text(
-                            'Uji Coba Cepat',
-                            style: AppTypography.captionMuted,
+                        Flexible(
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: AppSpacing.md,
+                            ),
+                            child: Text(
+                              'Uji Coba Cepat',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              textAlign: TextAlign.center,
+                              style: AppTypography.captionMuted,
+                            ),
                           ),
                         ),
                         const Expanded(child: Divider()),
@@ -317,6 +335,23 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       onPressed: authState.isBusy
                           ? null
                           : () => _openDemoSheet(),
+                    ),
+                    const SizedBox(height: AppSpacing.sm),
+                    LacakSecondaryButton(
+                      label: 'Masuk Cepat - Kurir Demo',
+                      icon: Icons.local_shipping_rounded,
+                      isLoading:
+                          authState.busyAction == AuthBusyAction.signInDemo,
+                      onPressed: authState.isBusy
+                          ? null
+                          : () {
+                              final courierPreset = kDemoAccounts.firstWhere(
+                                (item) => item.isCourier,
+                              );
+                              ref
+                                  .read(authControllerProvider.notifier)
+                                  .signInDemo(courierPreset);
+                            },
                     ),
                     const SizedBox(height: AppSpacing.sm),
                     LayoutBuilder(
@@ -338,6 +373,21 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                               ? null
                               : () => _openDemoSheet(filterKitchen: false),
                         );
+                        final supervisorBtn = _SoftRolePillButton(
+                          label: 'Demo Pengawas',
+                          icon: Icons.visibility_rounded,
+                          onTap: authState.isBusy
+                              ? null
+                              : () {
+                                  final supervisorPreset =
+                                      kDemoAccounts.firstWhere(
+                                        (item) => item.isSupervisor,
+                                      );
+                                  ref
+                                      .read(authControllerProvider.notifier)
+                                      .signInDemo(supervisorPreset);
+                                },
+                        );
                         if (stack) {
                           return Column(
                             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -345,14 +395,23 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                               kitchenBtn,
                               const SizedBox(height: AppSpacing.sm),
                               schoolBtn,
+                              const SizedBox(height: AppSpacing.sm),
+                              supervisorBtn,
                             ],
                           );
                         }
-                        return Row(
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
-                            Expanded(child: kitchenBtn),
-                            const SizedBox(width: AppSpacing.sm),
-                            Expanded(child: schoolBtn),
+                            Row(
+                              children: [
+                                Expanded(child: kitchenBtn),
+                                const SizedBox(width: AppSpacing.sm),
+                                Expanded(child: schoolBtn),
+                              ],
+                            ),
+                            const SizedBox(height: AppSpacing.sm),
+                            supervisorBtn,
                           ],
                         );
                       },
@@ -430,9 +489,16 @@ class _QuickDemoSheet extends StatelessWidget {
   Widget build(BuildContext context) {
     final accounts = filterKitchen == null
         ? kDemoAccounts
-        : kDemoAccounts
-              .where((item) => item.isKitchen == filterKitchen)
-              .toList(growable: false);
+        : filterKitchen == true
+            ? kDemoAccounts
+                .where((item) => item.isKitchen)
+                .toList(growable: false)
+            : kDemoAccounts
+                .where(
+                  (item) =>
+                      !item.isKitchen && !item.isSupervisor && !item.isCourier,
+                )
+                .toList(growable: false);
 
     return SafeArea(
       child: Padding(
@@ -499,9 +565,11 @@ class _QuickDemoSheet extends StatelessWidget {
                         child: Icon(
                           preset.isSupervisor
                               ? Icons.visibility_rounded
-                              : preset.isKitchen
-                                  ? Icons.soup_kitchen_rounded
-                                  : Icons.school_rounded,
+                              : preset.isCourier
+                                  ? Icons.local_shipping_rounded
+                                  : preset.isKitchen
+                                      ? Icons.soup_kitchen_rounded
+                                      : Icons.school_rounded,
                           size: 22,
                           color: AppColors.primary,
                         ),

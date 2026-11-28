@@ -1,4 +1,6 @@
+import '../../auth/domain/auth_models.dart';
 import '../../school/domain/danger_zone_calculator.dart';
+import '../../traceability/domain/traceability_models.dart';
 import '../../../core/network/bmkg_weather_service.dart';
 
 final RegExp _unicodeEmojiRegex = RegExp(
@@ -42,6 +44,60 @@ enum ClusterAlertStage {
   }
 }
 
+enum AlertResolutionStatus {
+  active('active', 'Darurat Aktif'),
+  clarifiedSafe('clarified_safe', 'Klarifikasi: Aman Kembali'),
+  confirmedKlb('confirmed_klb', 'Terkonfirmasi KLB');
+
+  const AlertResolutionStatus(this.dbValue, this.label);
+
+  final String dbValue;
+  final String label;
+
+  static AlertResolutionStatus fromDb(String? value) {
+    for (final status in AlertResolutionStatus.values) {
+      if (status.dbValue == value) {
+        return status;
+      }
+    }
+    return AlertResolutionStatus.active;
+  }
+
+  bool canTransitionTo(AlertResolutionStatus next) {
+    switch (this) {
+      case AlertResolutionStatus.active:
+        return next == AlertResolutionStatus.clarifiedSafe ||
+            next == AlertResolutionStatus.confirmedKlb;
+      case AlertResolutionStatus.clarifiedSafe:
+        return next == AlertResolutionStatus.confirmedKlb;
+      case AlertResolutionStatus.confirmedKlb:
+        return false;
+    }
+  }
+}
+
+bool canResolveClusterAlert({
+  required AuthState auth,
+  required String sppgId,
+  required String reporterSchoolId,
+}) {
+  if (auth.status != AuthStatus.authenticated || auth.profile == null) {
+    return false;
+  }
+  final role = auth.profile!.role;
+  if (role == UserRole.kitchen &&
+      auth.isInstitutionAdmin &&
+      auth.kitchen?.id == sppgId) {
+    return true;
+  }
+  if (role == UserRole.school &&
+      auth.school != null &&
+      auth.school!.id == reporterSchoolId) {
+    return true;
+  }
+  return false;
+}
+
 class ClusterAlertEvent {
   const ClusterAlertEvent({
     required this.id,
@@ -61,6 +117,11 @@ class ClusterAlertEvent {
     this.pdfDispatched = false,
     this.activeReporterCount = 1,
     this.isPendingSync = false,
+    this.resolutionStatus = AlertResolutionStatus.active,
+    this.resolutionNote,
+    this.resolvedByUserId,
+    this.resolvedByName,
+    this.resolvedAtUtc,
   });
 
   final String id;
@@ -80,6 +141,47 @@ class ClusterAlertEvent {
   final DateTime createdAtUtc;
   final int activeReporterCount;
   final bool isPendingSync;
+  final AlertResolutionStatus resolutionStatus;
+  final String? resolutionNote;
+  final String? resolvedByUserId;
+  final String? resolvedByName;
+  final DateTime? resolvedAtUtc;
+
+  String get handledStateKey => '$id:${resolutionStatus.dbValue}';
+
+  ClusterAlertEvent copyWith({
+    AlertResolutionStatus? resolutionStatus,
+    String? resolutionNote,
+    String? resolvedByUserId,
+    String? resolvedByName,
+    DateTime? resolvedAtUtc,
+    bool? isPendingSync,
+  }) {
+    return ClusterAlertEvent(
+      id: id,
+      sppgId: sppgId,
+      sppgName: sppgName,
+      batchId: batchId,
+      batchCode: batchCode,
+      menuName: menuName,
+      reporterSchoolId: reporterSchoolId,
+      reporterSchoolName: reporterSchoolName,
+      stage: stage,
+      symptomCount: symptomCount,
+      notes: notes,
+      broadcastEnabled: broadcastEnabled,
+      sampleLabelCode: sampleLabelCode,
+      pdfDispatched: pdfDispatched,
+      createdAtUtc: createdAtUtc,
+      activeReporterCount: activeReporterCount,
+      isPendingSync: isPendingSync ?? this.isPendingSync,
+      resolutionStatus: resolutionStatus ?? this.resolutionStatus,
+      resolutionNote: resolutionNote ?? this.resolutionNote,
+      resolvedByUserId: resolvedByUserId ?? this.resolvedByUserId,
+      resolvedByName: resolvedByName ?? this.resolvedByName,
+      resolvedAtUtc: resolvedAtUtc ?? this.resolvedAtUtc,
+    );
+  }
 
   String get instructionText {
     if (stage == ClusterAlertStage.postConsumption) {
@@ -163,6 +265,8 @@ class PuskesmasDraftArgs {
     this.sampleLabelCode,
     this.isPendingSync = false,
     this.initialPdfDispatched = false,
+    this.ingredientLogs = const [],
+    this.transitHandover,
   });
 
   final String alertId;
@@ -187,4 +291,38 @@ class PuskesmasDraftArgs {
   final bool isPendingSync;
   final bool initialPdfDispatched;
   final DateTime reportedAtUtc;
+  final List<IngredientLogItem> ingredientLogs;
+  final TransitHandoverItem? transitHandover;
+
+  PuskesmasDraftArgs withTraceability({
+    List<IngredientLogItem>? ingredientLogs,
+    TransitHandoverItem? transitHandover,
+  }) {
+    return PuskesmasDraftArgs(
+      alertId: alertId,
+      batchId: batchId,
+      batchCode: batchCode,
+      menuName: menuName,
+      sppgId: sppgId,
+      sppgName: sppgName,
+      sealedAtUtc: sealedAtUtc,
+      scannedAtUtc: scannedAtUtc,
+      elapsedMinutes: elapsedMinutes,
+      bmkgTempC: bmkgTempC,
+      bmkgSource: bmkgSource,
+      dangerStatus: dangerStatus,
+      stage: stage,
+      symptomCount: symptomCount,
+      reasonSummary: reasonSummary,
+      broadcastEnabled: broadcastEnabled,
+      reportedAtUtc: reportedAtUtc,
+      notes: notes,
+      localPhotoPath: localPhotoPath,
+      sampleLabelCode: sampleLabelCode,
+      isPendingSync: isPendingSync,
+      initialPdfDispatched: initialPdfDispatched,
+      ingredientLogs: ingredientLogs ?? this.ingredientLogs,
+      transitHandover: transitHandover ?? this.transitHandover,
+    );
+  }
 }

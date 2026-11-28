@@ -2,6 +2,7 @@ import 'package:lacak_saji/core/constants/app_routes.dart';
 
 enum UserRole {
   kitchen('kitchen', 'Petugas Dapur SPPG'),
+  courier('courier', 'Kurir / Pengantar'),
   school('school', 'Guru / PIC Sekolah'),
   supervisor('supervisor', 'Pengawas BGN / Dinkes');
 
@@ -37,6 +38,29 @@ enum SchoolVerificationStatus {
       }
     }
     return SchoolVerificationStatus.pending;
+  }
+}
+
+enum InstitutionMemberRole {
+  admin('admin', 'Admin Institusi'),
+  staff('staff', 'Staf Pelaksana'),
+  courier('courier', 'Kurir Pengantar');
+
+  const InstitutionMemberRole(this.dbValue, this.label);
+
+  final String dbValue;
+  final String label;
+
+  static InstitutionMemberRole? fromDb(String? value) {
+    if (value == null || value.isEmpty) {
+      return null;
+    }
+    for (final role in InstitutionMemberRole.values) {
+      if (role.dbValue == value) {
+        return role;
+      }
+    }
+    return null;
   }
 }
 
@@ -198,11 +222,13 @@ class AuthSessionSnapshot {
     required this.profile,
     this.kitchen,
     this.school,
+    this.institutionRole,
   });
 
   final UserProfile profile;
   final KitchenProfile? kitchen;
   final SchoolProfile? school;
+  final InstitutionMemberRole? institutionRole;
 }
 
 class KitchenRegistrationResult {
@@ -249,6 +275,7 @@ class AuthState {
     this.profile,
     this.kitchen,
     this.school,
+    this.institutionRole,
     this.busyAction,
     this.errorMessage,
     this.pendingConfirmationEmail,
@@ -260,6 +287,7 @@ class AuthState {
         profile = null,
         kitchen = null,
         school = null,
+        institutionRole = null,
         busyAction = null,
         errorMessage = null,
         pendingConfirmationEmail = null,
@@ -269,12 +297,34 @@ class AuthState {
   final UserProfile? profile;
   final KitchenProfile? kitchen;
   final SchoolProfile? school;
+  final InstitutionMemberRole? institutionRole;
   final AuthBusyAction? busyAction;
   final String? errorMessage;
   final String? pendingConfirmationEmail;
   final bool holdKitchenActivationSummary;
 
   bool get isBusy => busyAction != null;
+
+  bool get isInstitutionAdmin {
+    final currentProfile = profile;
+    if (status != AuthStatus.authenticated || currentProfile == null) {
+      return false;
+    }
+    if (currentProfile.role != UserRole.kitchen &&
+        currentProfile.role != UserRole.school) {
+      return false;
+    }
+    if (institutionRole != null) {
+      return institutionRole == InstitutionMemberRole.admin;
+    }
+    if (currentProfile.role == UserRole.kitchen && kitchen != null) {
+      return kitchen!.ownerUserId == currentProfile.id;
+    }
+    if (currentProfile.role == UserRole.school && school != null) {
+      return school!.ownerUserId == currentProfile.id;
+    }
+    return false;
+  }
 
   String get landingRoute {
     if (status != AuthStatus.authenticated || profile == null) {
@@ -283,6 +333,8 @@ class AuthState {
     switch (profile!.role) {
       case UserRole.kitchen:
         return AppRoutes.kitchenHome;
+      case UserRole.courier:
+        return AppRoutes.courierHome;
       case UserRole.supervisor:
         return AppRoutes.supervisor;
       case UserRole.school:
@@ -299,6 +351,7 @@ class AuthState {
     UserProfile? profile,
     KitchenProfile? kitchen,
     SchoolProfile? school,
+    InstitutionMemberRole? institutionRole,
     AuthBusyAction? busyAction,
     String? errorMessage,
     String? pendingConfirmationEmail,
@@ -312,6 +365,9 @@ class AuthState {
       profile: clearEntities ? null : (profile ?? this.profile),
       kitchen: clearEntities ? null : (kitchen ?? this.kitchen),
       school: clearEntities ? null : (school ?? this.school),
+      institutionRole: clearEntities
+          ? null
+          : (institutionRole ?? this.institutionRole),
       busyAction: clearBusy ? null : (busyAction ?? this.busyAction),
       errorMessage: clearError ? null : (errorMessage ?? this.errorMessage),
       pendingConfirmationEmail: clearEntities
@@ -350,6 +406,13 @@ String? resolveAuthActorName({
   required KitchenProfile? kitchen,
   required SchoolProfile? school,
 }) {
+  if (profile?.role == UserRole.courier) {
+    final fullName = profile?.fullName.trim();
+    if (fullName != null && fullName.isNotEmpty) {
+      final cleaned = fullName.replaceAll(RegExp(r'\s*\([^)]*\)\s*$'), '').trim();
+      return cleaned.isNotEmpty ? cleaned : fullName;
+    }
+  }
   final kitchenName = kitchen?.name.trim();
   if (kitchenName != null && kitchenName.isNotEmpty) {
     return kitchenName;
