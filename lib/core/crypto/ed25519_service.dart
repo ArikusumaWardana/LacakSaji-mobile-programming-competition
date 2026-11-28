@@ -71,15 +71,20 @@ class Ed25519Service {
   }
 
   /// Checks whether a key marked [status] must reject a QR sealed at [sealedAtUtc].
-  /// Retired keys remain valid for older QRs; revoked keys reject QRs sealed at or
+  /// Retired keys remain valid for older QRs; revoked keys always reject offline_unverified
+  /// QRs (preventing offline clock-rollback spoofing) and reject QRs sealed at or
   /// after [revokedAtUtc] (or all QRs if revocation timestamp is absent).
   static bool isRevokedForSealTime({
     required String status,
     required DateTime? revokedAtUtc,
     required DateTime sealedAtUtc,
+    String? timestampSource,
   }) {
     if (status != 'revoked') {
       return false;
+    }
+    if (timestampSource == 'offline_unverified') {
+      return true;
     }
     if (revokedAtUtc == null) {
       return true;

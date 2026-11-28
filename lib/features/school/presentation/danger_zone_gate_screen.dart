@@ -356,6 +356,22 @@ class _DangerZoneGateScreenState extends ConsumerState<DangerZoneGateScreen> {
                           ),
                         ),
                       ),
+                      if (ctx.dangerEvaluation.hasClockSkew)
+                        Padding(
+                          padding: EdgeInsets.fromLTRB(
+                            horizontalPad,
+                            AppSpacing.md,
+                            horizontalPad,
+                            0,
+                          ),
+                          child: LacakStatusBanner(
+                            level: LacakStatusLevel.warning,
+                            icon: Icons.schedule_rounded,
+                            title: 'Jam HP Tidak Sinkron dengan Waktu Dapur',
+                            description:
+                                'Jam pada perangkat ini tertinggal ${ctx.dangerEvaluation.rawElapsedMinutes.abs()} menit dari waktu segel dapur. Aktifkan Tanggal & Waktu Otomatis di pengaturan HP dan periksa kesegaran makanan secara teliti.',
+                          ),
+                        ),
                       if (allergenWarning.hasMatches)
                         Padding(
                           padding: EdgeInsets.fromLTRB(

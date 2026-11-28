@@ -1,10 +1,12 @@
 import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/network/connectivity_provider.dart';
 import '../../../core/network/supabase_provider.dart';
 import '../../../core/notifications/fcm_alert_service.dart';
+import '../../../core/theme/text_scale_provider.dart';
 import '../../auth/domain/auth_models.dart';
 import '../../auth/presentation/auth_controller.dart';
 import '../../kitchen/presentation/kitchen_providers.dart';
@@ -76,7 +78,9 @@ class ClusterAlertController extends Notifier<ClusterAlertOverlayState> {
     if (auth.status != AuthStatus.authenticated || auth.profile == null) {
       return null;
     }
-    if (auth.profile!.role == UserRole.kitchen && auth.kitchen != null) {
+    if ((auth.profile!.role == UserRole.kitchen ||
+            auth.profile!.role == UserRole.courier) &&
+        auth.kitchen != null) {
       return (
         userId: auth.profile!.id,
         sppgId: auth.kitchen!.id,
@@ -112,7 +116,7 @@ class ClusterAlertController extends Notifier<ClusterAlertOverlayState> {
     }
 
     final nextKey =
-        '${scope.userId}:${scope.sppgId}:${scope.excludeSchoolId ?? 'kitchen'}';
+        '${scope.userId}:${scope.sppgId}:${scope.excludeSchoolId ?? auth.profile!.role.dbValue}';
     if (_boundSessionKey == nextKey) {
       return;
     }
@@ -152,8 +156,54 @@ class ClusterAlertController extends Notifier<ClusterAlertOverlayState> {
     if (!ref.mounted) {
       return;
     }
+    final prefs = _tryReadPrefs();
     for (final item in pendingToday.reversed) {
+      if (item.resolutionStatus != AlertResolutionStatus.active &&
+          _isResolutionSeenPersisted(prefs, scope.userId, item.handledStateKey)) {
+        continue;
+      }
       enqueueIncomingAlert(item);
+    }
+  }
+
+  SharedPreferences? _tryReadPrefs() {
+    try {
+      return ref.read(sharedPreferencesProvider);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  static String _resolutionSeenPrefKey(String userId, String handledStateKey) =>
+      'lacak_alert_res_seen_${userId}_$handledStateKey';
+
+  bool _isResolutionSeenPersisted(
+    SharedPreferences? prefs,
+    String userId,
+    String handledStateKey,
+  ) {
+    if (prefs == null) {
+      return false;
+    }
+    return prefs.getBool(_resolutionSeenPrefKey(userId, handledStateKey)) ??
+        false;
+  }
+
+  Future<void> _markResolutionSeenPersisted(
+    String userId,
+    String handledStateKey,
+  ) async {
+    final prefs = _tryReadPrefs();
+    if (prefs == null) {
+      return;
+    }
+    try {
+      await prefs.setBool(
+        _resolutionSeenPrefKey(userId, handledStateKey),
+        true,
+      );
+    } catch (_) {
+      // Non-fatal persistence failure.
     }
   }
 
@@ -298,6 +348,13 @@ class ClusterAlertController extends Notifier<ClusterAlertOverlayState> {
       } catch (_) {
         // Queue fallback handled inside repository.
       }
+    }
+    if (active.resolutionStatus != AlertResolutionStatus.active &&
+        auth.profile != null) {
+      await _markResolutionSeenPersisted(
+        auth.profile!.id,
+        active.handledStateKey,
+      );
     }
     if (!ref.mounted) {
       return;

@@ -109,6 +109,7 @@ class LacakClusterAlertOverlay extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final auth = ref.watch(authControllerProvider);
     final isSchoolUser = auth.school != null;
+    final isCourierUser = auth.profile?.role == UserRole.courier;
     final isClarifiedSafe =
         event.resolutionStatus == AlertResolutionStatus.clarifiedSafe;
     final isConfirmedKlb =
@@ -357,6 +358,17 @@ class LacakClusterAlertOverlay extends ConsumerWidget {
                                   : () => _ackAndNavigate(
                                       ref,
                                       AppRoutes.schoolSamples,
+                                    ),
+                            )
+                          else if (isCourierUser)
+                            LacakSecondaryButton(
+                              label: 'Buka Daftar Pengantaran',
+                              icon: Icons.local_shipping_rounded,
+                              onPressed: isAcknowledging
+                                  ? null
+                                  : () => _ackAndNavigate(
+                                      ref,
+                                      AppRoutes.courierHome,
                                     ),
                             )
                           else

@@ -15,6 +15,7 @@ import '../../../core/theme/text_scale_provider.dart';
 import '../../../core/widgets/editorial_widgets.dart';
 import '../../../core/widgets/lacak_buttons.dart';
 import '../../../core/widgets/lacak_feedback_states.dart';
+import '../../../core/widgets/lacak_status_badge.dart';
 import '../../../core/widgets/lacak_text_field.dart';
 import '../../allergens/domain/allergen_models.dart';
 import '../../auth/presentation/auth_controller.dart';
@@ -614,6 +615,72 @@ class _CreateBatchScreenState extends ConsumerState<CreateBatchScreen> {
                                       ),
                                     )
                                     .toList(growable: false),
+                              ),
+                              Builder(
+                                builder: (context) {
+                                  final missingSuggestions =
+                                      AllergenTag.inferLikelyTagsFromMenuName(
+                                        _menuController.text,
+                                      ).difference(_selectedAllergens);
+                                  if (missingSuggestions.isEmpty) {
+                                    return const SizedBox.shrink();
+                                  }
+                                  final sorted = missingSuggestions.toList()
+                                    ..sort(
+                                      (a, b) => a.index.compareTo(b.index),
+                                    );
+                                  final names = sorted
+                                      .map((t) => t.label)
+                                      .join(', ');
+                                  return Padding(
+                                    padding: const EdgeInsets.only(
+                                      top: AppSpacing.sm,
+                                    ),
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.stretch,
+                                      children: [
+                                        LacakStatusBanner(
+                                          level: LacakStatusLevel.warning,
+                                          icon: Icons.health_and_safety_rounded,
+                                          title:
+                                              'Saran Tag Alergen dari Nama Menu',
+                                          description:
+                                              'Nama menu mengandung indikasi: $names. Pastikan tag alergen dicentang agar sekolah menerima peringatan otomatis.',
+                                        ),
+                                        const SizedBox(height: AppSpacing.xs),
+                                        Align(
+                                          alignment: Alignment.centerLeft,
+                                          child: TextButton.icon(
+                                            onPressed: () {
+                                              setState(() {
+                                                _selectedAllergens.addAll(
+                                                  sorted,
+                                                );
+                                              });
+                                              _saveLocalDraft();
+                                            },
+                                            style: TextButton.styleFrom(
+                                              minimumSize: const Size(
+                                                AppSpacing.minTouchTarget,
+                                                AppSpacing.minTouchTarget,
+                                              ),
+                                              foregroundColor:
+                                                  AppColors.primary,
+                                            ),
+                                            icon: const Icon(
+                                              Icons.add_task_rounded,
+                                              size: 18,
+                                            ),
+                                            label: const Text(
+                                              'Terapkan Tag Disarankan',
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                },
                               ),
                               const SizedBox(height: AppSpacing.lg),
                               Text(

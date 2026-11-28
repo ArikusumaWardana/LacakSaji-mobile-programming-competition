@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/crypto/ed25519_service.dart';
 import '../../../core/database/database_provider.dart';
 import '../../../core/network/supabase_provider.dart';
 import '../../../core/sync/workmanager_sync_dispatcher.dart';
@@ -13,6 +14,7 @@ final traceabilityRepositoryProvider = Provider<TraceabilityRepository>((ref) {
     client: ref.watch(supabaseClientProvider),
     database: ref.watch(appDatabaseProvider),
     backgroundSyncScheduler: ref.watch(backgroundSyncSchedulerProvider),
+    ed25519Service: ref.watch(ed25519ServiceProvider),
   );
 });
 

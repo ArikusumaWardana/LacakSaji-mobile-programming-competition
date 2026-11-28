@@ -104,7 +104,7 @@ final goRouterProvider = Provider<GoRouter>((ref) {
           (location.startsWith(AppRoutes.schoolHome) ||
               location.startsWith(AppRoutes.courierHome) ||
               location == AppRoutes.pendingVerification ||
-              location == AppRoutes.supervisor)) {
+              location.startsWith(AppRoutes.supervisor))) {
         return AppRoutes.kitchenHome;
       }
 
@@ -113,7 +113,7 @@ final goRouterProvider = Provider<GoRouter>((ref) {
               location.startsWith(AppRoutes.schoolHome) ||
               location == AppRoutes.pendingVerification ||
               location == AppRoutes.settingsTeamSecurity ||
-              location == AppRoutes.supervisor)) {
+              location.startsWith(AppRoutes.supervisor))) {
         return AppRoutes.courierHome;
       }
 
@@ -121,7 +121,7 @@ final goRouterProvider = Provider<GoRouter>((ref) {
           (location.startsWith(AppRoutes.kitchenHome) ||
               location.startsWith(AppRoutes.courierHome) ||
               location == AppRoutes.pendingVerification ||
-              location == AppRoutes.supervisor)) {
+              location.startsWith(AppRoutes.supervisor))) {
         return AppRoutes.schoolHome;
       }
 

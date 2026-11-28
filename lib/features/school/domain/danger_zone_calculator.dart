@@ -52,6 +52,8 @@ class DangerZoneEvaluation {
     this.effectiveTempC,
     this.tempSource = FoodTemperatureSource.bmkgEstimate,
     this.isControlledHoldingTemp = false,
+    this.hasClockSkew = false,
+    this.rawElapsedMinutes = 0,
   });
 
   final DangerZoneStatus status;
@@ -63,6 +65,8 @@ class DangerZoneEvaluation {
   final double? effectiveTempC;
   final FoodTemperatureSource tempSource;
   final bool isControlledHoldingTemp;
+  final bool hasClockSkew;
+  final int rawElapsedMinutes;
 }
 
 /// Evaluates PRD Section 3.3 Danger-Zone Clock matrix across menu risk, duration,
@@ -77,6 +81,7 @@ abstract final class DangerZoneCalculator {
     FoodTemperatureSource tempSource = FoodTemperatureSource.bmkgEstimate,
   }) {
     final rawElapsed = scanAtUtc.toUtc().difference(sealedAtUtc.toUtc()).inMinutes;
+    final hasClockSkew = rawElapsed < -5;
     final elapsedMinutes = rawElapsed < 0 ? 0 : rawElapsed;
 
     final hasActualTemp =
@@ -110,6 +115,8 @@ abstract final class DangerZoneCalculator {
           effectiveTempC: resolvedTempC,
           tempSource: resolvedSource,
           isControlledHoldingTemp: true,
+          hasClockSkew: hasClockSkew,
+          rawElapsedMinutes: rawElapsed,
           explanation:
               'Suhu aktual makanan ($formattedTemp via ${resolvedSource.label}) berada di luar zona bahaya bakteri (5-60 C). Makanan aman dikonsumsi setelah cek visual dan aroma.',
         );
@@ -123,6 +130,8 @@ abstract final class DangerZoneCalculator {
         effectiveTempC: resolvedTempC,
         tempSource: resolvedSource,
         isControlledHoldingTemp: true,
+        hasClockSkew: hasClockSkew,
+        rawElapsedMinutes: rawElapsed,
         explanation:
             'Suhu aktual makanan ($formattedTemp via ${resolvedSource.label}) terjaga di luar zona bahaya, namun durasi kirim sudah melebihi ${formatDurationMinutes(normalStop)}. Lakukan cek organoleptik menyeluruh.',
       );
@@ -166,6 +175,8 @@ abstract final class DangerZoneCalculator {
         isHotWeather: isHot,
         effectiveTempC: resolvedTempC,
         tempSource: resolvedSource,
+        hasClockSkew: hasClockSkew,
+        rawElapsedMinutes: rawElapsed,
         explanation:
             'Durasi perjalanan masih dalam batas aman ${formatDurationMinutes(safeLimit)} untuk ${riskCategory.label.toLowerCase()} pada $tempContext. Lanjutkan ke cek kondisi makanan.',
       );
@@ -180,6 +191,8 @@ abstract final class DangerZoneCalculator {
         isHotWeather: isHot,
         effectiveTempC: resolvedTempC,
         tempSource: resolvedSource,
+        hasClockSkew: hasClockSkew,
+        rawElapsedMinutes: rawElapsed,
         explanation:
             'Durasi perjalanan melewati batas optimal ${formatDurationMinutes(safeLimit)} pada $tempContext. Periksa bau, tampilan, dan kemasan dengan sangat teliti sebelum dibagikan.',
       );
@@ -193,6 +206,8 @@ abstract final class DangerZoneCalculator {
       isHotWeather: isHot,
       effectiveTempC: resolvedTempC,
       tempSource: resolvedSource,
+      hasClockSkew: hasClockSkew,
+      rawElapsedMinutes: rawElapsed,
       explanation:
           'Durasi perjalanan melampaui batas maksimal ${formatDurationMinutes(stopLimit)} untuk ${riskCategory.label.toLowerCase()} pada $tempContext. Hentikan pembagian makanan demi keselamatan siswa.',
     );

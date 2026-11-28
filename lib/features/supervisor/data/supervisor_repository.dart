@@ -228,6 +228,52 @@ class SupabaseSupervisorRepository implements SupervisorRepository {
       }
     }
 
+    final missingResolutionAlertIds = resolutionAuditRows
+        .map((r) => r['alert_id'] as String?)
+        .whereType<String>()
+        .where((id) => id.isNotEmpty && !alertById.containsKey(id))
+        .toSet()
+        .toList(growable: false);
+    if (missingResolutionAlertIds.isNotEmpty) {
+      try {
+        final extraAlerts = List<Map<String, dynamic>>.from(
+          await client
+                  .from('cluster_alerts')
+                  .select('id, sppg_id, batch_id')
+                  .inFilter('id', missingResolutionAlertIds)
+              as List,
+        );
+        final missingBatchIds = <String>{};
+        for (final extra in extraAlerts) {
+          final id = extra['id'] as String?;
+          if (id != null && id.isNotEmpty) {
+            alertById[id] = extra;
+          }
+          final bId = extra['batch_id'] as String?;
+          if (bId != null && bId.isNotEmpty && !batchById.containsKey(bId)) {
+            missingBatchIds.add(bId);
+          }
+        }
+        if (missingBatchIds.isNotEmpty) {
+          final extraBatches = List<Map<String, dynamic>>.from(
+            await client
+                    .from('food_batches')
+                    .select('id, batch_code, menu_name')
+                    .inFilter('id', missingBatchIds.toList(growable: false))
+                as List,
+          );
+          for (final eb in extraBatches) {
+            final bId = eb['id'] as String?;
+            if (bId != null && bId.isNotEmpty) {
+              batchById[bId] = eb;
+            }
+          }
+        }
+      } catch (_) {
+        // Keep best-effort resolution history display when fallback lookup fails.
+      }
+    }
+
     final resolutionHistory = <SupervisorAlertResolutionBrief>[];
     for (final log in resolutionAuditRows) {
       final sppgId = (log['sppg_id'] as String?) ?? '';

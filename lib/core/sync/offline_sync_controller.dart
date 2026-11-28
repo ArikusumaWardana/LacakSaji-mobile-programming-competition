@@ -8,6 +8,7 @@ import '../../features/auth/domain/auth_models.dart';
 import '../../features/auth/presentation/auth_controller.dart';
 import '../../features/kitchen/presentation/kitchen_providers.dart';
 import '../../features/school/presentation/school_providers.dart';
+import '../../features/settings/presentation/team_security_providers.dart';
 import '../../features/traceability/presentation/traceability_providers.dart';
 import '../database/database_provider.dart';
 import '../network/connectivity_provider.dart';
@@ -148,8 +149,10 @@ class OfflineSyncController extends Notifier<OfflineSyncState> {
     state = state.copyWith(isSyncing: true, clearError: true);
     var totalSynced = 0;
 
+    final isCourier = auth.profile?.role == UserRole.courier;
+
     try {
-      if (kitchen != null) {
+      if (kitchen != null && !isCourier) {
         final count = await ref
             .read(kitchenRepositoryProvider)
             .syncPendingKitchenBatches(kitchen: kitchen);
@@ -201,11 +204,30 @@ class OfflineSyncController extends Notifier<OfflineSyncState> {
         }
       }
 
+      if (!isCourier && (kitchen != null || school != null)) {
+        final teamSecurityCount = await ref
+            .read(teamSecurityRepositoryProvider)
+            .syncPendingTeamAndKeyQueue(
+              kitchenId: kitchen?.id,
+              schoolId: school?.id,
+            );
+        if (!ref.mounted) {
+          return OfflineSyncRunReport(syncedCount: totalSynced);
+        }
+        totalSynced += teamSecurityCount;
+        if (teamSecurityCount > 0) {
+          ref.invalidate(teamSecurityOverviewProvider);
+        }
+      }
+
       final traceabilityCount = await ref
           .read(traceabilityRepositoryProvider)
           .syncPendingTraceabilityQueue(
             sppgId: kitchen?.id,
             schoolId: school?.id,
+            operationTypes: isCourier
+                ? const {'upsert_transit_handover'}
+                : null,
           );
       if (!ref.mounted) {
         return OfflineSyncRunReport(syncedCount: totalSynced);

@@ -6,6 +6,7 @@ import 'package:uuid/uuid.dart';
 
 import '../../../core/crypto/ed25519_service.dart';
 import '../../../core/database/app_database.dart';
+import '../../../core/sync/offline_sync_service.dart';
 import '../../auth/domain/auth_models.dart';
 import '../domain/team_security_models.dart';
 
@@ -41,6 +42,11 @@ abstract class TeamSecurityRepository {
     required KitchenProfile kitchen,
     required String keyId,
     required bool isOffline,
+  });
+
+  Future<int> syncPendingTeamAndKeyQueue({
+    String? kitchenId,
+    String? schoolId,
   });
 }
 
@@ -587,6 +593,30 @@ class SupabaseTeamSecurityRepository implements TeamSecurityRepository {
         ),
       );
     }
+  }
+
+  @override
+  Future<int> syncPendingTeamAndKeyQueue({
+    String? kitchenId,
+    String? schoolId,
+  }) async {
+    final client = _client;
+    if (client == null) {
+      return 0;
+    }
+    final result = await replayDriftSyncQueue(
+      database: _database,
+      client: client,
+      kitchenId: kitchenId,
+      schoolId: schoolId,
+      operationTypes: const {
+        'rotate_signing_key',
+        'revoke_signing_key',
+        'upsert_institution_member',
+        'toggle_institution_member',
+      },
+    );
+    return result.syncedCount;
   }
 
   List<InstitutionMemberItem> _mergeMembersWithPendingLocal(

@@ -86,14 +86,16 @@ class _AnomalyReportScreenState extends ConsumerState<AnomalyReportScreen> {
     }
   }
 
-  bool _isBatchVerifiedToday(AnomalyHandoffArgs? args) {
+  bool _isBatchWithin48hWindow(AnomalyHandoffArgs? args) {
     if (args == null ||
         args.batchId.trim().isEmpty ||
         args.inspectionId.trim().isEmpty) {
       return false;
     }
-    final anchorUtc = args.scannedAtUtc ?? args.sealedAtUtc;
-    return isSameWibCalendarDay(anchorUtc, DateTime.now().toUtc());
+    final anchorUtc = (args.scannedAtUtc ?? args.sealedAtUtc).toUtc();
+    final elapsed = DateTime.now().toUtc().difference(anchorUtc);
+    return elapsed <= const Duration(hours: 48) &&
+        elapsed >= const Duration(hours: -2);
   }
 
   Future<void> _submitReport(AnomalyHandoffArgs args) async {
@@ -238,7 +240,7 @@ class _AnomalyReportScreenState extends ConsumerState<AnomalyReportScreen> {
     final width = MediaQuery.sizeOf(context).width;
     final horizontalPad = AppSpacing.horizontalPadding(width);
     final maxWidth = AppSpacing.maxContentWidth(width);
-    final validToday = _isBatchVerifiedToday(args);
+    final validWindow = _isBatchWithin48hWindow(args);
 
     return Scaffold(
       backgroundColor: AppColors.bgCanvas,
@@ -306,7 +308,7 @@ class _AnomalyReportScreenState extends ConsumerState<AnomalyReportScreen> {
             ),
           ),
           Expanded(
-            child: !validToday || args == null
+            child: !validWindow || args == null
                 ? SingleChildScrollView(
                     padding: EdgeInsets.all(horizontalPad),
                     child: Center(
@@ -315,7 +317,7 @@ class _AnomalyReportScreenState extends ConsumerState<AnomalyReportScreen> {
                         child: LacakErrorState(
                           title: 'Akses Pelaporan Terkunci',
                           message:
-                              'Laporan darurat hanya dapat dibuat dari batch makanan yang telah dipindai dan diverifikasi pada hari ini.',
+                              'Laporan darurat hanya dapat dibuat dari batch makanan yang telah dipindai dan diverifikasi dalam 48 jam terakhir (sesuai masa retensi Bank Sampel).',
                           onRetry: () => context.go(AppRoutes.schoolHome),
                           retryLabel: 'Kembali ke Beranda Sekolah',
                         ),
@@ -527,7 +529,7 @@ class _AnomalyReportScreenState extends ConsumerState<AnomalyReportScreen> {
                     ),
                   ),
           ),
-          if (validToday && args != null)
+          if (validWindow && args != null)
             StickyBottomActionBar(
               summaryLabel: 'Tindakan Darurat',
               summaryValue:

@@ -225,7 +225,7 @@ Deno.serve(async (req: Request) => {
       return jsonResponse({ ok: false, error: "Alert record not found" }, 404);
     }
 
-    const [kitchens, batches, approvedSchools, reporterSchools, batchAlerts] =
+    const [kitchens, batches, approvedSchools, reporterSchools, batchAlerts, sppgMembers] =
       await Promise.all([
         fetchSupabaseRest<Array<{ id: string; name: string; owner_user_id: string }>>(
           supabaseUrl,
@@ -252,15 +252,45 @@ Deno.serve(async (req: Request) => {
           serviceRoleKey,
           `cluster_alerts?batch_id=eq.${encodeURIComponent(alert.batch_id)}&select=reporter_school_id`,
         ),
+        fetchSupabaseRest<Array<{ user_id: string | null; role: string }>>(
+          supabaseUrl,
+          serviceRoleKey,
+          `institution_members?institution_type=eq.sppg&institution_id=eq.${encodeURIComponent(alert.sppg_id)}&is_active=eq.true&user_id=not.is.null&select=user_id,role`,
+        ).catch(() => []),
       ]);
 
     const kitchen = kitchens[0];
     const reporterSchoolRow = reporterSchools[0];
-    if (
-      !isServiceCaller &&
-      callerUserId !== reporterSchoolRow?.owner_user_id &&
-      callerUserId !== kitchen?.owner_user_id
-    ) {
+    const allSchoolIds = Array.from(
+      new Set<string>([
+        alert.reporter_school_id,
+        ...approvedSchools.map((s) => s.id),
+      ]),
+    );
+    const schoolMembers = allSchoolIds.length > 0
+      ? await fetchSupabaseRest<Array<{ institution_id: string; user_id: string | null }>>(
+          supabaseUrl,
+          serviceRoleKey,
+          `institution_members?institution_type=eq.school&institution_id=in.(${encodeURIComponent(allSchoolIds.join(","))})&is_active=eq.true&user_id=not.is.null&select=institution_id,user_id`,
+        ).catch(() => [])
+      : [];
+
+    const isAuthorizedCaller =
+      isServiceCaller ||
+      callerUserId === reporterSchoolRow?.owner_user_id ||
+      callerUserId === kitchen?.owner_user_id ||
+      schoolMembers.some(
+        (m) =>
+          m.institution_id === alert.reporter_school_id &&
+          m.user_id === callerUserId,
+      ) ||
+      sppgMembers.some(
+        (m) =>
+          m.user_id === callerUserId &&
+          (m.role === "admin" || m.role === "staff"),
+      );
+
+    if (!isAuthorizedCaller) {
       return jsonResponse(
         { ok: false, error: "Forbidden for this tenant" },
         403,
@@ -282,18 +312,27 @@ Deno.serve(async (req: Request) => {
     const recipientSchools = approvedSchools.filter(
       (s) => s.id !== alert.reporter_school_id,
     );
+    const recipientSchoolIds = new Set(recipientSchools.map((s) => s.id));
 
-    const ownerUserIds = new Set<string>();
+    const recipientUserIds = new Set<string>();
     for (const s of recipientSchools) {
-      if (s.owner_user_id) ownerUserIds.add(s.owner_user_id);
+      if (s.owner_user_id) recipientUserIds.add(s.owner_user_id);
+    }
+    for (const m of schoolMembers) {
+      if (m.user_id && recipientSchoolIds.has(m.institution_id)) {
+        recipientUserIds.add(m.user_id);
+      }
     }
     if (kitchen?.owner_user_id) {
-      ownerUserIds.add(kitchen.owner_user_id);
+      recipientUserIds.add(kitchen.owner_user_id);
+    }
+    for (const m of sppgMembers) {
+      if (m.user_id) recipientUserIds.add(m.user_id);
     }
 
     let tokens: string[] = [];
-    if (ownerUserIds.size > 0) {
-      const idList = Array.from(ownerUserIds).join(",");
+    if (recipientUserIds.size > 0) {
+      const idList = Array.from(recipientUserIds).join(",");
       const profiles = await fetchSupabaseRest<Array<{ id: string; fcm_token: string | null }>>(
         supabaseUrl,
         serviceRoleKey,

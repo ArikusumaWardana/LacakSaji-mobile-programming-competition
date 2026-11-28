@@ -1,9 +1,13 @@
+import 'dart:convert';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../../../core/constants/app_routes.dart';
+import '../../../core/database/database_provider.dart';
 import '../../../core/network/connectivity_provider.dart';
+import '../../../core/network/supabase_provider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
@@ -11,8 +15,10 @@ import '../../../core/widgets/editorial_widgets.dart';
 import '../../../core/widgets/lacak_buttons.dart';
 import '../../../core/widgets/lacak_confirm_dialog.dart';
 import '../../../core/widgets/lacak_feedback_states.dart';
+import '../../alerts/domain/cluster_alert_models.dart';
 import '../../auth/presentation/auth_controller.dart';
 import '../../kitchen/domain/kitchen_models.dart';
+import '../domain/danger_zone_calculator.dart';
 import '../domain/school_models.dart';
 import 'school_providers.dart';
 
@@ -30,6 +36,134 @@ class _SampleVaultScreenState extends ConsumerState<SampleVaultScreen> {
   bool _savingOnboarding = false;
   bool _showActiveTab = true;
   String? _disposingId;
+  String? _reportingSampleId;
+
+  Future<void> _openPostConsumptionReport(SampleVaultItem item) async {
+    if (_reportingSampleId != null) {
+      return;
+    }
+    final school = ref.read(authControllerProvider).school;
+    if (school == null) {
+      return;
+    }
+
+    setState(() => _reportingSampleId = item.id);
+    try {
+      AnomalyHandoffArgs? resolvedArgs;
+      final db = ref.read(appDatabaseProvider);
+      final pending = await db.getPendingSyncItems();
+      for (final row in pending) {
+        if (row.operationType != 'create_inspection') {
+          continue;
+        }
+        try {
+          final map = Map<String, dynamic>.from(
+            jsonDecode(row.payloadJson) as Map,
+          );
+          if (map['id'] == item.inspectionId &&
+              map['batch_id'] is String &&
+              (map['batch_id'] as String).isNotEmpty) {
+            final scannedAt =
+                DateTime.tryParse('${map['scanned_at'] ?? ''}')?.toUtc() ??
+                item.storedAtUtc;
+            final elapsed = (map['elapsed_minutes'] as num?)?.toInt() ?? 0;
+            resolvedArgs = AnomalyHandoffArgs(
+              batchId: map['batch_id'] as String,
+              batchCode: (map['batch_code'] as String?) ?? item.labelCode,
+              menuName: (map['menu_name'] as String?) ?? item.menuName,
+              inspectionId: item.inspectionId,
+              sppgId: school.sppgId,
+              sppgName: school.partnerKitchenName ?? 'Dapur SPPG Mitra',
+              sealedAtUtc: scannedAt.subtract(Duration(minutes: elapsed)),
+              scannedAtUtc: scannedAt,
+              dangerStatus: DangerZoneStatus.fromDb(
+                map['danger_status'] as String?,
+              ),
+              elapsedMinutes: elapsed,
+              bmkgTempC: (map['bmkg_temp_c'] as num?)?.toDouble() ?? 30.0,
+              reasonSummary:
+                  'Laporan dugaan KLB pasca-konsumsi dari Bank Sampel 48 jam (${item.labelCode}).',
+              initialStage: ClusterAlertStage.postConsumption,
+              sampleLabelCode: item.labelCode,
+            );
+            break;
+          }
+        } catch (_) {}
+      }
+
+      if (resolvedArgs == null) {
+        final client = ref.read(supabaseClientProvider);
+        if (client != null) {
+          try {
+            final row = await client
+                .from('school_inspections')
+                .select(
+                  'id, batch_id, scanned_at, elapsed_minutes, bmkg_temp_c, danger_status, food_batches(batch_code, menu_name, sealed_at)',
+                )
+                .eq('id', item.inspectionId)
+                .eq('school_id', school.id)
+                .maybeSingle();
+            if (row != null && row['batch_id'] is String) {
+              final batchJoin = row['food_batches'];
+              String? batchCode;
+              String? menuName;
+              DateTime? sealedAt;
+              if (batchJoin is Map) {
+                batchCode = batchJoin['batch_code'] as String?;
+                menuName = batchJoin['menu_name'] as String?;
+                sealedAt = DateTime.tryParse(
+                  '${batchJoin['sealed_at'] ?? ''}',
+                )?.toUtc();
+              }
+              final scannedAt =
+                  DateTime.tryParse('${row['scanned_at'] ?? ''}')?.toUtc() ??
+                  item.storedAtUtc;
+              final elapsed = (row['elapsed_minutes'] as num?)?.toInt() ?? 0;
+              resolvedArgs = AnomalyHandoffArgs(
+                batchId: row['batch_id'] as String,
+                batchCode: batchCode ?? item.labelCode,
+                menuName: menuName ?? item.menuName,
+                inspectionId: item.inspectionId,
+                sppgId: school.sppgId,
+                sppgName: school.partnerKitchenName ?? 'Dapur SPPG Mitra',
+                sealedAtUtc:
+                    sealedAt ?? scannedAt.subtract(Duration(minutes: elapsed)),
+                scannedAtUtc: scannedAt,
+                dangerStatus: DangerZoneStatus.fromDb(
+                  row['danger_status'] as String?,
+                ),
+                elapsedMinutes: elapsed,
+                bmkgTempC: (row['bmkg_temp_c'] as num?)?.toDouble() ?? 30.0,
+                reasonSummary:
+                    'Laporan dugaan KLB pasca-konsumsi dari Bank Sampel 48 jam (${item.labelCode}).',
+                initialStage: ClusterAlertStage.postConsumption,
+                sampleLabelCode: item.labelCode,
+              );
+            }
+          } catch (_) {}
+        }
+      }
+
+      if (!mounted) {
+        return;
+      }
+      if (resolvedArgs == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Detail batch sampel belum tersedia offline. Hubungkan jaringan sejenak lalu coba lagi.',
+            ),
+          ),
+        );
+        return;
+      }
+      context.push(AppRoutes.schoolReportAlert, extra: resolvedArgs);
+    } finally {
+      if (mounted) {
+        setState(() => _reportingSampleId = null);
+      }
+    }
+  }
 
   Future<void> _completeOnboarding(SampleVaultOnboardingArgs args) async {
     if (_savingOnboarding) {
@@ -277,8 +411,12 @@ class _SampleVaultScreenState extends ConsumerState<SampleVaultScreen> {
                                       item: items[i],
                                       isActiveTab: _showActiveTab,
                                       isDisposing: _disposingId == items[i].id,
+                                      isReporting:
+                                          _reportingSampleId == items[i].id,
                                       showDivider: i < items.length - 1,
                                       onDispose: () => _disposeSample(items[i]),
+                                      onReportKlb: () =>
+                                          _openPostConsumptionReport(items[i]),
                                     ),
                                 ],
                               );
@@ -478,15 +616,19 @@ class _SampleVaultRow extends StatelessWidget {
     required this.item,
     required this.isActiveTab,
     required this.isDisposing,
+    required this.isReporting,
     required this.showDivider,
     required this.onDispose,
+    required this.onReportKlb,
   });
 
   final SampleVaultItem item;
   final bool isActiveTab;
   final bool isDisposing;
+  final bool isReporting;
   final bool showDivider;
   final VoidCallback onDispose;
+  final VoidCallback onReportKlb;
 
   @override
   Widget build(BuildContext context) {
@@ -548,11 +690,18 @@ class _SampleVaultRow extends StatelessWidget {
               ),
               if (isActiveTab) ...[
                 const SizedBox(height: AppSpacing.md),
+                LacakDangerButton(
+                  label: 'Laporkan Gejala / KLB (48 Jam)',
+                  icon: Icons.notification_important_rounded,
+                  isLoading: isReporting,
+                  onPressed: isDisposing ? null : onReportKlb,
+                ),
+                const SizedBox(height: AppSpacing.sm),
                 LacakSecondaryButton(
                   label: 'Tandai Sudah Dimusnahkan',
                   icon: Icons.check_circle_rounded,
                   isLoading: isDisposing,
-                  onPressed: onDispose,
+                  onPressed: isReporting ? null : onDispose,
                 ),
               ],
             ],

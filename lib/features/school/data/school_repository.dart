@@ -375,6 +375,7 @@ class SupabaseSchoolRepository implements SchoolRepository {
       }
     }
 
+    var unknownRotatedKeyOffline = false;
     if (payload.keyId != null && payload.keyId!.isNotEmpty) {
       final keyRecord = await _database.getSigningKeyById(payload.keyId!);
       if (keyRecord != null && keyRecord.sppgId == payload.sppgId) {
@@ -382,19 +383,23 @@ class SupabaseSchoolRepository implements SchoolRepository {
           status: keyRecord.status,
           revokedAtUtc: keyRecord.revokedAt,
           sealedAtUtc: sealedAtUtc,
+          timestampSource: payload.timestampSource,
         )) {
           return const QrVerificationResult(
             outcome: QrVerificationOutcome.revokedKey,
             errorTitle: 'Kunci Segel Sudah Dicabut',
             errorMessage:
-                'Perangkat pencetak QR ini telah dicabut aksesnya sebelum waktu segel batch. Hentikan pembagian dan hubungi Dapur SPPG.',
+                'Perangkat pencetak QR ini telah dicabut aksesnya sebelum waktu segel batch atau menggunakan jam offline tidak terverifikasi. Hentikan pembagian dan hubungi Dapur SPPG.',
           );
         }
         publicKeyB64 = keyRecord.publicKeyB64;
-      } else if (publicKeyB64.isEmpty) {
-        final sppgKeys = await _database.getSigningKeysForSppg(payload.sppgId);
-        if (sppgKeys.isNotEmpty) {
-          publicKeyB64 = sppgKeys.first.publicKeyB64;
+      } else {
+        unknownRotatedKeyOffline = isOffline;
+        if (publicKeyB64.isEmpty) {
+          final sppgKeys = await _database.getSigningKeysForSppg(payload.sppgId);
+          if (sppgKeys.isNotEmpty) {
+            publicKeyB64 = sppgKeys.first.publicKeyB64;
+          }
         }
       }
     }
@@ -414,22 +419,73 @@ class SupabaseSchoolRepository implements SchoolRepository {
       publicKeyB64: publicKeyB64,
     );
 
+    if (!signatureValid && unknownRotatedKeyOffline) {
+      return QrVerificationResult(
+        outcome: QrVerificationOutcome.missingPublicKey,
+        errorTitle: 'Kunci Verifikasi Dapur Perlu Diperbarui',
+        errorMessage:
+            'Kunci segel baru dapur (${payload.keyId}) belum tersimpan di HP ini. Hubungkan HP ke internet sekali lalu tekan Perbarui Data Akun di menu Profil.',
+      );
+    }
+
     if (!signatureValid && !isOffline && _client != null) {
       try {
-        final serverRow = await _client
-            .from('food_batches')
-            .select(
-              'id, sppg_id, batch_code, menu_name, risk_category, sealed_at, timestamp_source, signature_b64',
-            )
-            .eq('id', payload.batchId)
-            .maybeSingle();
+        Map<String, dynamic>? serverRow;
+        try {
+          serverRow = await _client
+              .from('food_batches')
+              .select(
+                'id, sppg_id, batch_code, menu_name, risk_category, sealed_at, timestamp_source, signature_b64, signing_key_id, allergen_tags',
+              )
+              .eq('id', payload.batchId)
+              .maybeSingle();
+        } on PostgrestException catch (pgError) {
+          if (pgError.code == 'PGRST204' || pgError.code == '42703') {
+            serverRow = await _client
+                .from('food_batches')
+                .select(
+                  'id, sppg_id, batch_code, menu_name, risk_category, sealed_at, timestamp_source, signature_b64',
+                )
+                .eq('id', payload.batchId)
+                .maybeSingle();
+          } else {
+            rethrow;
+          }
+        }
         if (serverRow != null) {
+          final serverKeyId = serverRow['signing_key_id'] as String?;
+          if (serverKeyId != null && serverKeyId.isNotEmpty) {
+            final keyCheck = await _database.getSigningKeyById(serverKeyId);
+            if (keyCheck != null &&
+                Ed25519Service.isRevokedForSealTime(
+                  status: keyCheck.status,
+                  revokedAtUtc: keyCheck.revokedAt,
+                  sealedAtUtc: sealedAtUtc,
+                  timestampSource: payload.timestampSource,
+                )) {
+              return const QrVerificationResult(
+                outcome: QrVerificationOutcome.revokedKey,
+                errorTitle: 'Kunci Segel Sudah Dicabut',
+                errorMessage:
+                    'Perangkat pencetak QR ini telah dicabut aksesnya. Hentikan pembagian dan hubungi Dapur SPPG.',
+              );
+            }
+          }
           final serverSealed = DateTime.tryParse(
             '${serverRow['sealed_at'] ?? ''}',
           )?.toUtc();
           final serverEpoch = serverSealed == null
               ? -1
               : serverSealed.millisecondsSinceEpoch ~/ 1000;
+          final rawServerAllergens = serverRow['allergen_tags'];
+          final allergensMatch = rawServerAllergens == null
+              ? true
+              : BatchQrPayload.normalizeAllergenTags(
+                    (rawServerAllergens as List).map((e) => '$e'),
+                  ).join(',') ==
+                  BatchQrPayload.normalizeAllergenTags(
+                    payload.allergenTags,
+                  ).join(',');
           signatureValid =
               serverRow['batch_code'] == payload.batchCode &&
               serverRow['sppg_id'] == payload.sppgId &&
@@ -437,6 +493,7 @@ class SupabaseSchoolRepository implements SchoolRepository {
               serverRow['risk_category'] == payload.riskCategory &&
               serverRow['timestamp_source'] == payload.timestampSource &&
               serverRow['signature_b64'] == payload.signatureB64 &&
+              allergensMatch &&
               (serverEpoch - payload.sealedAtEpochSec).abs() <= 1;
         }
       } catch (_) {

@@ -228,6 +228,14 @@ class _InMemoryTeamSecurityRepo implements TeamSecurityRepository {
       );
     }
   }
+
+  @override
+  Future<int> syncPendingTeamAndKeyQueue({
+    String? kitchenId,
+    String? schoolId,
+  }) async {
+    return 0;
+  }
 }
 
 const KitchenProfile _kitchenAdminProfile = KitchenProfile(

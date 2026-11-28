@@ -468,6 +468,12 @@ class SupabaseAuthRepository implements AuthRepository {
     SchoolProfile? school;
     InstitutionMemberRole? institutionRole;
 
+    try {
+      await client.rpc('claim_pending_institution_memberships');
+    } catch (_) {
+      // Non-fatal when offline or before migration 010.
+    }
+
     if (profile.role == UserRole.kitchen) {
       var kitchenRow = await client
           .from('sppg_kitchens')
@@ -512,13 +518,48 @@ class SupabaseAuthRepository implements AuthRepository {
             sppgId: loaded.id,
             legacyUserId: user.id,
           );
-          activePublicKey = material.publicKeyB64;
-          if (activePublicKey != loaded.publicKey &&
-              institutionRole == InstitutionMemberRole.admin) {
-            await client
-                .from('sppg_kitchens')
-                .update({'public_key': activePublicKey})
-                .eq('id', loaded.id);
+          if (material.publicKeyB64 != loaded.publicKey) {
+            if (institutionRole == InstitutionMemberRole.admin) {
+              try {
+                await client.rpc(
+                  'rotate_sppg_signing_key',
+                  params: {
+                    'p_sppg_id': loaded.id,
+                    'p_new_key_id': material.keyId,
+                    'p_new_public_key': material.publicKeyB64,
+                    'p_revoke_previous': false,
+                    'p_device_label': 'Perangkat Admin SPPG',
+                  },
+                );
+                activePublicKey = material.publicKeyB64;
+              } catch (_) {
+                await client
+                    .from('sppg_kitchens')
+                    .update({'public_key': material.publicKeyB64})
+                    .eq('id', loaded.id);
+                try {
+                  await client.from('signing_keys').upsert({
+                    'key_id': material.keyId,
+                    'sppg_id': loaded.id,
+                    'public_key': material.publicKeyB64,
+                    'status': 'active',
+                    'device_label': 'Perangkat Admin SPPG',
+                  });
+                } catch (_) {}
+                activePublicKey = material.publicKeyB64;
+              }
+            } else {
+              // Backup kitchen staff: register device key in signing_keys without overwriting SPPG primary key.
+              try {
+                await client.from('signing_keys').upsert({
+                  'key_id': material.keyId,
+                  'sppg_id': loaded.id,
+                  'public_key': material.publicKeyB64,
+                  'status': 'active',
+                  'device_label': 'Perangkat Staf Dapur SPPG',
+                });
+              } catch (_) {}
+            }
           }
         } catch (_) {
           // Preserve loaded public key when offline or secure storage fails.

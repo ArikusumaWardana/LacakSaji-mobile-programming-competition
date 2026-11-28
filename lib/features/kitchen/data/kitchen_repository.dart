@@ -638,14 +638,8 @@ class SupabaseKitchenRepository implements KitchenRepository {
       sppgId: kitchen.id,
       legacyUserId: kitchen.ownerUserId,
     );
-    if (!isOffline &&
-        client != null &&
-        kitchen.publicKey != activeMaterial.publicKeyB64) {
+    if (!isOffline && client != null) {
       try {
-        await client
-            .from('sppg_kitchens')
-            .update({'public_key': activeMaterial.publicKeyB64})
-            .eq('id', kitchen.id);
         await client.from('signing_keys').upsert({
           'key_id': activeMaterial.keyId,
           'sppg_id': kitchen.id,
@@ -654,7 +648,17 @@ class SupabaseKitchenRepository implements KitchenRepository {
           'device_label': 'Perangkat Dapur SPPG',
         });
       } catch (_) {
-        // Ignore if table/policy update waits on schema 008 migration.
+        // Ignore if signing_keys waits on migration or duplicate key.
+      }
+      if (kitchen.publicKey != activeMaterial.publicKeyB64) {
+        try {
+          await client
+              .from('sppg_kitchens')
+              .update({'public_key': activeMaterial.publicKeyB64})
+              .eq('id', kitchen.id);
+        } catch (_) {
+          // Non-admin kitchen staff do not overwrite primary sppg_kitchens.public_key.
+        }
       }
     }
 
@@ -778,6 +782,7 @@ class SupabaseKitchenRepository implements KitchenRepository {
         sealedAtUtc: batch.sealedAtUtc,
         timestampSource: batch.timestampSource,
         signingKeyId: batch.signingKeyId,
+        allergenTags: batch.allergenTags,
         packagingPhotoUrl: batch.packagingPhotoUrl,
         localPhotoPath: batch.localPhotoPath,
         signatureB64: batch.signatureB64,
@@ -797,6 +802,7 @@ class SupabaseKitchenRepository implements KitchenRepository {
         sealedAtUtc: batch.sealedAtUtc,
         timestampSource: batch.timestampSource,
         signingKeyId: batch.signingKeyId,
+        allergenTags: batch.allergenTags,
         packagingPhotoUrl: batch.packagingPhotoUrl,
         localPhotoPath: batch.localPhotoPath,
         signatureB64: batch.signatureB64,

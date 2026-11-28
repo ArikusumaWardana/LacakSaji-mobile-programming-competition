@@ -5,6 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../core/crypto/batch_qr_payload.dart';
+import '../../../core/crypto/ed25519_service.dart';
 import '../../../core/database/app_database.dart';
 import '../../../core/sync/offline_sync_service.dart';
 import '../../../core/sync/workmanager_sync_dispatcher.dart';
@@ -57,6 +58,7 @@ abstract class TraceabilityRepository {
     required String batchId,
     required DateTime sealedAtUtc,
     DateTime? schoolScannedAtUtc,
+    String? schoolId,
   });
 
   Future<TrayReturnLogItem> submitSchoolTrayReturn({
@@ -88,7 +90,11 @@ abstract class TraceabilityRepository {
     String? notes,
   });
 
-  Future<int> syncPendingTraceabilityQueue({String? sppgId, String? schoolId});
+  Future<int> syncPendingTraceabilityQueue({
+    String? sppgId,
+    String? schoolId,
+    Set<String>? operationTypes,
+  });
 }
 
 class SupabaseTraceabilityRepository implements TraceabilityRepository {
@@ -96,12 +102,15 @@ class SupabaseTraceabilityRepository implements TraceabilityRepository {
     required this._client,
     required this._database,
     this._backgroundSyncScheduler,
+    Ed25519Service? ed25519Service,
     Uuid? uuid,
-  }) : _uuid = uuid ?? const Uuid();
+  }) : _ed25519Service = ed25519Service ?? Ed25519Service(),
+       _uuid = uuid ?? const Uuid();
 
   final SupabaseClient? _client;
   final AppDatabase _database;
   final BackgroundSyncScheduler? _backgroundSyncScheduler;
+  final Ed25519Service _ed25519Service;
   final Uuid _uuid;
 
   static const Set<String> _traceabilityOperationTypes = {
@@ -375,18 +384,38 @@ class SupabaseTraceabilityRepository implements TraceabilityRepository {
     final client = _client;
     if (client != null) {
       try {
-        final rows = List<Map<String, dynamic>>.from(
-          await client
-                  .from('food_batches')
-                  .select(
-                    'id, sppg_id, batch_code, menu_name, portion_count, risk_category, sealed_at, timestamp_source, signing_key_id, packaging_photo_url, signature_b64, created_at',
-                  )
-                  .eq('sppg_id', kitchen.id)
-                  .gte('sealed_at', sinceUtc.toIso8601String())
-                  .order('sealed_at', ascending: false)
-                  .limit(60)
-              as List,
-        );
+        List<Map<String, dynamic>> rows;
+        try {
+          rows = List<Map<String, dynamic>>.from(
+            await client
+                    .from('food_batches')
+                    .select(
+                      'id, sppg_id, batch_code, menu_name, portion_count, risk_category, sealed_at, timestamp_source, signing_key_id, allergen_tags, packaging_photo_url, signature_b64, created_at',
+                    )
+                    .eq('sppg_id', kitchen.id)
+                    .gte('sealed_at', sinceUtc.toIso8601String())
+                    .order('sealed_at', ascending: false)
+                    .limit(60)
+                as List,
+          );
+        } on PostgrestException catch (pgError) {
+          if (pgError.code == 'PGRST204' || pgError.code == '42703') {
+            rows = List<Map<String, dynamic>>.from(
+              await client
+                      .from('food_batches')
+                      .select(
+                        'id, sppg_id, batch_code, menu_name, portion_count, risk_category, sealed_at, timestamp_source, signing_key_id, packaging_photo_url, signature_b64, created_at',
+                      )
+                      .eq('sppg_id', kitchen.id)
+                      .gte('sealed_at', sinceUtc.toIso8601String())
+                      .order('sealed_at', ascending: false)
+                      .limit(60)
+                  as List,
+            );
+          } else {
+            rethrow;
+          }
+        }
         for (final row in rows) {
           final remoteBatch = FoodBatchItem.fromSupabaseMap(
             row,
@@ -412,7 +441,7 @@ class SupabaseTraceabilityRepository implements TraceabilityRepository {
       kitchen: kitchen,
       days: 3,
     );
-    final handoversByBatchId = <String, TransitHandoverItem>{};
+    final handoversById = <String, TransitHandoverItem>{};
 
     final localRows = await _database.getTraceabilityDrafts(
       recordType: 'transit_handover',
@@ -427,11 +456,8 @@ class SupabaseTraceabilityRepository implements TraceabilityRepository {
         decoded,
         isPendingSync: !row.isSynced,
       );
-      if (item.batchId.isNotEmpty) {
-        final prev = handoversByBatchId[item.batchId];
-        if (prev == null || item.createdAtUtc.isAfter(prev.createdAtUtc)) {
-          handoversByBatchId[item.batchId] = item;
-        }
+      if (item.batchId.isNotEmpty && item.id.isNotEmpty) {
+        handoversById[item.id] = item;
       }
     }
 
@@ -444,10 +470,10 @@ class SupabaseTraceabilityRepository implements TraceabilityRepository {
         );
         for (final row in remoteRows) {
           final remoteItem = TransitHandoverItem.fromMap(row);
-          if (remoteItem.batchId.isNotEmpty) {
-            final existing = handoversByBatchId[remoteItem.batchId];
+          if (remoteItem.batchId.isNotEmpty && remoteItem.id.isNotEmpty) {
+            final existing = handoversById[remoteItem.id];
             if (existing == null || !existing.isPendingSync) {
-              handoversByBatchId[remoteItem.batchId] = remoteItem;
+              handoversById[remoteItem.id] = remoteItem;
             }
           }
         }
@@ -456,43 +482,65 @@ class SupabaseTraceabilityRepository implements TraceabilityRepository {
       }
     }
 
-    // Also include standalone handovers whose batch was scanned via QR while offline.
+    final handoversByBatchId = <String, List<TransitHandoverItem>>{};
+    for (final h in handoversById.values) {
+      (handoversByBatchId[h.batchId] ??= <TransitHandoverItem>[]).add(h);
+    }
+    for (final list in handoversByBatchId.values) {
+      list.sort((a, b) => b.createdAtUtc.compareTo(a.createdAtUtc));
+    }
+
+    // Include one delivery tile per multi-school handover (or one ready tile if none loaded yet).
     final seenBatchIds = <String>{};
     final result = <CourierBatchDeliveryItem>[];
     for (final batch in batches) {
       seenBatchIds.add(batch.id);
-      result.add(
-        CourierBatchDeliveryItem(
-          batch: batch,
-          handover: handoversByBatchId[batch.id],
-        ),
-      );
+      final batchHandovers = handoversByBatchId[batch.id];
+      if (batchHandovers == null || batchHandovers.isEmpty) {
+        result.add(
+          CourierBatchDeliveryItem(
+            batch: batch,
+            handover: null,
+          ),
+        );
+      } else {
+        for (final h in batchHandovers) {
+          result.add(
+            CourierBatchDeliveryItem(
+              batch: batch,
+              handover: h,
+            ),
+          );
+        }
+      }
     }
 
     for (final entry in handoversByBatchId.entries) {
       if (seenBatchIds.contains(entry.key)) {
         continue;
       }
-      final h = entry.value;
-      result.add(
-        CourierBatchDeliveryItem(
-          batch: FoodBatchItem(
-            id: h.batchId,
-            sppgId: h.sppgId,
-            sppgName: kitchen.name,
-            batchCode: h.batchCode ?? h.batchId.substring(0, 8).toUpperCase(),
-            menuName: h.menuName ?? 'Batch Pengiriman SPPG',
-            portionCount: 0,
-            riskCategory: FoodRiskCategory.medium,
-            sealedAtUtc: h.loadedAtUtc,
-            timestampSource: BatchTimestampSource.offlineUnverified,
-            signatureB64: '',
-            createdAtUtc: h.createdAtUtc,
-            isPendingSync: h.isPendingSync,
+      for (final h in entry.value) {
+        result.add(
+          CourierBatchDeliveryItem(
+            batch: FoodBatchItem(
+              id: h.batchId,
+              sppgId: h.sppgId,
+              sppgName: kitchen.name,
+              batchCode:
+                  h.batchCode ?? h.batchId.substring(0, 8).toUpperCase(),
+              menuName: h.menuName ?? 'Batch Pengiriman SPPG',
+              portionCount: 0,
+              riskCategory: FoodRiskCategory.medium,
+              sealedAtUtc: h.loadedAtUtc,
+              timestampSource: BatchTimestampSource.offlineUnverified,
+              signatureB64: '',
+              createdAtUtc: h.createdAtUtc,
+              isPendingSync: h.isPendingSync,
+            ),
+            handover: h,
           ),
-          handover: h,
-        ),
-      );
+        );
+      }
     }
 
     return result;
@@ -532,6 +580,66 @@ class SupabaseTraceabilityRepository implements TraceabilityRepository {
     }
   }
 
+  bool _isValidEd25519PublicKeyB64(String b64) {
+    if (b64.trim().isEmpty) {
+      return false;
+    }
+    try {
+      return base64Decode(b64.trim()).length == 32;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<void> _verifyCourierQrSignature({
+    required KitchenProfile kitchen,
+    required BatchQrPayload qrPayload,
+  }) async {
+    final sealedAtUtc = DateTime.fromMillisecondsSinceEpoch(
+      qrPayload.sealedAtEpochSec * 1000,
+      isUtc: true,
+    );
+    String publicKeyB64 = kitchen.publicKey;
+    final keyId = qrPayload.keyId;
+    if (keyId != null && keyId.isNotEmpty) {
+      final keyRecord = await _database.getSigningKeyById(keyId);
+      if (keyRecord != null && keyRecord.sppgId == kitchen.id) {
+        if (Ed25519Service.isRevokedForSealTime(
+          status: keyRecord.status,
+          revokedAtUtc: keyRecord.revokedAt,
+          sealedAtUtc: sealedAtUtc,
+          timestampSource: qrPayload.timestampSource,
+        )) {
+          throw const FormatException(
+            'Kunci segel QR ini telah dicabut oleh Admin SPPG. Hentikan pengantaran dan verifikasi ulang dengan Dapur SPPG.',
+          );
+        }
+        publicKeyB64 = keyRecord.publicKeyB64;
+      }
+    }
+
+    if (!_isValidEd25519PublicKeyB64(publicKeyB64)) {
+      final cachedSppg = await _database.getSppgKey(kitchen.id);
+      if (cachedSppg != null &&
+          _isValidEd25519PublicKeyB64(cachedSppg.publicKeyB64)) {
+        publicKeyB64 = cachedSppg.publicKeyB64;
+      }
+    }
+
+    if (_isValidEd25519PublicKeyB64(publicKeyB64)) {
+      final valid = await _ed25519Service.verifyCanonicalPayload(
+        canonicalData: qrPayload.toCanonicalSigningString(),
+        signatureB64: qrPayload.signatureB64,
+        publicKeyB64: publicKeyB64,
+      );
+      if (!valid) {
+        throw const FormatException(
+          'Tanda tangan digital QR segel tidak valid atau data telah diubah. Pastikan QR asli dari Dapur SPPG.',
+        );
+      }
+    }
+  }
+
   @override
   Future<TransitHandoverItem> recordCourierScan({
     required KitchenProfile kitchen,
@@ -551,39 +659,100 @@ class SupabaseTraceabilityRepository implements TraceabilityRepository {
       );
     }
 
+    await _verifyCourierQrSignature(kitchen: kitchen, qrPayload: qrPayload);
+
+    final existingById = <String, TransitHandoverItem>{};
     final existingList = await _database.getTraceabilityDrafts(
       recordType: 'transit_handover',
       batchId: qrPayload.batchId,
     );
-    TransitHandoverItem? existing;
-    if (existingList.isNotEmpty) {
-      final decoded = _decodeMap(existingList.first.payloadJson);
+    for (final row in existingList) {
+      final decoded = _decodeMap(row.payloadJson);
       if (decoded != null) {
-        existing = TransitHandoverItem.fromMap(
+        final parsed = TransitHandoverItem.fromMap(
           decoded,
-          isPendingSync: !existingList.first.isSynced,
+          isPendingSync: !row.isSynced,
         );
+        if (parsed.id.isNotEmpty) {
+          existingById[parsed.id] = parsed;
+        }
       }
     }
-    if (existing == null && !isOffline && _client != null) {
+    if (!isOffline && _client != null) {
       try {
         final rows = await _selectTransitHandovers(
           client: _client,
           sppgId: kitchen.id,
           batchId: qrPayload.batchId,
         );
-        if (rows.isNotEmpty) {
-          existing = TransitHandoverItem.fromMap(rows.first);
+        for (final row in rows) {
+          final remote = TransitHandoverItem.fromMap(row);
+          if (remote.id.isNotEmpty) {
+            final local = existingById[remote.id];
+            if (local == null || !local.isPendingSync) {
+              existingById[remote.id] = remote;
+            }
+          }
         }
       } catch (_) {
         // Ignore network errors during pre-check.
       }
     }
 
+    final existingHandovers = existingById.values.toList()
+      ..sort((a, b) => a.createdAtUtc.compareTo(b.createdAtUtc));
+
     final nowUtc = DateTime.now().toUtc();
-    final id = (existing?.id.isNotEmpty ?? false) ? existing!.id : _uuid.v4();
+    final cleanSchoolId = schoolId?.trim().isEmpty == true
+        ? null
+        : schoolId?.trim();
+    final cleanSchoolName = schoolName?.trim().isEmpty == true
+        ? null
+        : schoolName?.trim();
+
+    TransitHandoverItem? targetExisting;
+    TransitHandoverItem? loadTemplate;
+
+    if (existingHandovers.isNotEmpty) {
+      loadTemplate = existingHandovers.first;
+    }
+
+    if (mode == CourierScanMode.loadAtKitchen) {
+      // Reuse only an open (not yet arrived) handover; never regress an arrived school handover.
+      for (final h in existingHandovers) {
+        if (h.schoolId == null && h.arrivedAtUtc == null) {
+          targetExisting = h;
+          break;
+        }
+      }
+    } else {
+      // 1. Update same school handover if courier scans again at the same school.
+      if (cleanSchoolId != null) {
+        for (final h in existingHandovers) {
+          if (h.schoolId == cleanSchoolId) {
+            targetExisting = h;
+            break;
+          }
+        }
+      }
+      // 2. Otherwise claim the open load handover (first school arrival).
+      if (targetExisting == null) {
+        for (final h in existingHandovers) {
+          if (h.schoolId == null && h.arrivedAtUtc == null) {
+            targetExisting = h;
+            break;
+          }
+        }
+      }
+      // 3. Otherwise (2nd+ school arrival for the same batch): allocate a new handover id
+      //    while inheriting load metadata from loadTemplate so prior school records stay intact.
+    }
+
+    final id = (targetExisting?.id.isNotEmpty ?? false)
+        ? targetExisting!.id
+        : _uuid.v4();
     final mergedNotes = _mergeHandoverNotes(
-      existingNote: existing?.handoverNotes,
+      existingNote: targetExisting?.handoverNotes,
       nextNote: notes,
     );
 
@@ -595,23 +764,23 @@ class SupabaseTraceabilityRepository implements TraceabilityRepository {
         batchCode: qrPayload.batchCode,
         menuName: qrPayload.menuName,
         sppgId: kitchen.id,
-        schoolId: schoolId ?? existing?.schoolId,
-        schoolName: schoolName ?? existing?.schoolName,
+        schoolId: cleanSchoolId ?? targetExisting?.schoolId,
+        schoolName: cleanSchoolName ?? targetExisting?.schoolName,
         courierUserId: actor.id,
         courierName: actor.fullName.trim().isNotEmpty
             ? actor.fullName.trim()
             : 'Kurir SPPG',
-        loadedAtUtc: nowUtc,
-        departedAtUtc: nowUtc,
-        arrivedAtUtc: existing?.arrivedAtUtc,
-        handedOverAtUtc: existing?.handedOverAtUtc,
+        loadedAtUtc: targetExisting?.loadedAtUtc ?? nowUtc,
+        departedAtUtc: targetExisting?.departedAtUtc ?? nowUtc,
+        arrivedAtUtc: null,
+        handedOverAtUtc: null,
         status: TransitHandoverDbStatus.inTransit,
         handoverNotes: mergedNotes,
-        loadLat: lat ?? existing?.loadLat,
-        loadLng: lng ?? existing?.loadLng,
-        arriveLat: existing?.arriveLat,
-        arriveLng: existing?.arriveLng,
-        createdAtUtc: existing?.createdAtUtc ?? nowUtc,
+        loadLat: lat ?? targetExisting?.loadLat,
+        loadLng: lng ?? targetExisting?.loadLng,
+        arriveLat: null,
+        arriveLng: null,
+        createdAtUtc: targetExisting?.createdAtUtc ?? nowUtc,
         isPendingSync: true,
       );
     } else {
@@ -619,30 +788,31 @@ class SupabaseTraceabilityRepository implements TraceabilityRepository {
         qrPayload.sealedAtEpochSec * 1000,
         isUtc: true,
       );
+      final sourceForLoad = targetExisting ?? loadTemplate;
       nextItem = TransitHandoverItem(
         id: id,
         batchId: qrPayload.batchId,
         batchCode: qrPayload.batchCode,
         menuName: qrPayload.menuName,
         sppgId: kitchen.id,
-        schoolId: schoolId ?? existing?.schoolId,
-        schoolName: schoolName ?? existing?.schoolName,
-        courierUserId: existing?.courierUserId ?? actor.id,
-        courierName: existing?.courierName ??
+        schoolId: cleanSchoolId ?? targetExisting?.schoolId,
+        schoolName: cleanSchoolName ?? targetExisting?.schoolName,
+        courierUserId: sourceForLoad?.courierUserId ?? actor.id,
+        courierName: sourceForLoad?.courierName ??
             (actor.fullName.trim().isNotEmpty
                 ? actor.fullName.trim()
                 : 'Kurir SPPG'),
-        loadedAtUtc: existing?.loadedAtUtc ?? sealedFallback,
-        departedAtUtc: existing?.departedAtUtc ?? sealedFallback,
+        loadedAtUtc: sourceForLoad?.loadedAtUtc ?? sealedFallback,
+        departedAtUtc: sourceForLoad?.departedAtUtc ?? sealedFallback,
         arrivedAtUtc: nowUtc,
         handedOverAtUtc: nowUtc,
         status: TransitHandoverDbStatus.arrived,
         handoverNotes: mergedNotes,
-        loadLat: existing?.loadLat,
-        loadLng: existing?.loadLng,
-        arriveLat: lat ?? existing?.arriveLat,
-        arriveLng: lng ?? existing?.arriveLng,
-        createdAtUtc: existing?.createdAtUtc ?? nowUtc,
+        loadLat: sourceForLoad?.loadLat,
+        loadLng: sourceForLoad?.loadLng,
+        arriveLat: lat ?? targetExisting?.arriveLat,
+        arriveLng: lng ?? targetExisting?.arriveLng,
+        createdAtUtc: targetExisting?.createdAtUtc ?? nowUtc,
         isPendingSync: true,
       );
     }
@@ -741,20 +911,24 @@ class SupabaseTraceabilityRepository implements TraceabilityRepository {
     required String batchId,
     required DateTime sealedAtUtc,
     DateTime? schoolScannedAtUtc,
+    String? schoolId,
   }) async {
-    TransitHandoverItem? handover;
+    final byId = <String, TransitHandoverItem>{};
 
     final localRows = await _database.getTraceabilityDrafts(
       recordType: 'transit_handover',
       batchId: batchId,
     );
-    if (localRows.isNotEmpty) {
-      final decoded = _decodeMap(localRows.first.payloadJson);
+    for (final row in localRows) {
+      final decoded = _decodeMap(row.payloadJson);
       if (decoded != null) {
-        handover = TransitHandoverItem.fromMap(
+        final item = TransitHandoverItem.fromMap(
           decoded,
-          isPendingSync: !localRows.first.isSynced,
+          isPendingSync: !row.isSynced,
         );
+        if (item.id.isNotEmpty) {
+          byId[item.id] = item;
+        }
       }
     }
 
@@ -766,15 +940,36 @@ class SupabaseTraceabilityRepository implements TraceabilityRepository {
           sppgId: sppgId,
           batchId: batchId,
         );
-        if (remoteRows.isNotEmpty) {
-          final remote = TransitHandoverItem.fromMap(remoteRows.first);
-          if (handover == null || !handover.isPendingSync) {
-            handover = remote;
+        for (final row in remoteRows) {
+          final remote = TransitHandoverItem.fromMap(row);
+          if (remote.id.isNotEmpty) {
+            final existing = byId[remote.id];
+            if (existing == null || !existing.isPendingSync) {
+              byId[remote.id] = remote;
+            }
           }
         }
       } catch (_) {
         // Keep local draft when offline.
       }
+    }
+
+    TransitHandoverItem? handover;
+    final candidates = byId.values.toList()
+      ..sort((a, b) => b.createdAtUtc.compareTo(a.createdAtUtc));
+    if (candidates.isNotEmpty) {
+      if (schoolId != null && schoolId.isNotEmpty) {
+        for (final item in candidates) {
+          if (item.schoolId == schoolId) {
+            handover = item;
+            break;
+          }
+        }
+      }
+      handover ??= candidates.firstWhere(
+        (h) => h.arrivedAtUtc != null,
+        orElse: () => candidates.first,
+      );
     }
 
     var resolvedSchoolScan = schoolScannedAtUtc;
@@ -1199,6 +1394,7 @@ class SupabaseTraceabilityRepository implements TraceabilityRepository {
   Future<int> syncPendingTraceabilityQueue({
     String? sppgId,
     String? schoolId,
+    Set<String>? operationTypes,
   }) async {
     final client = _client;
     if (client == null) {
@@ -1209,7 +1405,7 @@ class SupabaseTraceabilityRepository implements TraceabilityRepository {
       client: client,
       kitchenId: sppgId,
       schoolId: schoolId,
-      operationTypes: _traceabilityOperationTypes,
+      operationTypes: operationTypes ?? _traceabilityOperationTypes,
     );
     return result.syncedCount;
   }

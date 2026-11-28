@@ -396,15 +396,34 @@ class SupabaseClusterAlertRepository implements ClusterAlertRepository {
       final result = <ClusterAlertEvent>[];
       for (final row in rawAlerts) {
         final createdAt = DateTime.parse(row['created_at'] as String).toUtc();
-        if (!isSameWibCalendarDay(createdAt, nowUtc)) {
-          continue;
-        }
+        final resolvedAt = DateTime.tryParse(
+          '${row['resolved_at'] ?? ''}',
+        )?.toUtc();
         final alertId = row['id'] as String;
         final reporterId = row['reporter_school_id'] as String?;
         final rowStatus = AlertResolutionStatus.fromDb(
           row['resolution_status'] as String?,
         );
+
         if (rowStatus != AlertResolutionStatus.active) {
+          // Surface recent clarification/KLB confirmation updates (<= 24h)
+          // so schools/couriers that were offline or closed during the Realtime UPDATE
+          // still receive "Distribusi Aman Dilanjutkan" / "Terkonfirmasi KLB" once on reconnect.
+          final resolutionAnchor = resolvedAt ?? createdAt;
+          final within24h =
+              nowUtc.difference(resolutionAnchor) <= const Duration(hours: 24);
+          final relevantToActor =
+              currentSchoolId == null ||
+              reporterId == currentSchoolId ||
+              ackedIds.contains(alertId) ||
+              isSameWibCalendarDay(createdAt, nowUtc);
+          if (within24h && relevantToActor) {
+            result.add(await _enrichAlertRow(client, row));
+          }
+          continue;
+        }
+
+        if (!isSameWibCalendarDay(createdAt, nowUtc)) {
           continue;
         }
         if (currentSchoolId != null &&

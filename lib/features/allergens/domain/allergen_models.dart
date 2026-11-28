@@ -69,6 +69,66 @@ enum AllergenTag {
   static String displayLabelFor(String rawTag) {
     return fromDb(rawTag)?.label ?? rawTag.trim();
   }
+
+  /// Infers likely allergen tags mentioned in a menu name so kitchen staff receive
+  /// a gentle cross-check hint when a dish is substituted or tags were left unchecked.
+  static Set<AllergenTag> inferLikelyTagsFromMenuName(String menuName) {
+    final lower = menuName.trim().toLowerCase();
+    if (lower.isEmpty) {
+      return const <AllergenTag>{};
+    }
+    final tokens = lower
+        .split(RegExp(r'[^a-z0-9]+'))
+        .where((t) => t.isNotEmpty)
+        .toSet();
+    final inferred = <AllergenTag>{};
+
+    bool hasAny(List<String> words) {
+      for (final w in words) {
+        if (tokens.contains(w) || lower.contains(w)) {
+          return true;
+        }
+      }
+      return false;
+    }
+
+    if (hasAny(const ['telur', 'telor', 'omelet', 'dadar', 'ceplok', 'balado telur'])) {
+      inferred.add(AllergenTag.telur);
+    }
+    if (hasAny(const ['susu', 'uht', 'keju', 'yogurt', 'yoghurt', 'mentega', 'krim'])) {
+      inferred.add(AllergenTag.susuLaktosa);
+    }
+    if (hasAny(const [
+      'ikan',
+      'udang',
+      'cumi',
+      'tongkol',
+      'tuna',
+      'lele',
+      'nila',
+      'patin',
+      'bandeng',
+      'kembung',
+      'kakap',
+      'seafood',
+      'kerang',
+    ])) {
+      inferred.add(AllergenTag.ikanSeafood);
+    }
+    if (hasAny(const ['kacang', 'pecel', 'gado', 'satay', 'sate'])) {
+      inferred.add(AllergenTag.kacang);
+    }
+    if (hasAny(const ['tahu', 'tempe', 'kedelai', 'kecap', 'orek', 'bacem'])) {
+      inferred.add(AllergenTag.kedelai);
+    }
+    if (hasAny(const ['roti', 'gandum', 'terigu', 'pasta', 'makaroni', 'spageti']) ||
+        tokens.contains('mie') ||
+        tokens.contains('mi')) {
+      inferred.add(AllergenTag.gluten);
+    }
+
+    return inferred;
+  }
 }
 
 enum AllergenSeverity {

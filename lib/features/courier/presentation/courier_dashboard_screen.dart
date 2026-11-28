@@ -108,15 +108,28 @@ class _CourierDashboardScreenState
     final maxWidth = AppSpacing.maxContentWidth(width);
 
     if (kitchen == null) {
-      return const Scaffold(
+      return Scaffold(
         backgroundColor: AppColors.bgCanvas,
         body: SafeArea(
           child: Padding(
-            padding: EdgeInsets.all(AppSpacing.lg),
-            child: LacakErrorState(
-              title: 'SPPG Mitra Belum Terhubung',
-              message:
-                  'Akun kurir Anda belum ditautkan ke Dapur SPPG aktif. Hubungi Admin Dapur SPPG.',
+            padding: const EdgeInsets.all(AppSpacing.lg),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const LacakErrorState(
+                  title: 'Akses Kurir SPPG Belum Aktif',
+                  message:
+                      'Akun kurir Anda belum ditautkan atau sedang dinonaktifkan oleh Admin Dapur SPPG. Hubungi Admin SPPG untuk mengaktifkan kembali akses pengiriman.',
+                ),
+                const SizedBox(height: AppSpacing.lg),
+                LacakSecondaryButton(
+                  label: 'Keluar Akun',
+                  icon: Icons.logout_rounded,
+                  onPressed: () =>
+                      ref.read(authControllerProvider.notifier).signOut(),
+                ),
+              ],
             ),
           ),
         ),
